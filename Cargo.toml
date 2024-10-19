@@ -1,0 +1,11 @@
+[workspace]
+members = ["runtime", "vm"]
+exclude = []
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+repository = "https://github.com/datagogo/webginx"
+license = "Apache-2.0"
+
+[workspace.dependencies]

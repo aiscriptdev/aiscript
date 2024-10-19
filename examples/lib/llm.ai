@@ -1,0 +1,45 @@
+post /chat {
+
+    @json
+    body {
+        message: str
+    }
+
+    let e = embed message
+    
+    let responses = parallel {
+        @anthropic("sonnet-3.5")
+        @anthropic("claude-2")
+        prompt {
+            You are a helpful assistant. The user is :message.
+            Answer the user's question.
+            Answer:
+            @{result}
+        }
+
+        @openai
+        prompt {
+            You are a helpful assistant. The user is :message.
+            Answer the user's question.
+            Answer:
+            @{result}
+        }
+    }
+
+    if result == "ok" {
+        prompt {
+            The user is :message.
+            Answer the user's question.
+            Answer:
+            {info}
+        }
+    } else {
+        prompt {
+            The user is :message.
+            Answer the user's question.
+            Answer:
+            {info}
+        }
+    }
+
+}

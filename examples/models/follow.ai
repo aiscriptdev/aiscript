@@ -1,0 +1,27 @@
+@table(name="assoc_follow")
+model Follow {
+    @primary
+    id: int
+    user_id: int
+    follower_id: int
+    created_at: datetime
+}
+
+with Follow {
+    auto fn get_by_user_id(user_id: int) -> [Follow]
+
+    auto fn get_by_follower_id(follower_id: int) -> [Follow]
+
+    fn create(user_id: int, follower_id: int) -> Follow {
+        return sql {
+            INSERT INTO follow (user_id, follower_id) 
+            VALUES (:user_id, :follower_id) RETURNING *
+        }
+    }
+
+    fn delete(user_id: int, follower_id: int) {
+        return sql {
+            DELETE FROM follow WHERE user_id = :user_id AND follower_id = :follower_id
+        }
+    }
+}

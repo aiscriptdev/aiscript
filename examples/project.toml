@@ -1,0 +1,50 @@
+[project]
+name = "example"
+description = "An twitter clone"
+version = "0.1.0"
+authors = ["Folyd"]
+
+[apidoc]
+enabled = true
+type = "swagger"
+path = "/docs"
+
+[network]
+host = "0.0.0.0"
+port = 8000
+
+[database.postgresql]
+host = "localhost"
+port = 5432
+user = "postgres"
+password = "postgres"
+database = "example"
+
+[database.redis]
+host = "localhost"
+port = 6379
+password = "redis"
+
+[cors]
+allowed_origins = ["http://localhost:3000"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE"]
+allowed_headers = ["Content-Type", "Authorization"]
+allow_credentials = true
+max_age = 600
+
+[security]
+jwt_secret = "secret"
+jwt_expiration = 3600
+allow_host = "http://localhost:3000"
+
+[logging]
+level = "info"
+format = "json"
+
+[mertrics]
+enabled = true
+host = "localhost"
+port = 9090
+path = "/metrics"
+
+[tracing]

@@ -1,0 +1,43 @@
+get /<tweet_id: int> -> schema.Tweet {
+    let tweet = model.Tweet.get_by_id(:tweet_id)?
+    if not tweet {
+        return "Tweet not found", 404
+    }
+    return tweet
+}
+
+post / {
+    @json
+    body {
+        @length(min=1, max=255)
+        content: str
+    }
+
+    let tweet = model.Tweet.create(user_id, content)?
+    return tweet, 201
+}
+
+put /<tweet_id: int> {
+    @json
+    body {
+        @length(min=1, max=255)
+        content: str
+    }
+
+    let tweet = model.Tweet.get_by_id(tweet_id)?
+    if not tweet {
+        return 404, "Tweet not found"
+    }
+    model.Tweet.update(tweet_id, content)?
+    return "ok"
+}
+
+delete /<tweet_id: int> {
+    let tweet = model.Tweet.get_by_id(tweet_id)
+    if not tweet {
+        return "Tweet not found", 404
+    }
+    
+    model.Tweet.delete_by_id(tweet_id)?
+    return "ok"
+}

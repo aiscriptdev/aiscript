@@ -1,0 +1,20 @@
+[package]
+name = "aiscript-vm"
+version = "0.1.0"
+
+[dependencies]
+ahash = "0.8.11"
+gc-arena = { version = "0.5.3" }
+num_enum = "0.7.3"
+
+[features]
+# Enable debug features.
+debug = []
+
+[dev-dependencies]
+regex = "1.11"
+test-generator = "0.3"
+
+# RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.lox
+[profile.release]
+debug = true
