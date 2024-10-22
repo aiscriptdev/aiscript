@@ -1,9 +1,32 @@
 
 **aim** (AiScript Manager) is a command-line tool for AiScript. Similar [cargo](https://github.com/rust-lang/cargo) for Rust. It provides a set of commands to help you build web applications quickly.
 
+## ai
+
+`aim ai` is a command to generate AI apps built in AiScript from a prompt.
+
+```
+$ cat prompts.txt
+Please write a chatbot apps that can answer questions about the
+following topics:
+- history
+- geography
+
+$ aim ai prompts.txt
+
+```
+
 ## compile
 
 ## console
+
+## deploy
+
+Deploy the AiScript project to the aiscript.dev server.
+
+```
+$ aim deploy
+```
 
 ## debug
 

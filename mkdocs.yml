@@ -44,11 +44,12 @@ nav:
     - Directives: references/directives.md
     - Configuration:
       - General: references/configuration/general.md
+      - AI: references/configuration/ai.md
       - Database: references/configuration/database.md
       - Middleware: references/configuration/middleware.md
       - Security: references/configuration/security.md
       - Obersevability: references/configuration/observability.md
-    - aim reference: references/aim.md
+    - aim command reference: references/aim.md
 
 theme:
   name: material

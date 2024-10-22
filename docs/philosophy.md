@@ -1,5 +1,5 @@
 
-## Web development first
+## AI apps development first
 
 ## Keep it simple as possible
 

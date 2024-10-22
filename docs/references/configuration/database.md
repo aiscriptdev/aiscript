@@ -1,5 +1,14 @@
-
 ```toml
+[database.pinecone]
+api_key = "YOUR_API_KEY"
+environment = "YOUR_ENVIRONMENT"
+index = "YOUR_INDEX"
+
+[database.qdrant]
+api_key = "YOUR_API_KEY"
+environment = "YOUR_ENVIRONMENT"
+index = "YOUR_INDEX"
+
 [database.sqlite]
 path = "example.db"
 
@@ -17,25 +26,36 @@ user = "mysql"
 password = "mysql"
 database = "example"
 
-[database.redis]
-host = "localhost"
-port = 6379
-password = "redis"
-
 [database.mongodb]
 host = "localhost"
 port = 27017
 user = "mongodb"
 password = "mongodb"
 
+[database.redis]
+host = "localhost"
+port = 6379
+password = "redis"
 ```
 
-## SQLite
+## Vector Database
 
-## PostgreSQL
+### Pinecone
 
-## MySQL
+### Qdrant
 
-## Redis
+## Rational Database
+
+### SQLite
+
+### PostgreSQL
+
+### MySQL
+
+## NoSQL Database
 
 ## MongoDB
+
+## Cache Database
+
+### Redis

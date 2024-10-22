@@ -1,10 +1,41 @@
 ## AI
 
+### ai
+
+Use `ai` keword to define an AI function and call AI functions.
+
+```rs
+ai fn sentiment(text: str) -> float {
+    prompt { 
+        "Analyze the sentiment of the following text: {text}" 
+    }
+}
+
+let value = ai sentiment("I love AiScript")
+print(value) # 0.9
+```
+
 ### prompt
 
 ### embedding
 
 ### agent
+
+```rs
+agent Researcher {
+
+    prompt {
+
+    }
+
+    tool {
+        GoogleSearch {
+        }
+    }
+
+
+}
+```
 
 ### task
 
@@ -32,6 +63,10 @@ for i in 1..10 {
     print(i)
 }
 ```
+
+### catch
+
+`catch` is used to handle errors.
 
 ### const
 
@@ -243,15 +278,15 @@ fn div(a: int, b: int) -> int, !DivByZero {
 }
 
 # handle error
-let e = try div(10, 0) -> err {
+let e = try div(10, 0) catch err {
     raise err
 }
 
-# syntax sugar to try method() -> err
+# syntax sugar to try method() catch err
 let e = div(10, 0)?
 
 # handle error late
-let r = try div(10, 0) -> err
+let r = try div(10, 0) catch err
 match err {
     !DivByZero => print("DivByZero"),
     !UnknownError => print("UnknownError"),

@@ -1,4 +1,10 @@
 ```toml
+[observability.llm]
+prompt_log = true
+response_log = true
+token_cost = true
+
+
 [observability.logging]
 level = "info"
 format = "json"
@@ -12,6 +18,8 @@ path = "/metrics"
 [observability.tracing]
 
 ```
+
+## LLM
 
 ## Logging
 

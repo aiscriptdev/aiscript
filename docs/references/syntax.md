@@ -360,15 +360,15 @@ fn div(a: int, b: int) -> int, !DivByZero {
 }
 
 # handle error
-let e = try div(10, 0) -> err {
+let e = try div(10, 0) catch err {
     raise err
 }
 
-# syntax sugar to try method() -> err
+# syntax sugar to avoid try catch and raise
 let e = div(10, 0)?
 
 # handle error late
-let r = try div(10, 0) -> err
+let r = try div(10, 0) catch err
 match err {
     !DivByZero => print("DivByZero"),
     _ => print("UnknownError"),
