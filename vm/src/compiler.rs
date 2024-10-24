@@ -2,12 +2,12 @@ use core::panic;
 use std::{array, mem, ops::Add};
 
 use crate::{
-    object::{Function, FunctionType},
+    object::{Function, FunctionType, Upvalue},
     scanner::{Scanner, Token, TokenType},
-    vm::VmError,
+    vm::{Context, VmError},
     OpCode, Value,
 };
-use gc_arena::{Gc, Mutation};
+use gc_arena::Gc;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 const MAX_LOCAL_SIZE: usize = u8::MAX as usize + 1;
@@ -16,7 +16,7 @@ const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
 type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/);
 
 struct Parser<'gc> {
-    mutation: &'gc Mutation<'gc>,
+    ctx: Context<'gc>,
     compiler: Box<Compiler<'gc>>,
     class_compiler: Option<Box<ClassCompiler>>,
     scanner: Scanner<'gc>,
@@ -66,14 +66,6 @@ struct Local<'a> {
     is_captured: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct Upvalue {
-    index: usize,
-    // that flag controls whether the closure captures a local
-    // variable or an upvalue from the surrounding function.
-    is_local: bool,
-}
-
 struct Compiler<'gc> {
     enclosing: Option<Box<Compiler<'gc>>>,
     function: Function<'gc>,
@@ -81,7 +73,6 @@ struct Compiler<'gc> {
     locals: [Local<'gc>; MAX_LOCAL_SIZE],
     local_count: usize,
     scope_depth: isize,
-    upvalues: [Upvalue; MAX_LOCAL_SIZE],
 }
 
 #[derive(Default)]
@@ -91,11 +82,11 @@ struct ClassCompiler {
 }
 
 impl<'gc> Parser<'gc> {
-    fn new(mutation: &'gc Mutation<'gc>, source: &'gc str) -> Self {
+    fn new(ctx: Context<'gc>, source: &'static str) -> Self {
         Parser {
+            ctx,
             // Let the default top level <script> function name to empty.
-            mutation,
-            compiler: Compiler::new(mutation, FunctionType::Script, ""),
+            compiler: Compiler::new(ctx, FunctionType::Script, ""),
             class_compiler: None,
             scanner: Scanner::new(source),
             current: Token::default(),
@@ -114,18 +105,18 @@ impl<'gc> Parser<'gc> {
         constant
     }
 
-    fn emit_byte<T: Into<u8>>(&mut self, byte: T) {
+    fn emit_byte(&mut self, byte: OpCode) {
         self.compiler.function.write_byte(byte, self.previous.line);
     }
 
-    fn emit_bytes<T1: Into<u8>, T2: Into<u8>>(&mut self, byte1: T1, byte2: T2) {
-        self.compiler.function.write_byte(byte1, self.previous.line);
-        self.compiler.function.write_byte(byte2, self.previous.line);
+    fn emit_bytes(&mut self, op1: OpCode, op2: OpCode) {
+        self.compiler.function.write_byte(op1, self.previous.line);
+        self.compiler.function.write_byte(op2, self.previous.line);
     }
 
     fn emit_return(&mut self) {
         if self.compiler.fn_type == FunctionType::Initializer {
-            self.emit_bytes(OpCode::GetLocal, 0);
+            self.emit_byte(OpCode::GetLocal(0));
         } else {
             self.emit_byte(OpCode::Nil);
         }
@@ -134,40 +125,30 @@ impl<'gc> Parser<'gc> {
 
     fn emit_constant(&mut self, value: Value<'gc>) {
         let constant = self.make_constant(value);
-        self.emit_bytes(OpCode::Constant, constant as u8);
+        self.emit_byte(OpCode::Constant(constant as u8));
     }
 
     fn emit_jump(&mut self, instruction: OpCode) -> usize {
         self.emit_byte(instruction);
-        self.emit_byte(0xff);
-        self.emit_byte(0xff);
-        self.compiler.function.code_size() - 2
+        self.compiler.function.code_size()
     }
 
     fn patch_jump(&mut self, offset: usize) {
-        let jump = self.compiler.function.code_size() - offset - 2;
+        let jump = self.compiler.function.code_size() - offset;
         if jump > u16::MAX as usize {
             self.error("Too much code to jump over.");
         }
 
-        // self.compiler.function[offset] = ((jump >> 8) & 0xff) as u8;
-        // self.compiler.function[offset + 1] = (jump & 0xff) as u8;
-        let [a, b] = (jump as u16).to_be_bytes();
-        self.compiler.function[offset] = a;
-        self.compiler.function[offset + 1] = b;
+        self.compiler.function[offset - 1].putch_jump(jump as u16);
     }
 
     fn emit_loop(&mut self, loop_start: usize) {
-        self.emit_byte(OpCode::Loop);
-
-        let jump = self.compiler.function.code_size() - loop_start + 2;
+        // plus 1 to skip the OpCode::Loop itself
+        let jump = self.compiler.function.code_size() - loop_start + 1;
         if jump > u16::MAX as usize {
             self.error("Loop body too large.");
         }
-
-        let [a, b] = (jump as u16).to_be_bytes();
-        self.emit_byte(a);
-        self.emit_byte(b);
+        self.emit_byte(OpCode::Loop(jump as u16));
     }
 }
 
@@ -239,7 +220,8 @@ impl<'gc> Parser<'gc> {
     }
 
     fn identifier_constant(&mut self, identifier: &str) -> usize {
-        self.make_constant(Value::from(Gc::new(self.mutation, identifier.to_owned())))
+        let s = self.ctx.intern(identifier.as_bytes());
+        self.make_constant(Value::from(s))
     }
 
     fn add_local(&mut self, name: Token<'gc>) {
@@ -286,7 +268,7 @@ impl<'gc> Parser<'gc> {
             self.mark_initialized();
             return;
         }
-        self.emit_bytes(OpCode::DefineGlobal, global as u8);
+        self.emit_byte(OpCode::DefineGlobal(global as u8));
     }
 
     fn statement(&mut self) {
@@ -332,10 +314,10 @@ impl<'gc> Parser<'gc> {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
-        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
         self.emit_byte(OpCode::Pop);
         self.statement();
-        let else_jump = self.emit_jump(OpCode::Jump);
+        let else_jump = self.emit_jump(OpCode::Jump(0));
         self.patch_jump(then_jump);
         self.emit_byte(OpCode::Pop);
 
@@ -351,7 +333,7 @@ impl<'gc> Parser<'gc> {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
-        let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse(0));
         self.emit_byte(OpCode::Pop);
         self.statement();
         self.emit_loop(loop_start);
@@ -378,12 +360,12 @@ impl<'gc> Parser<'gc> {
             self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
             // Jump out of the loop if the condition is false.
-            exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse));
+            exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse(0)));
             self.emit_byte(OpCode::Pop);
         }
 
         if !self._match(TokenType::RightParen) {
-            let body_jump = self.emit_jump(OpCode::Jump);
+            let body_jump = self.emit_jump(OpCode::Jump(0));
             let increment_start = self.compiler.function.code_size();
             self.expression();
             self.emit_byte(OpCode::Pop);
@@ -412,7 +394,7 @@ impl<'gc> Parser<'gc> {
         let name_constant = self.identifier_constant(class_name);
         self.declare_varible();
 
-        self.emit_bytes(OpCode::Class, name_constant as u8);
+        self.emit_byte(OpCode::Class(name_constant as u8));
         self.define_variable(name_constant);
 
         let class_compiler = ClassCompiler {
@@ -470,7 +452,7 @@ impl<'gc> Parser<'gc> {
             fn_type = FunctionType::Initializer;
         }
         self.function(fn_type);
-        self.emit_bytes(OpCode::Method, name_constant as u8);
+        self.emit_byte(OpCode::Method(name_constant as u8));
     }
 
     fn fun_declaration(&mut self) {
@@ -507,19 +489,8 @@ impl<'gc> Parser<'gc> {
         // Pop the compiler of this compiling function,
         // self.compiler already became set to enclosing compiler
         let compiler = self.pop_compiler();
-        let upvalue_count = compiler.function.upvalue_count;
-        let constant = self.make_constant(Value::from(Gc::new(self.mutation, compiler.function)));
-        self.emit_bytes(OpCode::Closure, constant as u8);
-
-        for i in 0..upvalue_count {
-            // For each upvalue the closure captures, there are two single-byte operands.
-            // Each pair of operands specifies what that upvalue captures.
-            // If the first byte is one, it captures a local variable in the enclosing function.
-            // If zero, it captures one of the function’s upvalues.
-            // The next byte is the local slot or upvalue index to capture.
-            let upvalue = compiler.upvalues[i as usize];
-            self.emit_bytes(upvalue.is_local as u8, upvalue.index as u8);
-        }
+        let constant = self.make_constant(Value::from(Gc::new(&self.ctx, compiler.function)));
+        self.emit_byte(OpCode::Closure(constant as u8));
     }
 
     fn block(&mut self) {
@@ -591,7 +562,6 @@ impl<'gc> Parser<'gc> {
         if self.had_error {
             return Err(VmError::CompileError);
         }
-        // Ok(self.compiler.function)
         Ok(())
     }
 
@@ -603,7 +573,7 @@ impl<'gc> Parser<'gc> {
     fn push_compiler(&mut self, fn_type: FunctionType) {
         // grab the function name from the previous token
         let function_name = self.previous.lexeme;
-        let compiler = Compiler::new(self.mutation, fn_type, function_name);
+        let compiler = Compiler::new(self.ctx, fn_type, function_name);
         let enclosing_compiler = mem::replace(&mut self.compiler, compiler);
         self.compiler.enclosing = Some(enclosing_compiler);
     }
@@ -687,13 +657,12 @@ impl<'gc> Parser<'gc> {
 
         if can_assign && self._match(TokenType::Equal) {
             self.expression();
-            self.emit_bytes(OpCode::SetProperty, name_constant);
+            self.emit_byte(OpCode::SetProperty(name_constant));
         } else if self._match(TokenType::LeftParen) {
             let arg_count = self.argument_list();
-            self.emit_bytes(OpCode::Invoke, name_constant);
-            self.emit_byte(arg_count);
+            self.emit_byte(OpCode::Invoke(name_constant, arg_count));
         } else {
-            self.emit_bytes(OpCode::GetProperty, name_constant);
+            self.emit_byte(OpCode::GetProperty(name_constant));
         }
     }
 
@@ -708,7 +677,7 @@ impl<'gc> Parser<'gc> {
 
     fn string(&mut self, _can_assign: bool) {
         let string = self.previous.lexeme.trim_matches('"');
-        self.emit_constant(Gc::new(self.mutation, string.to_owned()).into());
+        self.emit_constant(Value::from(self.ctx.intern(string.as_bytes())));
     }
 
     fn number(&mut self, _can_assign: bool) {
@@ -752,7 +721,7 @@ impl<'gc> Parser<'gc> {
 
     fn call(&mut self, _can_assign: bool) {
         let arg_count = self.argument_list();
-        self.emit_bytes(OpCode::Call, arg_count);
+        self.emit_byte(OpCode::Call(arg_count));
     }
 
     fn argument_list(&mut self) -> u8 {
@@ -791,11 +760,10 @@ impl<'gc> Parser<'gc> {
         if self._match(TokenType::LeftParen) {
             let arg_count = self.argument_list();
             self.named_variable("super", false);
-            self.emit_bytes(OpCode::SuperInvoke, method_name as u8);
-            self.emit_byte(arg_count);
+            self.emit_byte(OpCode::SuperInvoke(method_name as u8, arg_count));
         } else {
             self.named_variable("super", false);
-            self.emit_bytes(OpCode::GetSuper, method_name as u8);
+            self.emit_byte(OpCode::GetSuper(method_name as u8));
         }
     }
 
@@ -814,12 +782,12 @@ impl<'gc> Parser<'gc> {
     }
 
     fn named_variable(&mut self, name: &str, can_assign: bool) {
-        let (pos, get_op, set_op) = if let Some((pos, depth)) = self.compiler.resolve_local(name) {
+        let (get_op, set_op) = if let Some((pos, depth)) = self.compiler.resolve_local(name) {
             if depth == UNINITIALIZED_LOCAL_DEPTH {
                 self.error("Can't read local variable in its own initializer.");
                 return;
             }
-            (pos, OpCode::GetLocal, OpCode::SetLocal)
+            (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
         } else if let Some((pos, _)) = self
             .compiler
             .resolve_upvalue(name)
@@ -827,32 +795,32 @@ impl<'gc> Parser<'gc> {
             .ok()
             .flatten()
         {
-            (pos, OpCode::GetUpvalue, OpCode::SetUpvalue)
+            (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
         } else {
-            let pos = self.identifier_constant(name);
-            (pos, OpCode::GetGlobal, OpCode::SetGlobal)
+            let pos = self.identifier_constant(name) as u8;
+            (OpCode::GetGlobal(pos), OpCode::SetGlobal(pos))
         };
 
         if can_assign && self._match(TokenType::Equal) {
             // println!("{name} {pos}, {:?}", set_op);
             self.expression();
-            self.emit_bytes(set_op, pos as u8);
+            self.emit_byte(set_op);
         } else {
             // println!("{name} {pos}, {:?}", get_op);
-            self.emit_bytes(get_op, pos as u8);
+            self.emit_byte(get_op);
         }
     }
 
     fn and(&mut self, _can_assign: bool) {
-        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse(0));
         self.emit_byte(OpCode::Pop);
         self.parse_precedence(Precedence::And);
         self.patch_jump(end_jump);
     }
 
     fn or(&mut self, _can_assign: bool) {
-        let else_jump = self.emit_jump(OpCode::JumpIfFalse);
-        let end_jump = self.emit_jump(OpCode::Jump);
+        let else_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+        let end_jump = self.emit_jump(OpCode::Jump(0));
 
         self.patch_jump(else_jump);
         self.emit_byte(OpCode::Pop);
@@ -888,10 +856,10 @@ impl<'gc> Parser<'gc> {
 }
 
 impl<'gc> Compiler<'gc> {
-    pub fn new(mc: &'gc Mutation<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
+    pub fn new(ctx: Context<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
         Box::new(Compiler {
             enclosing: None,
-            function: Function::new(mc, name, 0),
+            function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: array::from_fn(|i| {
                 // Remember that the compiler’s locals array keeps track of which stack slots
@@ -922,19 +890,18 @@ impl<'gc> Compiler<'gc> {
             // because we reserve slot zero for VM use.
             local_count: 1,
             scope_depth: 0,
-            upvalues: [Upvalue::default(); MAX_LOCAL_SIZE],
         })
     }
 
     // Resolve a local variable by name, return its index and depth.
-    fn resolve_local(&mut self, name: &str) -> Option<(usize, isize)> {
+    fn resolve_local(&mut self, name: &str) -> Option<(u8, isize)> {
         (0..self.local_count)
             .rev()
             .find(|&i| self.locals[i].name.lexeme == name)
-            .map(|i| (i, self.locals[i].depth))
+            .map(|i| (i as u8, self.locals[i].depth))
     }
 
-    fn resolve_upvalue(&mut self, name: &str) -> Result<Option<(usize, isize)>, &'static str> {
+    fn resolve_upvalue(&mut self, name: &str) -> Result<Option<(u8, isize)>, &'static str> {
         if let Some((index, depth)) = self
             .enclosing
             .as_mut()
@@ -943,51 +910,50 @@ impl<'gc> Compiler<'gc> {
             if let Some(enclosing) = self.enclosing.as_mut() {
                 // When resolving an identifier, if we end up creating an upvalue for
                 // a local variable, we mark it as captured.
-                enclosing.locals[index].is_captured = true;
+                enclosing.locals[index as usize].is_captured = true;
             }
-            let index = self.add_upvalue(index, true)?;
+            let index = self.add_upvalue(index as usize, true)?;
             // println!(
             //     "resolve_upvalue: {} {name} {index}, local",
             //     self.function.name
             // );
-            return Ok(Some((index, depth)));
+            return Ok(Some((index as u8, depth)));
         } else if let Some((index, depth)) = self
             .enclosing
             .as_mut()
             .and_then(|enclosing| enclosing.resolve_upvalue(name).ok())
             .flatten()
         {
-            let index = self.add_upvalue(index, false)?;
+            let index = self.add_upvalue(index as usize, false)?;
             // println!(
             //     "resolve_upvalue: {} {name} {index}, upvalue",
             //     self.function.name
             // );
-            return Ok(Some((index, depth)));
+            return Ok(Some((index as u8, depth)));
         }
 
         Ok(None)
     }
 
     fn add_upvalue(&mut self, index: usize, is_local: bool) -> Result<usize, &'static str> {
-        let upvalue_index = self.function.upvalue_count as usize;
+        let upvalue_index = self.function.upvalues.len();
 
         // before we add a new upvalue, we first check to see if the function
         // already has an upvalue that closes over that variable.
         if let Some(i) = self
+            .function
             .upvalues
             .iter()
-            .take(upvalue_index)
             .position(|u| u.index == index && u.is_local == is_local)
         {
             return Ok(i);
         }
 
-        if upvalue_index == MAX_LOCAL_SIZE {
+        if self.function.upvalues.len() == MAX_LOCAL_SIZE {
             return Err("Too many closure variables in function.");
         }
 
-        self.upvalues[upvalue_index] = Upvalue { index, is_local };
-        self.function.upvalue_count += 1;
+        self.function.upvalues.push(Upvalue { index, is_local });
         // println!("add upvalue to {upvalue_index} of {:?}", Upvalue { index, is_local });
         Ok(upvalue_index)
     }
@@ -1042,11 +1008,8 @@ impl<'gc> ParseRule<'gc> {
     }
 }
 
-pub fn compile<'gc>(
-    mutation: &'gc Mutation<'gc>,
-    source: &'gc str,
-) -> Result<Function<'gc>, VmError> {
-    let mut parser = Parser::new(mutation, source);
+pub fn compile<'gc>(ctx: Context<'gc>, source: &'static str) -> Result<Function<'gc>, VmError> {
+    let mut parser = Parser::new(ctx, source);
     parser.compile()?;
     Ok(parser.compiler.function)
 }

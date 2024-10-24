@@ -4,6 +4,8 @@ mod compiler;
 mod fuel;
 mod object;
 mod scanner;
+mod string;
+mod string_utils;
 mod value;
 mod vm;
 

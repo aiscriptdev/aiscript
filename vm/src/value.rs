@@ -4,6 +4,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
+    string::InternedString,
     vm::VmError,
 };
 
@@ -11,8 +12,7 @@ use crate::{
 pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
-    String(Gc<'gc, String>),
-    // String(Gc<'gc, Ustr>),
+    String(InternedString<'gc>),
     Function(Gc<'gc, Function<'gc>>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
@@ -69,11 +69,12 @@ impl<'gc> Display for Value<'gc> {
 }
 
 impl<'gc> Value<'gc> {
+    #[inline]
     pub fn equals(&self, other: &Value<'gc>) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
-            (Value::String(a), Value::String(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a.equals(b),
             (Value::Nil, Value::Nil) => true,
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
@@ -102,7 +103,7 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_string(self) -> Result<Gc<'gc, String>, VmError> {
+    pub fn as_string(self) -> Result<InternedString<'gc>, VmError> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err(VmError::RuntimeError("cannot convert to string.".into())),
@@ -205,23 +206,11 @@ impl<'gc> From<bool> for Value<'gc> {
     }
 }
 
-// impl<'gc> From<Gc<'gc, Ustr>> for Value<'gc> {
-//     fn from(value: Gc<'gc, Ustr>) -> Self {
-//         Value::String(value)
-//     }
-// }
-
-impl<'gc> From<Gc<'gc, String>> for Value<'gc> {
-    fn from(value: Gc<'gc, String>) -> Self {
+impl<'gc> From<InternedString<'gc>> for Value<'gc> {
+    fn from(value: InternedString<'gc>) -> Self {
         Value::String(value)
     }
 }
-
-// impl<'gc> From<&str> for Value<'gc> {
-//     fn from(value: &str) -> Self {
-//         Value::String(intern_str(value))
-//     }
-// }
 
 impl<'gc> From<Gc<'gc, Function<'gc>>> for Value<'gc> {
     fn from(value: Gc<'gc, Function<'gc>>) -> Self {

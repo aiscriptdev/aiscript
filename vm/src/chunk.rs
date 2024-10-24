@@ -1,17 +1,17 @@
 use std::{
+    fmt::Display,
     ops::{Index, IndexMut},
     sync::Once,
 };
 
 use gc_arena::Collect;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::Value;
+use crate::{object::Upvalue, Value};
 
-#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive)]
-#[repr(u8)]
+#[derive(Copy, Clone, Debug, Collect)]
+#[collect(no_drop)]
 pub enum OpCode {
-    Constant,
+    Constant(u8),
     Return,
     Add,
     Subtract,
@@ -27,34 +27,51 @@ pub enum OpCode {
     Less,
     Print,
     Pop,
-    DefineGlobal,
-    GetGlobal,
-    SetGlobal,
-    GetLocal,
-    SetLocal,
-    JumpIfFalse,
-    Jump,
-    Loop,
-    Call,
-    Closure,
-    GetUpvalue,
-    SetUpvalue,
+    DefineGlobal(u8),
+    GetGlobal(u8),
+    SetGlobal(u8),
+    GetLocal(u8),
+    SetLocal(u8),
+    JumpIfFalse(u16),
+    Jump(u16),
+    Loop(u16),
+    Call(u8),
+    Closure(u8),
+    GetUpvalue(u8),
+    SetUpvalue(u8),
     CloseUpvalue,
-    Class,
-    SetProperty,
-    GetProperty,
-    Method,
-    Invoke,
+    Class(u8),
+    SetProperty(u8),
+    GetProperty(u8),
+    Method(u8),
+    Invoke(u8, u8),
     Inherit,
-    GetSuper,
-    SuperInvoke,
+    GetSuper(u8),
+    SuperInvoke(u8, u8),
     Unknown,
+}
+
+impl OpCode {
+    pub fn putch_jump(&mut self, jump: u16) {
+        match self {
+            OpCode::JumpIfFalse(j) => {
+                *j = jump;
+            }
+            OpCode::Jump(j) => {
+                *j = jump;
+            }
+            OpCode::Loop(j) => {
+                *j = jump;
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Clone, Debug, Collect)]
 #[collect[no_drop]]
 pub struct Chunk<'gc> {
-    code: Vec<u8>,
+    code: Vec<OpCode>,
     constans: Vec<Value<'gc>>,
     lines: Vec<u32>,
 }
@@ -66,15 +83,17 @@ impl<'gc> Default for Chunk<'gc> {
 }
 
 impl<'gc> Index<usize> for Chunk<'gc> {
-    type Output = u8;
+    type Output = OpCode;
     fn index(&self, index: usize) -> &Self::Output {
-        &self.code[index]
+        // &self.code[index]
+        unsafe { self.code.get_unchecked(index) }
     }
 }
 
 impl<'gc> IndexMut<usize> for Chunk<'gc> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.code[index]
+        // &mut self.code[index]
+        unsafe { self.code.get_unchecked_mut(index) }
     }
 }
 
@@ -99,8 +118,8 @@ impl<'gc> Chunk<'gc> {
         self.write_byte(code, line);
     }
 
-    pub fn write_byte<T: Into<u8>>(&mut self, byte: T, line: u32) {
-        self.code.push(byte.into());
+    pub fn write_byte(&mut self, byte: OpCode, line: u32) {
+        self.code.push(byte);
         self.lines.push(line);
     }
 
@@ -111,11 +130,13 @@ impl<'gc> Chunk<'gc> {
         self.constans.len() - 1
     }
 
+    #[inline]
     pub fn read_constant(&self, byte: u8) -> Value<'gc> {
-        self.constans[byte as usize]
+        // self.constans[byte as usize]
+        unsafe { *self.constans.get_unchecked(byte as usize) }
     }
 
-    pub fn disassemble(&self, name: &str) {
+    pub fn disassemble(&self, name: impl Display) {
         println!("\n== {name} ==>");
         let mut offset = 0;
         while offset < self.code.len() {
@@ -138,47 +159,46 @@ impl<'gc> Chunk<'gc> {
         }
 
         if let Some(code) = self.code.get(offset) {
-            match OpCode::try_from(*code).unwrap_or(OpCode::Unknown) {
-                OpCode::Return => return simple_instruction("RETURN", offset),
-                OpCode::Constant => return self.constant_instruction("CONSTANT", offset),
-                OpCode::Add => return simple_instruction("ADD", offset),
-                OpCode::Subtract => return simple_instruction("SUBTRACT", offset),
-                OpCode::Multiply => return simple_instruction("MULTIPLY", offset),
-                OpCode::Divide => return simple_instruction("DIVIDE", offset),
-                OpCode::Negate => return simple_instruction("NEGATE", offset),
-                OpCode::Nil => return simple_instruction("NIL", offset),
-                OpCode::True => return simple_instruction("TRUE", offset),
-                OpCode::False => return simple_instruction("FALSE", offset),
-                OpCode::Not => return simple_instruction("NOT", offset),
-                OpCode::Equal => return simple_instruction("EQUAL", offset),
-                OpCode::Greater => return simple_instruction("GREATER", offset),
-                OpCode::Less => return simple_instruction("LESS", offset),
-                OpCode::Print => return simple_instruction("PRINT", offset),
-                OpCode::Pop => return simple_instruction("POP", offset),
-                OpCode::DefineGlobal => return self.constant_instruction("DEFINE_GLOBAL", offset),
-                OpCode::GetGlobal => return self.constant_instruction("GET_GLOBAL", offset),
-                OpCode::SetGlobal => return self.constant_instruction("SET_GLOBAL", offset),
-                OpCode::GetLocal => return self.byte_instruction("GET_LOCAL", offset),
-                OpCode::SetLocal => return self.byte_instruction("SET_LOCAL", offset),
-                OpCode::JumpIfFalse => return self.jump_instruction("JUMP_IF_FALSE", 1, offset),
-                OpCode::Jump => return self.jump_instruction("JUMP", 1, offset),
-                OpCode::Loop => return self.jump_instruction("LOOP", -1, offset),
-                OpCode::Call => return self.byte_instruction("CALL", offset),
-                OpCode::Closure => {
-                    let mut offset = offset + 1;
-                    let constant = self.code[offset] as usize;
-                    offset += 1;
+            match *code {
+                OpCode::Return => simple_instruction("RETURN"),
+                OpCode::Constant(c) => self.constant_instruction("CONSTANT", c),
+                OpCode::Add => simple_instruction("ADD"),
+                OpCode::Subtract => simple_instruction("SUBTRACT"),
+                OpCode::Multiply => simple_instruction("MULTIPLY"),
+                OpCode::Divide => simple_instruction("DIVIDE"),
+                OpCode::Negate => simple_instruction("NEGATE"),
+                OpCode::Nil => simple_instruction("NIL"),
+                OpCode::True => simple_instruction("TRUE"),
+                OpCode::False => simple_instruction("FALSE"),
+                OpCode::Not => simple_instruction("NOT"),
+                OpCode::Equal => simple_instruction("EQUAL"),
+                OpCode::Greater => simple_instruction("GREATER"),
+                OpCode::Less => simple_instruction("LESS"),
+                OpCode::Print => simple_instruction("PRINT"),
+                OpCode::Pop => simple_instruction("POP"),
+                OpCode::DefineGlobal(c) => self.constant_instruction("DEFINE_GLOBAL", c),
+                OpCode::GetGlobal(c) => self.constant_instruction("GET_GLOBAL", c),
+                OpCode::SetGlobal(c) => self.constant_instruction("SET_GLOBAL", c),
+                OpCode::GetLocal(byte) => self.byte_instruction("GET_LOCAL", byte),
+                OpCode::SetLocal(c) => self.byte_instruction("SET_LOCAL", c),
+                OpCode::JumpIfFalse(jump) => {
+                    self.jump_instruction("JUMP_IF_FALSE", 1, offset, jump)
+                }
+                OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
+                OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
+                OpCode::Call(arity) => self.byte_instruction("CALL", arity),
+                OpCode::Closure(c) => {
+                    // let mut offset = offset + 1;
+                    // let constant = self.code[offset] as usize;
+                    // offset += 1;
                     println!(
                         "{:-16} {:4} '{}'",
-                        "OP_CLOSURE", constant, self.constans[constant]
+                        "OP_CLOSURE", c, self.constans[c as usize]
                     );
 
-                    let function = self.constans[constant].as_function().unwrap();
-                    (0..function.upvalue_count as usize).for_each(|_| {
-                        let is_local = self.code[offset] == 1;
-                        offset += 1;
-                        let index = self.code[offset];
-                        offset += 1;
+                    let function = self.constans[c as usize].as_function().unwrap();
+                    function.upvalues.iter().for_each(|upvalue| {
+                        let Upvalue { index, is_local } = *upvalue;
                         println!(
                             "{:04}    | {:-22} {:4} {}",
                             offset - 2,
@@ -187,19 +207,20 @@ impl<'gc> Chunk<'gc> {
                             index,
                         );
                     });
-                    return offset;
                 }
-                OpCode::GetUpvalue => return self.byte_instruction("GET_UPVALUE", offset),
-                OpCode::SetUpvalue => return self.byte_instruction("SET_UPVALUE", offset),
-                OpCode::CloseUpvalue => return simple_instruction("CLOSE_UPVALUE", offset),
-                OpCode::Class => return self.constant_instruction("CLASS", offset),
-                OpCode::SetProperty => return self.constant_instruction("SET_PROPERTY", offset),
-                OpCode::GetProperty => return self.constant_instruction("GET_PROPERTY", offset),
-                OpCode::Method => return self.constant_instruction("METHOD", offset),
-                OpCode::Invoke => return self.invoke_instruction("INVOKE", offset),
-                OpCode::Inherit => return simple_instruction("INHERIT", offset),
-                OpCode::GetSuper => return self.constant_instruction("GET_SUPER", offset),
-                OpCode::SuperInvoke => return self.invoke_instruction("SUPER_INVOKE", offset),
+                OpCode::GetUpvalue(c) => self.byte_instruction("GET_UPVALUE", c),
+                OpCode::SetUpvalue(c) => self.byte_instruction("SET_UPVALUE", c),
+                OpCode::CloseUpvalue => simple_instruction("CLOSE_UPVALUE"),
+                OpCode::Class(c) => self.constant_instruction("CLASS", c),
+                OpCode::SetProperty(c) => self.constant_instruction("SET_PROPERTY", c),
+                OpCode::GetProperty(c) => self.constant_instruction("GET_PROPERTY", c),
+                OpCode::Method(c) => self.constant_instruction("METHOD", c),
+                OpCode::Invoke(name, arity) => self.invoke_instruction("INVOKE", name, arity),
+                OpCode::Inherit => simple_instruction("INHERIT"),
+                OpCode::GetSuper(c) => self.constant_instruction("GET_SUPER", c),
+                OpCode::SuperInvoke(name, arity) => {
+                    self.invoke_instruction("SUPER_INVOKE", name, arity)
+                }
                 OpCode::Unknown => {}
             }
         } else {
@@ -209,49 +230,40 @@ impl<'gc> Chunk<'gc> {
         offset + 1
     }
 
-    fn constant_instruction(&self, name: &str, offset: usize) -> usize {
+    fn constant_instruction(&self, name: &str, constant: u8) {
         let name = format!("OP_{name}");
-        let constant = self.code[offset + 1];
         println!(
             "{:-16} {:4} '{}'",
             name, constant, self.constans[constant as usize]
         );
-        offset + 2
     }
 
-    fn byte_instruction(&self, name: &str, offset: usize) -> usize {
+    fn byte_instruction(&self, name: &str, byte: u8) {
         let name = format!("OP_{name}");
-        let slot = self.code[offset + 1];
-        println!("{:-16} {:4}", name, slot);
-        offset + 2
+        println!("{:-16} {:4}", name, byte);
     }
 
-    fn jump_instruction(&self, name: &str, sign: i8, offset: usize) -> usize {
+    fn jump_instruction(&self, name: &str, sign: i8, offset: usize, jump: u16) {
         let name = format!("OP_{name}");
-        let jump = u16::from_be_bytes([self.code[offset + 1], self.code[offset + 2]]);
+        // let jump = u16::from_be_bytes([self.code[offset + 1], self.code[offset + 2]]);
         let jump = if sign < 0 {
-            offset.saturating_add(3).saturating_sub(jump as usize)
+            offset.saturating_sub(jump as usize)
         } else {
-            offset.saturating_add(3).saturating_add(jump as usize)
+            offset.saturating_add(jump as usize)
         };
 
         println!("{:-16} {:4} -> {}", name, offset, jump);
-        offset + 3
     }
 
-    fn invoke_instruction(&self, name: &str, offset: usize) -> usize {
+    fn invoke_instruction(&self, name: &str, constant: u8, arity: u8) {
         let name = format!("OP_{name}");
-        let constant = self.code[offset + 1];
-        let arg_count = self.code[offset + 2];
         println!(
             "{:-16} ({} args) {} '{}'",
-            name, arg_count, constant, self.constans[constant as usize]
+            name, arity, constant, self.constans[constant as usize]
         );
-        offset + 3
     }
 }
 
-fn simple_instruction(name: &str, offset: usize) -> usize {
+fn simple_instruction(name: &str) {
     println!("OP_{name}");
-    offset + 1
 }

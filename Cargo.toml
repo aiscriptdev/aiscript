@@ -5,7 +5,11 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-repository = "https://github.com/datagogo/webginx"
+repository = "https://github.com/aiscriptdev/aiscript"
 license = "Apache-2.0"
 
 [workspace.dependencies]
+
+# RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.lox
+[profile.release]
+debug = true

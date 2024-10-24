@@ -12,7 +12,7 @@ use gc_arena::{
     Collect, Gc, Mutation,
 };
 
-use crate::{Chunk, Value};
+use crate::{string::InternedString, Chunk, Value};
 
 #[derive(Debug, Copy, Clone, Collect)]
 #[collect[no_drop]]
@@ -40,8 +40,17 @@ pub struct Closure<'gc> {
 pub struct Function<'gc> {
     pub arity: u8,
     pub chunk: Chunk<'gc>,
-    pub name: Gc<'gc, String>,
-    pub upvalue_count: u16,
+    pub name: InternedString<'gc>,
+    pub upvalues: Vec<Upvalue>,
+}
+
+#[derive(Debug, Clone, Copy, Collect)]
+#[collect(require_static)]
+pub struct Upvalue {
+    pub index: usize,
+    // that flag controls whether the closure captures a local
+    // variable or an upvalue from the surrounding function.
+    pub is_local: bool,
 }
 
 impl<'gc> Display for Function<'gc> {
@@ -67,15 +76,15 @@ pub enum FunctionType {
 #[derive(Debug, Collect)]
 #[collect(no_drop)]
 pub struct Class<'gc> {
-    pub name: Gc<'gc, String>,
-    pub methods: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    pub name: InternedString<'gc>,
+    pub methods: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 #[derive(Debug, Collect)]
 #[collect(no_drop)]
 pub struct Instance<'gc> {
     pub class: GcRefLock<'gc, Class<'gc>>,
-    pub fields: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    pub fields: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 #[derive(Debug, Collect)]
@@ -86,7 +95,7 @@ pub struct BoundMethod<'gc> {
 }
 
 impl<'gc> Class<'gc> {
-    pub fn new(name: Gc<'gc, String>) -> Self {
+    pub fn new(name: InternedString<'gc>) -> Self {
         Self {
             name,
             methods: HashMap::default(),
@@ -122,7 +131,7 @@ impl<'gc> UpvalueObj<'gc> {
 impl<'gc> Closure<'gc> {
     pub fn new(mc: &'gc Mutation<'gc>, function: Gc<'gc, Function<'gc>>) -> Self {
         let upvalues = iter::repeat_with(|| Gc::new(mc, RefLock::new(UpvalueObj::default())))
-            .take(function.upvalue_count as usize)
+            .take(function.upvalues.len())
             .collect::<Vec<_>>()
             .into_boxed_slice();
         Self { function, upvalues }
@@ -130,12 +139,12 @@ impl<'gc> Closure<'gc> {
 }
 
 impl<'gc> Function<'gc> {
-    pub fn new(mc: &'gc Mutation<'gc>, name: &str, arity: u8) -> Self {
+    pub fn new(name: InternedString<'gc>, arity: u8) -> Self {
         Self {
             arity,
             chunk: Chunk::new(),
-            name: Gc::new(mc, name.to_owned()),
-            upvalue_count: 0,
+            name,
+            upvalues: Vec::new(),
         }
     }
 }
