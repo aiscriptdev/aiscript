@@ -6,12 +6,12 @@ Use `ai` keword to define an AI function and call AI functions.
 
 ```rs
 ai fn sentiment(text: str) -> float {
-    prompt { 
-        "Analyze the sentiment of the following text: {text}" 
+    prompt {
+        "Analyze the sentiment of the following text: {text}"
     }
 }
 
-let value = ai sentiment("I love AiScript")
+let value = try sentiment("I love AiScript").ai catch err
 print(value) # 0.9
 ```
 
@@ -23,21 +23,28 @@ print(value) # 0.9
 
 ```rs
 agent Researcher {
+    use tool.GoogleSearch
+    use tool.Wikipedia
 
-    prompt {
-
-    }
-
-    tool {
-        GoogleSearch {
-        }
-    }
-
-
+    role => "Researcher"
+    goal => "You are a researcher. Your task is to find information about the following"
+    backstroy => "You have access to the following tools: {tools}"
+    verbose => true
 }
 ```
 
 ### task
+
+```rs
+task A {
+    use agent.Researcher
+
+    use tool.GoogleSearch
+
+    description => "Research the following topic: {topic}"
+    expected => "You have found the following information: {result}"
+}
+```
 
 ## Language
 

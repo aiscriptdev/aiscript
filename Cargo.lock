@@ -40,6 +40,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aiscript"
+version = "0.1.0"
+
+[[package]]
+name = "aiscript-cli"
+version = "0.1.0"
+dependencies = [
+ "aiscript-vm",
+]
+
+[[package]]
 name = "aiscript-runtime"
 version = "0.1.0"
 dependencies = [

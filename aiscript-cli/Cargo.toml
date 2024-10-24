@@ -1,0 +1,9 @@
+[package]
+name = "aiscript-cli"
+version = "0.1.0"
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+aiscript-vm = { path = "../aiscript-vm" }

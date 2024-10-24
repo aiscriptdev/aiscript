@@ -4,7 +4,7 @@ AiScript is a programming language for building web applications. It is inspired
 
 - Dynamic typing interpreter language
 - Auto garbage collection
-- High level and domain specific in web development
+- High level and domain specific in AI and web development
 - Function is first class citizen
 - No semicolon end of line
 - Rich standard library

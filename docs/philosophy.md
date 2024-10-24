@@ -1,5 +1,5 @@
 
-## AI apps development first
+## AI native
 
 ## Keep it simple as possible
 

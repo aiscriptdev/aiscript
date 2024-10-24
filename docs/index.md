@@ -1,6 +1,6 @@
 # Welcome to AiScript
 
-AiScript is a high-level programming language let you build web applications intuitively, elegantly and blazing-fast.
+AiScript is a high-level programming language let you build AI applications intuitively, elegantly and blazing-fast.
 
 ## Features
 
