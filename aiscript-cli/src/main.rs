@@ -1,21 +1,52 @@
-use std::{env::args, fs, process::exit};
+use std::{fs, path::PathBuf, process::exit};
 
 use aiscript_vm::{Vm, VmError};
 
-fn main() {
-    let mut args = args();
-    if args.len() == 1 {
-        // repl
-    } else if args.len() == 2 {
-        let path = args.nth(1).unwrap();
-        run_file(&path);
-    } else {
-        println!("Usage: aiscript [path]");
-        exit(64);
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct AIScriptCli {
+    /// Sets a custom config file
+    #[arg(value_name = "FILE")]
+    file: Option<PathBuf>,
+    /// Subcommands
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the web server.
+    Serve {
+        /// The web server listening port.
+        #[arg(short, long, default_value_t = 8000)]
+        port: u16,
+    },
+}
+
+#[tokio::main]
+async fn main() {
+    let cli = AIScriptCli::parse();
+    match cli.command {
+        Some(Commands::Serve { port }) => {
+            println!("Server listening on port {}", port);
+            aiscript_runtime::run(port).await;
+        }
+        None => {
+            if let Some(path) = cli.file {
+                run_file(path);
+                return;
+            } else {
+                // Run the repl
+                println!("Welcome to the AIScript REPL!");
+                return;
+            }
+        }
     }
 }
 
-fn run_file(path: &str) {
+fn run_file(path: PathBuf) {
     let source = fs::read_to_string(path).unwrap();
     let source: &'static str = Box::leak(source.into_boxed_str());
     let mut vm = Vm::new();

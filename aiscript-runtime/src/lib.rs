@@ -3,6 +3,7 @@ use std::{
     convert::Infallible,
     future::Future,
     mem,
+    net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -305,8 +306,7 @@ fn get_routes() -> Vec<Route> {
     }]
 }
 
-#[tokio::main]
-async fn main() {
+pub async fn run(port: u16) {
     let mut router = Router::new().route("/", get(|| async { "Hello, World!" }));
 
     for route in get_routes() {
@@ -332,6 +332,7 @@ async fn main() {
         router = router.nest(&prefix, r);
     }
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }
