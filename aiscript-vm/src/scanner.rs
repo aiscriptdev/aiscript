@@ -114,6 +114,14 @@ impl<'a> Scanner<'a> {
         self.iter.peek()
     }
 
+    fn next2(&mut self) -> &str {
+        &self.source[self.current..=self.current + 1]
+    }
+
+    fn peek2(&mut self) -> &str {
+        &self.source[self.current - 1..=self.current]
+    }
+
     fn skip_white_spaces(&mut self) {
         while let Some(c) = self.peek() {
             match c {
@@ -125,7 +133,7 @@ impl<'a> Scanner<'a> {
                     self.advance();
                 }
                 '/' => {
-                    if &self.source[self.current..=self.current + 1] == "//" {
+                    if self.next2() == "//" {
                         while matches!(self.peek(), Some(c) if *c != '\n') {
                             self.advance();
                         }
@@ -225,7 +233,7 @@ impl<'a> Scanner<'a> {
                 '/' => return self.make_token(TokenType::Slash),
                 '*' => return self.make_token(TokenType::Star),
                 '!' => {
-                    return if &self.source[self.current - 1..=self.current] == "!=" {
+                    return if self.peek2() == "!=" {
                         self.advance();
                         self.make_token(TokenType::BangEqual)
                     } else {
@@ -233,7 +241,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '=' => {
-                    return if &self.source[self.current - 1..=self.current] == "==" {
+                    return if self.peek2() == "==" {
                         self.advance();
                         self.make_token(TokenType::EqualEqual)
                     } else {
@@ -241,7 +249,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '<' => {
-                    return if &self.source[self.current - 1..=self.current] == "<=" {
+                    return if self.peek2() == "<=" {
                         self.advance();
                         self.make_token(TokenType::LessEqual)
                     } else {
@@ -249,7 +257,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '>' => {
-                    return if &self.source[self.current - 1..=self.current] == ">=" {
+                    return if self.peek2() == ">=" {
                         self.advance();
                         self.make_token(TokenType::GreaterEqual)
                     } else {
