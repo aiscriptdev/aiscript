@@ -16,4 +16,3 @@ debug = []
 [dev-dependencies]
 regex = "1.11"
 test-generator = "0.3"
-
