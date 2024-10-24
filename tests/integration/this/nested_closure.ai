@@ -1,8 +1,8 @@
 class Foo {
   getClosure() {
-    fun f() {
-      fun g() {
-        fun h() {
+    fn f() {
+      fn g() {
+        fn h() {
           return this.toString();
         }
         return h;

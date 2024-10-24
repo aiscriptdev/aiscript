@@ -33,7 +33,7 @@ unsafe impl<'gc> Collect for Value<'gc> {
     fn trace(&self, cc: &gc_arena::Collection) {
         match self {
             Value::String(s) => s.trace(cc),
-            Value::Function(fun) => fun.trace(cc),
+            Value::Function(func) => func.trace(cc),
             Value::Closure(closure) => closure.trace(cc),
             Value::Class(class) => class.trace(cc),
             Value::Instance(instance) => instance.trace(cc),
@@ -49,7 +49,7 @@ impl<'gc> Display for Value<'gc> {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function(fun) => write!(f, "{}", fun),
+            Value::Function(func) => write!(f, "{}", func),
             Value::Closure(closure) => {
                 if closure.function.name.is_empty() {
                     write!(f, "<script>")

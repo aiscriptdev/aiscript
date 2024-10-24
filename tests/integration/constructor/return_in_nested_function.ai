@@ -1,6 +1,6 @@
 class Foo {
   init() {
-    fun init() {
+    fn init() {
       return "bar";
     }
     print init(); // expect: bar

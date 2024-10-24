@@ -1,4 +1,4 @@
-fun foo() {}
+fn foo() {}
 {
   var a = 1;
   foo(

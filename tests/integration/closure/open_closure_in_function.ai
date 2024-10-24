@@ -1,6 +1,6 @@
 {
   var local = "local";
-  fun f() {
+  fn f() {
     print local; // expect: local
   }
   f();

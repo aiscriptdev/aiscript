@@ -1,7 +1,7 @@
 var f;
 
-fun foo(param) {
-  fun f_() {
+fn foo(param) {
+  fn f_() {
     print param;
   }
   f = f_;

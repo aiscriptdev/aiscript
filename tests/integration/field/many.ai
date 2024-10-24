@@ -1,7 +1,7 @@
 class Foo {}
 
 var foo = Foo();
-fun setFields() {
+fn setFields() {
   foo.bilberry = "bilberry";
   foo.lime = "lime";
   foo.elderberry = "elderberry";
@@ -85,7 +85,7 @@ fun setFields() {
 
 setFields();
 
-fun printFields() {
+fn printFields() {
   print foo.apple; // expect: apple
   print foo.apricot; // expect: apricot
   print foo.avocado; // expect: avocado

@@ -6,7 +6,7 @@ class A {
 
 class B < A {
   getClosure() {
-    fun closure() {
+    fn closure() {
       super.say();
     }
     return closure;

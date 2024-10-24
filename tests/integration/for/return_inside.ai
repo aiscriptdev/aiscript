@@ -1,4 +1,4 @@
-fun f() {
+fn f() {
   for (;;) {
     var i = "i";
     return i;

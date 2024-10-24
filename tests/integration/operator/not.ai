@@ -9,5 +9,5 @@ print !nil;     // expect: true
 
 print !"";       // expect: false
 
-fun foo() {}
+fn foo() {}
 print !foo;      // expect: false

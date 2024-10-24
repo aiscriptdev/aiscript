@@ -1,2 +1,2 @@
-fun f() {}
+fn f() {}
 print f(); // expect: nil

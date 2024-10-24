@@ -1,5 +1,5 @@
 // 256 parameters.
-fun f(
+fn f(
     a1,
     a2,
     a3,

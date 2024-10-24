@@ -1,2 +1,2 @@
-// [line 2] Error at 'fun': Expect expression.
-if (true) fun foo() {}
+// [line 2] Error at 'fn': Expect expression.
+if (true) fn foo() {}

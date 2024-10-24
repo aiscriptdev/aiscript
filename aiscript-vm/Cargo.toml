@@ -12,7 +12,3 @@ num_enum = "0.7.3"
 [features]
 # Enable debug features.
 debug = []
-
-[dev-dependencies]
-regex = "1.11"
-test-generator = "0.3"

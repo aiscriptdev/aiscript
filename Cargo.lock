@@ -75,8 +75,6 @@ dependencies = [
  "gc-arena",
  "hashbrown 0.14.5",
  "num_enum",
- "regex",
- "test-generator",
 ]
 
 [[package]]
@@ -839,6 +837,14 @@ dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "tests"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "test-generator",
 ]
 
 [[package]]

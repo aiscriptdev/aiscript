@@ -2,7 +2,7 @@ var f;
 
 {
   var a = "a";
-  fun f_() {
+  fn f_() {
     print a;
     print a;
   }

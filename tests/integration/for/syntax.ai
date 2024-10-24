@@ -13,7 +13,7 @@ for (var a = 0; a < 3; a = a + 1) {
 // expect: 2
 
 // No clauses.
-fun foo() {
+fn foo() {
   for (;;) return "done";
 }
 print foo(); // expect: done
@@ -25,7 +25,7 @@ for (; i < 2; i = i + 1) print i;
 // expect: 1
 
 // No condition.
-fun bar() {
+fn bar() {
   for (var i = 0;; i = i + 1) {
     print i;
     if (i >= 2) return;

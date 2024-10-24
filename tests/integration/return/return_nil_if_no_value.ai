@@ -1,4 +1,4 @@
-fun f() {
+fn f() {
   return;
   print "bad";
 }

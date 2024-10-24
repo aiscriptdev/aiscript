@@ -1,4 +1,4 @@
-fun f() {
+fn f() {
   if (true) return "ok";
 }
 

@@ -11,14 +11,14 @@ var closure;
 
   {
     var b = "b";
-    fun returnA() {
+    fn returnA() {
       return a;
     }
 
     closure = returnA;
 
     if (false) {
-      fun returnB() {
+      fn returnB() {
         return b;
       }
     }

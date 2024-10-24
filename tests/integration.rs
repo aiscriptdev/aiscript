@@ -6,6 +6,8 @@ use test_generator;
 
 use test_generator::test_resources;
 
+const CLI_PKG_NAME: &str = "aiscript-cli";
+
 fn test_command() -> Command {
     // Create full path to binary
     let mut path = env::current_exe()
@@ -15,7 +17,8 @@ fn test_command() -> Command {
         .parent()
         .unwrap()
         .to_owned();
-    path.push(env!("CARGO_PKG_NAME"));
+    // path.push(env!("CARGO_PKG_NAME"));
+    path.push(CLI_PKG_NAME);
     path.set_extension(env::consts::EXE_EXTENSION);
     Command::new(path.into_os_string())
 }
@@ -76,7 +79,8 @@ fn parse_comments(path: &PathBuf) -> Expected {
 #[test_resources("tests/integration/*/*.ai")]
 fn run_file_test(filename: &str) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(filename);
+    // path.push(filename);
+    path.set_file_name(filename);
     let expected = parse_comments(&path);
 
     let output = test_command().arg(path).output().unwrap();
@@ -133,3 +137,5 @@ fn run_file_test(filename: &str) {
 
     assert_eq!(expected.out, out, "Output should match");
 }
+
+fn main() {}

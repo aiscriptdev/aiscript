@@ -1,0 +1,16 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "integration"
+path = "integration.rs"
+
+[dependencies]
+regex = "1.11"
+test-generator = "0.3"
+
+[dev-dependencies]

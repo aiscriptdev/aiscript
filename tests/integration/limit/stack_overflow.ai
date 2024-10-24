@@ -1,4 +1,4 @@
-fun foo() {
+fn foo() {
   var a1;
   var a2;
   var a3;

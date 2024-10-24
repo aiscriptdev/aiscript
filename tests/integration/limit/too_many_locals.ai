@@ -1,4 +1,4 @@
-fun f() {
+fn f() {
   // var v00; First slot already taken.
 
   var v01; var v02; var v03; var v04; var v05; var v06; var v07;

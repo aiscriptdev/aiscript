@@ -156,7 +156,7 @@ impl<'gc> Parser<'gc> {
     fn declaration(&mut self) {
         if self._match(TokenType::Class) {
             self.class_declaration();
-        } else if self._match(TokenType::Fun) {
+        } else if self._match(TokenType::Fn) {
             self.fun_declaration();
         } else if self._match(TokenType::Var) {
             self.var_decaration();
@@ -179,7 +179,7 @@ impl<'gc> Parser<'gc> {
 
             match self.current.kind {
                 TokenType::Class
-                | TokenType::Fun
+                | TokenType::Fn
                 | TokenType::Var
                 | TokenType::For
                 | TokenType::If

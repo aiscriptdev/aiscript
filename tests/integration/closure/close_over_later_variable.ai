@@ -3,10 +3,10 @@
 // would crash because it walked to the end of the upvalue list (correct), but
 // then didn't handle not finding the variable.
 
-fun f() {
+fn f() {
   var a = "a";
   var b = "b";
-  fun g() {
+  fn g() {
     print b; // expect: b
     print a; // expect: a
   }

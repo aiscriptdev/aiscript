@@ -2,7 +2,7 @@ var f;
 
 class Foo {
   method(param) {
-    fun f_() {
+    fn f_() {
       print param;
     }
     f = f_;

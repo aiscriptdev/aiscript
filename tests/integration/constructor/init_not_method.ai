@@ -5,7 +5,7 @@ class Foo {
   }
 }
 
-fun init() {
+fn init() {
   print "not initializer";
 }
 

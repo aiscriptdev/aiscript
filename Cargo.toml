@@ -1,15 +1,13 @@
 [workspace]
-members = ["aiscript", "aiscript-cli", "aiscript-runtime", "aiscript-vm"]
+members = [
+    "aiscript",
+    "aiscript-cli",
+    "aiscript-runtime",
+    "aiscript-vm",
+    "tests",
+]
 exclude = []
 resolver = "2"
-
-# [[bin]]
-# name = "aiscript-cli"
-# path = "aiscript-cli/src/main.rs"
-
-# [[bin]]
-# name = "aiscript-runtime"
-# path = "aiscript-runtime/src/main.rs"
 
 [workspace.package]
 edition = "2021"

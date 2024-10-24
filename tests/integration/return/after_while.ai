@@ -1,4 +1,4 @@
-fun f() {
+fn f() {
   while (true) return "ok";
 }
 

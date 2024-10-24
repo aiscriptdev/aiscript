@@ -2,7 +2,7 @@ var f;
 
 {
   var local = "local";
-  fun f_() {
+  fn f_() {
     print local;
   }
   f = f_;

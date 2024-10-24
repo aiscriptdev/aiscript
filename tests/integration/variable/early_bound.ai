@@ -1,6 +1,6 @@
 var a = "outer";
 {
-  fun foo() {
+  fn foo() {
     print a;
   }
 

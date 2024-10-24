@@ -1,7 +1,7 @@
 var a = "global";
 
 {
-  fun assign() {
+  fn assign() {
     a = "assigned";
   }
 

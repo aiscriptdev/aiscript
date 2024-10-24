@@ -1,6 +1,6 @@
 {
   var foo = "closure";
-  fun f() {
+  fn f() {
     {
       print foo; // expect: closure
       var foo = "shadow";
