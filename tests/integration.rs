@@ -137,5 +137,3 @@ fn run_file_test(filename: &str) {
 
     assert_eq!(expected.out, out, "Output should match");
 }
-
-fn main() {}

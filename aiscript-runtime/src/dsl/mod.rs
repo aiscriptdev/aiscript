@@ -68,7 +68,6 @@ pub struct Validator {
 pub enum Handler {
     Empty,
     Dsl,
-    Python,
 }
 #[derive(Clone, Debug)]
 pub enum DslHandler {}

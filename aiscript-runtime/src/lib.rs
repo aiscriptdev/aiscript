@@ -71,7 +71,7 @@ impl Future for ExecuteFuture {
                 }
                 ExecuteFutureState::Query => {
                     let extract::Query(query) =
-                        extract::Query::<Value>::try_from_uri(&self.req.uri()).unwrap();
+                        extract::Query::<Value>::try_from_uri(self.req.uri()).unwrap();
                     println!("Query: {:?}", query);
                     for mut field in mem::take(&mut self.raw.query) {
                         let field_value = query.get(&field.name);
@@ -93,7 +93,7 @@ impl Future for ExecuteFuture {
                                 || (matches!(field._type, FieldType::Array) && value.is_array())
                             {
                                 for validator in &field.validators {
-                                    if let Err(e) = validator.validate(&value) {
+                                    if let Err(e) = validator.validate(value) {
                                         return Poll::Ready(Ok(format!(
                                             "Field validation failed: {}",
                                             e
@@ -175,7 +175,7 @@ impl Future for ExecuteFuture {
                                     || (matches!(field._type, FieldType::Array) && value.is_array())
                                 {
                                     for validator in &field.validators {
-                                        if let Err(e) = validator.validate(&value) {
+                                        if let Err(e) = validator.validate(value) {
                                             return Poll::Ready(Ok(format!(
                                                 "Field validation failed: {}",
                                                 e
