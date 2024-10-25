@@ -6,7 +6,7 @@ use test_generator;
 
 use test_generator::test_resources;
 
-const CLI_PKG_NAME: &str = "aiscript-cli";
+const CLI_PKG_NAME: &str = "aiscript-cli-test";
 
 fn test_command() -> Command {
     // Create full path to binary

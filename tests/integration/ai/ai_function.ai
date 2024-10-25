@@ -1,0 +1,4 @@
+ai f1() {} // Error at 'f1': Expect 'fn' after 'ai'.
+
+ai fn f2() {
+}

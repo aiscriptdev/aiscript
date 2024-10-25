@@ -14,3 +14,5 @@ tokio = "1.41.0"
 [features]
 # Enable debug features.
 debug = []
+# For testing AI
+ai_test = []
