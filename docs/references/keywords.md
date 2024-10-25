@@ -6,16 +6,31 @@ Use `ai` keword to define an AI function and call AI functions.
 
 ```rs
 ai fn sentiment(text: str) -> float {
-    prompt {
-        "Analyze the sentiment of the following text: {text}"
-    }
+    prompt "Analyze the sentiment of the following text: {text}"
 }
 
-let value = try sentiment("I love AiScript").ai catch err
+let value = sentiment("I love AiScript")
 print(value) # 0.9
 ```
 
 ### prompt
+
+`prompt` is used to ask AI for a response with the given prompt.
+
+```py
+var a = prompt "What is AI?";
+print a;
+```
+
+`prompt` supports customizations, the format is `<company>://<model>?<key1>=<value1>&<key2>=<value2>`. For example:
+
+```py
+var a = prompt "openai://gpt-3.5-turbo?temperature=1 What is Rust?";
+print a;
+
+var b = prompt "anthropic://claude-3-5-sonnet-20241022?temperature=1 What is Rust?";
+print b;
+```
 
 ### embedding
 
