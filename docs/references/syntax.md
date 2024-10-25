@@ -368,9 +368,10 @@ let e = try div(10, 0) catch err {
 let e = div(10, 0)?
 
 # handle error late
-let r = try div(10, 0) catch err
-match err {
-    !DivByZero => print("DivByZero"),
-    _ => print("UnknownError"),
+let r = try div(10, 0) catch err {
+    match err {
+        !DivByZero => print("DivByZero"),
+        _ => print("UnknownError"),
+    }
 }
 ```
