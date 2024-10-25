@@ -1,3 +1,4 @@
+mod ai;
 mod builtins;
 mod chunk;
 mod compiler;

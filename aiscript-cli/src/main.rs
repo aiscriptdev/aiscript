@@ -3,6 +3,7 @@ use std::{fs, path::PathBuf, process::exit};
 use aiscript_vm::{Vm, VmError};
 
 use clap::{Parser, Subcommand};
+use tokio::runtime::Runtime;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -25,22 +26,23 @@ enum Commands {
     },
 }
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+fn main() {
+    dotenv::dotenv().ok();
     let cli = AIScriptCli::parse();
     match cli.command {
         Some(Commands::Serve { port }) => {
             println!("Server listening on port {}", port);
-            aiscript_runtime::run(port).await;
+            Runtime::new().unwrap().block_on(async {
+                aiscript_runtime::run(port).await;
+            });
         }
         None => {
             if let Some(path) = cli.file {
                 run_file(path);
-                return;
             } else {
                 // Run the repl
                 println!("Welcome to the AIScript REPL!");
-                return;
             }
         }
     }

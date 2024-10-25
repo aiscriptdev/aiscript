@@ -44,6 +44,11 @@ pub enum TokenType {
     Var,
     While,
 
+    // AI keywords
+    AI,
+    Prompt,
+    Agent,
+
     Error,
     Eof,
 }
@@ -185,6 +190,7 @@ impl<'a> Scanner<'a> {
         }
 
         let kind = match &self.source[self.start..self.current] {
+            "ai" => TokenType::AI,
             "and" => TokenType::And,
             "class" => TokenType::Class,
             "else" => TokenType::Else,
@@ -195,6 +201,7 @@ impl<'a> Scanner<'a> {
             "nil" => TokenType::Nil,
             "or" => TokenType::Or,
             "print" => TokenType::Print,
+            "prompt" => TokenType::Prompt,
             "return" => TokenType::Return,
             "super" => TokenType::Super,
             "this" => TokenType::This,

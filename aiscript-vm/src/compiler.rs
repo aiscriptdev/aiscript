@@ -855,6 +855,21 @@ impl<'gc> Parser<'gc> {
     }
 }
 
+impl<'gc> Parser<'gc> {
+    fn prompt(&mut self, _can_assign: bool) {
+        if !self.check(TokenType::String) {
+            self.error("Expect a string as the prompt.");
+            return;
+        }
+
+        // self.parse_precedence(Precedence::Unary);
+        self.expression();
+        // self.string(false);
+        // self.consume(TokenType::Semicolon, "Expect ';' after prompt.");
+        self.emit_byte(OpCode::Prompt);
+    }
+}
+
 impl<'gc> Compiler<'gc> {
     pub fn new(ctx: Context<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
         Box::new(Compiler {
@@ -1003,6 +1018,7 @@ impl<'gc> ParseRule<'gc> {
             TokenType::Super => Self::new(Some(Parser::super_), None, Precedence::None),
             TokenType::This => Self::new(Some(Parser::this), None, Precedence::None),
             TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
+            TokenType::Prompt => Self::new(Some(Parser::prompt), None, Precedence::Unary),
             _ => Self::new(None, None, Precedence::None),
         }
     }

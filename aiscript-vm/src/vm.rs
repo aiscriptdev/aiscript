@@ -5,9 +5,10 @@ use gc_arena::{
     lock::{GcRefLock, RefLock},
     Arena, Collect, Collection, CollectionPhase, Gc, Mutation, Rootable,
 };
+use tokio::runtime::{Handle, Runtime};
 
 use crate::{
-    builtins,
+    ai, builtins,
     compiler::compile,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
@@ -154,7 +155,11 @@ impl Vm {
             const FUEL_PER_GC: i32 = 1024 * 10;
             let mut fuel = Fuel::new(FUEL_PER_GC);
             // periodically exit the arena in order to collect garbage concurrently with running the VM.
-            let result = self.arena.mutate_root(|_, state| state.step(&mut fuel));
+            let result = self.arena.mutate_root(|_, state| {
+                Runtime::new()
+                    .unwrap()
+                    .block_on(async { state.step(&mut fuel).await })
+            });
 
             const COLLECTOR_GRANULARITY: f64 = 10240.0;
             if self.arena.metrics().allocation_debt() > COLLECTOR_GRANULARITY {
@@ -212,7 +217,7 @@ impl<'gc> State<'gc> {
     //
     // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
     // do, and returns `Ok(true)` if no more progress can be made.
-    fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
+    async fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
         loop {
             // Debug stack info
             #[cfg(feature = "debug")]
@@ -466,6 +471,11 @@ impl<'gc> State<'gc> {
                     let method_name = frame.read_constant(byte).as_string().unwrap();
                     let superclass = self.pop_stack().as_class()?;
                     self.invoke_from_class(superclass, method_name, arg_count)?;
+                }
+                OpCode::Prompt => {
+                    let message = self.pop_stack().as_string().unwrap().to_string();
+                    let result = Value::from(self.intern(ai::prompt(&message).await.as_bytes()));
+                    self.push_stack(result);
                 }
                 OpCode::Unknown => return Err(self.runtime_error("Unknown opcode.".into())),
             }

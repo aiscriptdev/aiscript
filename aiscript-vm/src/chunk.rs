@@ -48,6 +48,8 @@ pub enum OpCode {
     Inherit,
     GetSuper(u8),
     SuperInvoke(u8, u8),
+    // AI
+    Prompt,
     Unknown,
 }
 
@@ -221,6 +223,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SuperInvoke(name, arity) => {
                     self.invoke_instruction("SUPER_INVOKE", name, arity)
                 }
+                OpCode::Prompt => simple_instruction("PROMPT"),
                 OpCode::Unknown => {}
             }
         } else {

@@ -7,7 +7,9 @@ edition = "2021"
 ahash = "0.8"
 gc-arena = { version = "0.5.3", features = ["allocator-api2", "hashbrown"] }
 hashbrown = { version = "0.14", features = ["raw"] }
+langchain-rust = "4.6.0"
 num_enum = "0.7.3"
+tokio = "1.41.0"
 
 [features]
 # Enable debug features.
