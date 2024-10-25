@@ -50,7 +50,6 @@ pub enum OpCode {
     SuperInvoke(u8, u8),
     // AI
     Prompt,
-    Unknown,
 }
 
 impl OpCode {
@@ -224,7 +223,6 @@ impl<'gc> Chunk<'gc> {
                     self.invoke_instruction("SUPER_INVOKE", name, arity)
                 }
                 OpCode::Prompt => simple_instruction("PROMPT"),
-                OpCode::Unknown => {}
             }
         } else {
             println!("Invalid opcode at offset: {offset}");

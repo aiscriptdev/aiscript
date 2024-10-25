@@ -5,7 +5,7 @@ use gc_arena::{
     lock::{GcRefLock, RefLock},
     Arena, Collect, Collection, CollectionPhase, Gc, Mutation, Rootable,
 };
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::Runtime;
 
 use crate::{
     ai, builtins,
@@ -126,6 +126,12 @@ impl<'gc> State<'gc> {
 
     pub fn intern_static(&mut self, s: &'static str) -> InternedString<'gc> {
         self.strings.intern_static(self.mc, s.as_bytes())
+    }
+}
+
+impl Default for Vm {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -477,7 +483,6 @@ impl<'gc> State<'gc> {
                     let result = Value::from(self.intern(ai::prompt(&message).await.as_bytes()));
                     self.push_stack(result);
                 }
-                OpCode::Unknown => return Err(self.runtime_error("Unknown opcode.".into())),
             }
 
             const FUEL_PER_STEP: i32 = 1;
