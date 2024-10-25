@@ -67,6 +67,7 @@ pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {
+    AiFunction,
     Function,
     Method,
     Initializer,

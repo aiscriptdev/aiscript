@@ -1,5 +1,3 @@
-use langchain_rust::{language_models::llm::LLM, llm::OpenAI};
-
 pub async fn prompt(message: &str) -> String {
     // let claude = Claude::default()
     //     .with_api_key(std::env::var("CLAUDE_API_KEY").unwrap())
@@ -9,6 +7,7 @@ pub async fn prompt(message: &str) -> String {
     return format!("AI: {message}");
     #[cfg(not(feature = "ai_test"))]
     {
+        use langchain_rust::{language_models::llm::LLM, llm::OpenAI};
         let open_ai = OpenAI::default().with_model("gpt-3.5-turbo");
         open_ai.invoke(message).await.unwrap()
     }

@@ -17,14 +17,14 @@ print(value) # 0.9
 
 `prompt` is used to ask AI for a response with the given prompt.
 
-```py
+```rs
 let a = prompt "What is AI?";
 print a;
 ```
 
 `prompt` supports customizations, the format is `<company>://<model>?<key1>=<value1>&<key2>=<value2>`. For example:
 
-```py
+```rs
 let a = prompt "openai://gpt-3.5-turbo?temperature=1 What is Rust?";
 print a;
 

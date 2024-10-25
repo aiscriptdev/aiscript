@@ -191,6 +191,7 @@ impl<'a> Scanner<'a> {
 
         let kind = match &self.source[self.start..self.current] {
             "ai" => TokenType::AI,
+            "agent" => TokenType::Agent,
             "and" => TokenType::And,
             "class" => TokenType::Class,
             "else" => TokenType::Else,

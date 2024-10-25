@@ -1,4 +1,5 @@
-ai f1() {} // Error at 'f1': Expect 'fn' after 'ai'.
-
-ai fn f2() {
+ai fn f1() {
+    return prompt "What is the moon of Pluto?";
 }
+
+print f1(); // expect: AI: What is the moon of Pluto?

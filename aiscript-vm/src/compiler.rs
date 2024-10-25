@@ -156,8 +156,11 @@ impl<'gc> Parser<'gc> {
     fn declaration(&mut self) {
         if self._match(TokenType::Class) {
             self.class_declaration();
+        } else if self._match(TokenType::AI) {
+            self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
+            self.fun_declaration(FunctionType::AiFunction);
         } else if self._match(TokenType::Fn) {
-            self.fun_declaration();
+            self.fun_declaration(FunctionType::Function);
         } else if self._match(TokenType::Let) {
             self.var_decaration();
         } else {
@@ -455,10 +458,10 @@ impl<'gc> Parser<'gc> {
         self.emit_byte(OpCode::Method(name_constant as u8));
     }
 
-    fn fun_declaration(&mut self) {
+    fn fun_declaration(&mut self, fn_type: FunctionType) {
         let global = self.parse_variable("Expect function name.");
         self.mark_initialized();
-        self.function(FunctionType::Function);
+        self.function(fn_type);
         self.define_variable(global);
     }
 
