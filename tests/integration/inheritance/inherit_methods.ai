@@ -8,7 +8,7 @@ class Bar < Foo {
   override() { print "bar"; }
 }
 
-var bar = Bar();
+let bar = Bar();
 bar.methodOnFoo(); // expect: foo
 bar.methodOnBar(); // expect: bar
 bar.override(); // expect: bar

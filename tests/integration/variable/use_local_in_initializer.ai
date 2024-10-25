@@ -1,4 +1,4 @@
-var a = "outer";
+let a = "outer";
 {
-  var a = a; // Error at 'a': Can't read local variable in its own initializer.
+  let a = a; // Error at 'a': Can't read local variable in its own initializer.
 }

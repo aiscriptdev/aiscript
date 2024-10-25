@@ -1,7 +1,7 @@
-var f;
+let f;
 
 {
-  var a = "a";
+  let a = "a";
   fn f_() {
     print a;
     print a;

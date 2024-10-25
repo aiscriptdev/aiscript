@@ -6,6 +6,6 @@ class Foo {
   }
 }
 
-var foo = Foo(); // expect: init
+let foo = Foo(); // expect: init
 print foo.init(); // expect: init
 // expect: Foo instance

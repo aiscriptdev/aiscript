@@ -5,10 +5,10 @@ class Foo {
   }
 }
 
-var foo1 = Foo();
+let foo1 = Foo();
 foo1.name = "foo1";
 
-var foo2 = Foo();
+let foo2 = Foo();
 foo2.name = "foo2";
 
 // Store the method reference on another object.

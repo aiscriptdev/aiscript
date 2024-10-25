@@ -41,7 +41,7 @@ pub enum TokenType {
     Super,
     This,
     True,
-    Var,
+    Let,
     While,
 
     // AI keywords
@@ -206,7 +206,7 @@ impl<'a> Scanner<'a> {
             "super" => TokenType::Super,
             "this" => TokenType::This,
             "true" => TokenType::True,
-            "var" => TokenType::Var,
+            "let" => TokenType::Let,
             "while" => TokenType::While,
             _ => TokenType::Identifier,
         };

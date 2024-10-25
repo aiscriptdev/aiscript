@@ -1,54 +1,54 @@
 fn f() {
-  var v00; var v01; var v02; var v03; var v04; var v05; var v06; var v07;
-  var v08; var v09; var v0a; var v0b; var v0c; var v0d; var v0e; var v0f;
+  let v00; let v01; let v02; let v03; let v04; let v05; let v06; let v07;
+  let v08; let v09; let v0a; let v0b; let v0c; let v0d; let v0e; let v0f;
 
-  var v10; var v11; var v12; var v13; var v14; var v15; var v16; var v17;
-  var v18; var v19; var v1a; var v1b; var v1c; var v1d; var v1e; var v1f;
+  let v10; let v11; let v12; let v13; let v14; let v15; let v16; let v17;
+  let v18; let v19; let v1a; let v1b; let v1c; let v1d; let v1e; let v1f;
 
-  var v20; var v21; var v22; var v23; var v24; var v25; var v26; var v27;
-  var v28; var v29; var v2a; var v2b; var v2c; var v2d; var v2e; var v2f;
+  let v20; let v21; let v22; let v23; let v24; let v25; let v26; let v27;
+  let v28; let v29; let v2a; let v2b; let v2c; let v2d; let v2e; let v2f;
 
-  var v30; var v31; var v32; var v33; var v34; var v35; var v36; var v37;
-  var v38; var v39; var v3a; var v3b; var v3c; var v3d; var v3e; var v3f;
+  let v30; let v31; let v32; let v33; let v34; let v35; let v36; let v37;
+  let v38; let v39; let v3a; let v3b; let v3c; let v3d; let v3e; let v3f;
 
-  var v40; var v41; var v42; var v43; var v44; var v45; var v46; var v47;
-  var v48; var v49; var v4a; var v4b; var v4c; var v4d; var v4e; var v4f;
+  let v40; let v41; let v42; let v43; let v44; let v45; let v46; let v47;
+  let v48; let v49; let v4a; let v4b; let v4c; let v4d; let v4e; let v4f;
 
-  var v50; var v51; var v52; var v53; var v54; var v55; var v56; var v57;
-  var v58; var v59; var v5a; var v5b; var v5c; var v5d; var v5e; var v5f;
+  let v50; let v51; let v52; let v53; let v54; let v55; let v56; let v57;
+  let v58; let v59; let v5a; let v5b; let v5c; let v5d; let v5e; let v5f;
 
-  var v60; var v61; var v62; var v63; var v64; var v65; var v66; var v67;
-  var v68; var v69; var v6a; var v6b; var v6c; var v6d; var v6e; var v6f;
+  let v60; let v61; let v62; let v63; let v64; let v65; let v66; let v67;
+  let v68; let v69; let v6a; let v6b; let v6c; let v6d; let v6e; let v6f;
 
-  var v70; var v71; var v72; var v73; var v74; var v75; var v76; var v77;
-  var v78; var v79; var v7a; var v7b; var v7c; var v7d; var v7e; var v7f;
+  let v70; let v71; let v72; let v73; let v74; let v75; let v76; let v77;
+  let v78; let v79; let v7a; let v7b; let v7c; let v7d; let v7e; let v7f;
 
   fn g() {
-    var v80; var v81; var v82; var v83; var v84; var v85; var v86; var v87;
-    var v88; var v89; var v8a; var v8b; var v8c; var v8d; var v8e; var v8f;
+    let v80; let v81; let v82; let v83; let v84; let v85; let v86; let v87;
+    let v88; let v89; let v8a; let v8b; let v8c; let v8d; let v8e; let v8f;
 
-    var v90; var v91; var v92; var v93; var v94; var v95; var v96; var v97;
-    var v98; var v99; var v9a; var v9b; var v9c; var v9d; var v9e; var v9f;
+    let v90; let v91; let v92; let v93; let v94; let v95; let v96; let v97;
+    let v98; let v99; let v9a; let v9b; let v9c; let v9d; let v9e; let v9f;
 
-    var va0; var va1; var va2; var va3; var va4; var va5; var va6; var va7;
-    var va8; var va9; var vaa; var vab; var vac; var vad; var vae; var vaf;
+    let va0; let va1; let va2; let va3; let va4; let va5; let va6; let va7;
+    let va8; let va9; let vaa; let vab; let vac; let vad; let vae; let vaf;
 
-    var vb0; var vb1; var vb2; var vb3; var vb4; var vb5; var vb6; var vb7;
-    var vb8; var vb9; var vba; var vbb; var vbc; var vbd; var vbe; var vbf;
+    let vb0; let vb1; let vb2; let vb3; let vb4; let vb5; let vb6; let vb7;
+    let vb8; let vb9; let vba; let vbb; let vbc; let vbd; let vbe; let vbf;
 
-    var vc0; var vc1; var vc2; var vc3; var vc4; var vc5; var vc6; var vc7;
-    var vc8; var vc9; var vca; var vcb; var vcc; var vcd; var vce; var vcf;
+    let vc0; let vc1; let vc2; let vc3; let vc4; let vc5; let vc6; let vc7;
+    let vc8; let vc9; let vca; let vcb; let vcc; let vcd; let vce; let vcf;
 
-    var vd0; var vd1; var vd2; var vd3; var vd4; var vd5; var vd6; var vd7;
-    var vd8; var vd9; var vda; var vdb; var vdc; var vdd; var vde; var vdf;
+    let vd0; let vd1; let vd2; let vd3; let vd4; let vd5; let vd6; let vd7;
+    let vd8; let vd9; let vda; let vdb; let vdc; let vdd; let vde; let vdf;
 
-    var ve0; var ve1; var ve2; var ve3; var ve4; var ve5; var ve6; var ve7;
-    var ve8; var ve9; var vea; var veb; var vec; var ved; var vee; var vef;
+    let ve0; let ve1; let ve2; let ve3; let ve4; let ve5; let ve6; let ve7;
+    let ve8; let ve9; let vea; let veb; let vec; let ved; let vee; let vef;
 
-    var vf0; var vf1; var vf2; var vf3; var vf4; var vf5; var vf6; var vf7;
-    var vf8; var vf9; var vfa; var vfb; var vfc; var vfd; var vfe; var vff;
+    let vf0; let vf1; let vf2; let vf3; let vf4; let vf5; let vf6; let vf7;
+    let vf8; let vf9; let vfa; let vfb; let vfc; let vfd; let vfe; let vff;
 
-    var oops;
+    let oops;
 
     fn h() {
       v00; v01; v02; v03; v04; v05; v06; v07;

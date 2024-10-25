@@ -1,11 +1,11 @@
-var f;
+let f;
 
 fn f1() {
-  var a = "a";
+  let a = "a";
   fn f2() {
-    var b = "b";
+    let b = "b";
     fn f3() {
-      var c = "c";
+      let c = "c";
       fn f4() {
         print a;
         print b;

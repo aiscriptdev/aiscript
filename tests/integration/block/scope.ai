@@ -1,7 +1,7 @@
-var a = "outer";
+let a = "outer";
 
 {
-  var a = "inner";
+  let a = "inner";
   print a; // expect: inner
 }
 

@@ -1,6 +1,6 @@
-var a = "a";
-var b = "b";
-var c = "c";
+let a = "a";
+let b = "b";
+let c = "c";
 
 // Assignment is right-associative.
 a = b = c;

@@ -1,2 +1,2 @@
-// [line 2] Error at 'var': Expect expression.
-while (true) var foo;
+// [line 2] Error at 'let': Expect expression.
+while (true) let foo;

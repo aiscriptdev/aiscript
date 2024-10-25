@@ -22,7 +22,7 @@ class Bar < Foo {
   }
 }
 
-var bar = Bar();
+let bar = Bar();
 bar.foo("foo 1", "foo 2");
 bar.fooPrint();
 // expect: foo 1

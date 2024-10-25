@@ -10,7 +10,7 @@ class Foo {
   method8(a, b, c, d, e, f, g, h) { return a + b + c + d + e + f + g + h; }
 }
 
-var foo = Foo();
+let foo = Foo();
 print foo.method0(); // expect: no args
 print foo.method1(1); // expect: 1
 print foo.method2(1, 2); // expect: 3

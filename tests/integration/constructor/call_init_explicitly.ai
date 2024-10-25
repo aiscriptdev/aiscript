@@ -5,10 +5,10 @@ class Foo {
   }
 }
 
-var foo = Foo("one"); // expect: Foo.init(one)
+let foo = Foo("one"); // expect: Foo.init(one)
 foo.field = "field";
 
-var foo2 = foo.init("two"); // expect: Foo.init(two)
+let foo2 = foo.init("two"); // expect: Foo.init(two)
 print foo2; // expect: Foo instance
 
 // Make sure init() doesn't create a fresh instance.

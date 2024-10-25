@@ -1,4 +1,4 @@
-var foo = "variable";
+let foo = "variable";
 
 class Foo {
   method() {

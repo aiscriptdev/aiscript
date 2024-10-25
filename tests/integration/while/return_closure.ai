@@ -1,10 +1,10 @@
 fn f() {
   while (true) {
-    var i = "i";
+    let i = "i";
     fn g() { print i; }
     return g;
   }
 }
 
-var h = f();
+let h = f();
 h(); // expect: i

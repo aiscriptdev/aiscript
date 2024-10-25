@@ -1,7 +1,7 @@
-var f;
+let f;
 
 {
-  var local = "local";
+  let local = "local";
   fn f_() {
     print local;
   }

@@ -10,5 +10,5 @@ class A {
 
 class B < A {}
 
-var b = B("value");
+let b = B("value");
 b.test(); // expect: value

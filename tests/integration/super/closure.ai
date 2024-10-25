@@ -13,5 +13,5 @@ class Derived < Base {
   toString() { return "Derived"; }
 }
 
-var closure = Derived().getClosure();
+let closure = Derived().getClosure();
 print closure(); // expect: Base

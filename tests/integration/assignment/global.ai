@@ -1,4 +1,4 @@
-var a = "before";
+let a = "before";
 print a; // expect: before
 
 a = "after";

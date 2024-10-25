@@ -16,7 +16,7 @@ class Baz < Bar {
   }
 }
 
-var baz = Baz();
+let baz = Baz();
 baz.inFoo(); // expect: in foo
 baz.inBar(); // expect: in bar
 baz.inBaz(); // expect: in baz

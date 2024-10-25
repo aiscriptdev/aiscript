@@ -1,5 +1,5 @@
 {
-  var a = 1;
+  let a = 1;
   true.method(
      a, // 1
      a, // 2

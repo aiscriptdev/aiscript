@@ -4,8 +4,8 @@
 // then didn't handle not finding the variable.
 
 fn f() {
-  var a = "a";
-  var b = "b";
+  let a = "a";
+  let b = "b";
   fn g() {
     print b; // expect: b
     print a; // expect: a

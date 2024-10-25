@@ -1,20 +1,20 @@
 fn foo() {
-  var a1;
-  var a2;
-  var a3;
-  var a4;
-  var a5;
-  var a6;
-  var a7;
-  var a8;
-  var a9;
-  var a10;
-  var a11;
-  var a12;
-  var a13;
-  var a14;
-  var a15;
-  var a16;
+  let a1;
+  let a2;
+  let a3;
+  let a4;
+  let a5;
+  let a6;
+  let a7;
+  let a8;
+  let a9;
+  let a10;
+  let a11;
+  let a12;
+  let a13;
+  let a14;
+  let a15;
+  let a16;
   foo(); // expect runtime error: Stack overflow.
 }
 

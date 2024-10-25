@@ -158,7 +158,7 @@ impl<'gc> Parser<'gc> {
             self.class_declaration();
         } else if self._match(TokenType::Fn) {
             self.fun_declaration();
-        } else if self._match(TokenType::Var) {
+        } else if self._match(TokenType::Let) {
             self.var_decaration();
         } else {
             self.statement();
@@ -180,7 +180,7 @@ impl<'gc> Parser<'gc> {
             match self.current.kind {
                 TokenType::Class
                 | TokenType::Fn
-                | TokenType::Var
+                | TokenType::Let
                 | TokenType::For
                 | TokenType::If
                 | TokenType::While
@@ -197,8 +197,8 @@ impl<'gc> Parser<'gc> {
         if self._match(TokenType::Equal) {
             self.expression();
         } else {
-            // desugars a variable declaration like: var a;
-            // into: var a = nil;
+            // desugars a variable declaration like: let a;
+            // into: let a = nil;
             self.emit_byte(OpCode::Nil);
         }
 
@@ -347,7 +347,7 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
         if self._match(TokenType::Semicolon) {
             // No initializer.
-        } else if self._match(TokenType::Var) {
+        } else if self._match(TokenType::Let) {
             self.var_decaration();
         } else {
             self.expression_statement();

@@ -6,7 +6,7 @@ fn bar(a, b) {
   print b;
 }
 
-var foo = Foo();
+let foo = Foo();
 foo.bar = bar;
 
 foo.bar(1, 2);

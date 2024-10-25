@@ -1,11 +1,11 @@
-var a = "global";
+let a = "global";
 
 {
   fn assign() {
     a = "assigned";
   }
 
-  var a = "inner";
+  let a = "inner";
   assign();
   print a; // expect: inner
 }

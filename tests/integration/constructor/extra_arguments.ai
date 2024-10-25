@@ -5,4 +5,4 @@ class Foo {
   }
 }
 
-var foo = Foo(1, 2, 3, 4); // expect runtime error: Expected 2 arguments but got 4.
+let foo = Foo(1, 2, 3, 4); // expect runtime error: Expected 2 arguments but got 4.

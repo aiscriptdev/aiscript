@@ -1,9 +1,9 @@
 {
-  var a = "first";
+  let a = "first";
   print a; // expect: first
 }
 
 {
-  var a = "second";
+  let a = "second";
   print a; // expect: second
 }

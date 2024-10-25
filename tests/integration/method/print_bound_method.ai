@@ -1,5 +1,5 @@
 class Foo {
   method() { }
 }
-var foo = Foo();
+let foo = Foo();
 print foo.method; // expect: <fn method>

@@ -5,8 +5,8 @@ fn caller(g) {
 }
 
 fn callCaller() {
-  var capturedVar = "before";
-  var a = "a";
+  let capturedVar = "before";
+  let a = "a";
 
   fn f() {
     // Commenting the next line out prevents the bug!

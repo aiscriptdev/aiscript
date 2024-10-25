@@ -1,5 +1,5 @@
 {
-  var local = "local";
+  let local = "local";
   fn f() {
     print local; // expect: local
   }

@@ -10,8 +10,8 @@ class Foo {
   }
 }
 
-var foo = Foo();
-var method = foo.method;
+let foo = Foo();
+let method = foo.method;
 
 // Setting a property shadows the instance method.
 foo.method = foo.other;
