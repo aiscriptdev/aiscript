@@ -1,2 +1,3 @@
-var a = prompt "What is Rust?";
+var p = "What is Rust?";
+var a = prompt p;
 print a;

@@ -857,15 +857,7 @@ impl<'gc> Parser<'gc> {
 
 impl<'gc> Parser<'gc> {
     fn prompt(&mut self, _can_assign: bool) {
-        if !self.check(TokenType::String) {
-            self.error("Expect a string as the prompt.");
-            return;
-        }
-
-        // self.parse_precedence(Precedence::Unary);
         self.expression();
-        // self.string(false);
-        // self.consume(TokenType::Semicolon, "Expect ';' after prompt.");
         self.emit_byte(OpCode::Prompt);
     }
 }
