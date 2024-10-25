@@ -860,6 +860,11 @@ impl<'gc> Parser<'gc> {
 
 impl<'gc> Parser<'gc> {
     fn prompt(&mut self, _can_assign: bool) {
+        if self.compiler.fn_type != FunctionType::AiFunction
+            && self.compiler.fn_type != FunctionType::Script
+        {
+            self.error("Can't prompt outside of ai function or root.");
+        }
         self.expression();
         self.emit_byte(OpCode::Prompt);
     }

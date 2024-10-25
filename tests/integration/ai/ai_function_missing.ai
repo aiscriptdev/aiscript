@@ -1,0 +1,3 @@
+fn f2() {
+    prompt "1 + 1 = ?"; // Error at 'prompt': Can't prompt outside of ai function or root.
+}
