@@ -58,13 +58,19 @@ pub struct Field {
     pub _type: FieldType,
     pub required: bool,
     pub default: Option<Value>,
-    pub validators: Vec<Validator>,
+    pub validators: Vec<ValidationRule>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Validator {
     pub kind: ValidatorKind,
     pub message: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidationRule {
+    pub name: String,
+    pub params: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

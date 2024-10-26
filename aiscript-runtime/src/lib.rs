@@ -24,6 +24,7 @@ use tower::Service;
 mod ast;
 use ast::validators::*;
 use ast::*;
+mod lalrpop_helpers;
 
 lalrpop_mod!(
     #[rustfmt::skip]
@@ -97,15 +98,15 @@ impl Future for ExecuteFuture {
                                 || (matches!(field._type, FieldType::Bool) && value.is_boolean())
                                 || (matches!(field._type, FieldType::Array) && value.is_array())
                             {
-                                for validator in &field.validators {
-                                    if let Err(e) = validator.validate(value) {
-                                        return Poll::Ready(Ok(format!(
-                                            "Field validation failed: {}",
-                                            e
-                                        )
-                                        .into_response()));
-                                    }
-                                }
+                                // for validator in &field.validators {
+                                //     if let Err(e) = validator.validate(value) {
+                                //         return Poll::Ready(Ok(format!(
+                                //             "Field validation failed: {}",
+                                //             e
+                                //         )
+                                //         .into_response()));
+                                //     }
+                                // }
                                 self.query.insert(field.name.clone(), value.clone());
                             } else {
                                 // Field type mismatch
@@ -179,15 +180,15 @@ impl Future for ExecuteFuture {
                                         && value.is_boolean())
                                     || (matches!(field._type, FieldType::Array) && value.is_array())
                                 {
-                                    for validator in &field.validators {
-                                        if let Err(e) = validator.validate(value) {
-                                            return Poll::Ready(Ok(format!(
-                                                "Field validation failed: {}",
-                                                e
-                                            )
-                                            .into_response()));
-                                        }
-                                    }
+                                    // for validator in &field.validators {
+                                    //     if let Err(e) = validator.validate(value) {
+                                    //         return Poll::Ready(Ok(format!(
+                                    //             "Field validation failed: {}",
+                                    //             e
+                                    //         )
+                                    //         .into_response()));
+                                    //     }
+                                    // }
                                     self.body.insert(field.name.clone(), value.clone());
                                 } else {
                                     return Poll::Ready(Ok(format!(
@@ -286,10 +287,20 @@ mod tests {
     fn test_lalrpop() {
         let input = r#"
         get /a, put /a  {
+            @form
             body {
+                @match
                 a: str
                 b: bool
             }
+
+            query {
+                @length
+                name: str
+                @compare
+                age: int
+            }
+
         }
         "#;
 

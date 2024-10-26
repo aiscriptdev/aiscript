@@ -86,6 +86,8 @@
 
 ### @not
 
+### @or
+
 ### @number
 
 - min

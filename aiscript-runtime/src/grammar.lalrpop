@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::ast::*;
+use crate::lalrpop_helpers::*;
 
 grammar;
 
@@ -16,11 +17,11 @@ grammar;
 // }
 
 pub Endpoint: Endpoint = {
-     <path_specs:PathSpecs> "{" <body:RequestBody?>  "}" => Endpoint {
+     <path_specs:PathSpecs>  <body:RouteBody> => Endpoint {
         path_specs,
         return_type: None,
-        query: Vec::new(),
-        body,
+        query: body.query,
+        body: body.body,
         handler: Handler::Empty,
     }
 };
@@ -90,21 +91,73 @@ PathParameterType: String = {
     "bool" => <>.to_string(),
 }
 
-RequestBody: RequestBody = {
-    <is_json:("@json")?> "body" "{" <fields:Field*> "}" => RequestBody {
+RouteBody: RouteBodyParts = {
+    "{" <parts:RoutePart*> "}" => {
+        let mut query = Vec::new();
+        let mut body = None;
+        // let mut handler_code = String::new();
+        
+        for part in parts {
+            match part {
+                RoutePartKind::Query(q) => query = q,
+                RoutePartKind::Body(b) => body = Some(b),
+                // RoutePartKind::Code(c) => handler_code = c,
+            }
+        }
+        
+        RouteBodyParts {
+            query,
+            body,
+            // handler_code,
+        }
+    }
+};
+
+RoutePart: RoutePartKind = {
+    <q:QueryBlock> => RoutePartKind::Query(q),
+    <b:BodyBlock> => RoutePartKind::Body(b),
+    // <c:HandlerCode> => RoutePartKind::Code(c),
+};
+
+QueryBlock: Vec<Field> = {
+    "query" "{" <fields:Field*> "}" => fields,
+};
+
+BodyBlock: RequestBody = {
+    "body" "{" <fields:Field*> "}" => RequestBody {
         kind: BodyKind::Json,
+        fields,
+    },
+    <kind:BodyDirective> "body" "{" <fields:Field*> "}" => RequestBody {
+        kind,
         fields,
     }
 };
 
+// HandlerCode: String = {
+//     <s:(!("query" | "body") !"{" !"}" [_])*> => <>.iter().collect()
+// };
+
+BodyDirective: BodyKind = {
+    "@json" => BodyKind::Json,
+    "@form" => BodyKind::Form,
+};
+
 Field: Field = {
-    // <validations:("@" <Validation>)*>
+    <validations:("@" <Validation>)*>
     <name:Identifier> ":" <typ:PathParameterType> => Field {
         name: name.to_string(),
         _type: FieldType::Str,
         required: true,
         default: None,
-        validators: Vec::new(),
+        validators: validations,
+    }
+};
+
+Validation: ValidationRule = {
+    <name:Identifier> => ValidationRule {
+        name: name.to_string(),
+        params: Vec::new(),
     }
 };
 
