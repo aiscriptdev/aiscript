@@ -13,19 +13,27 @@ pub enum HttpMethod {
     Delete,
 }
 
-#[derive(Clone, Debug)]
-pub struct HttpRoute {
-    pub path: String,
+#[derive(Debug, Clone)]
+pub enum PathSegmentKind {
+    Static(String),           // Regular path segment like "users" or "posts"
+    Parameter(PathParameter), // Path parameter like "<id:int>"
 }
 
-#[derive(Clone, Debug)]
-pub struct Signature {
+#[derive(Debug, Clone)]
+pub struct PathParameter {
+    pub name: String,       // Parameter name (e.g., "id")
+    pub param_type: String, // Parameter type (e.g., "int")
+}
+
+#[derive(Debug, Clone)]
+pub struct PathSpec {
     pub method: HttpMethod,
-    pub route: HttpRoute,
+    pub path: String,
+    pub path_params: Vec<PathParameter>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Body {
+pub struct RequestBody {
     pub kind: BodyKind,
     pub fields: Vec<Field>,
 }
@@ -34,11 +42,6 @@ pub struct Body {
 pub enum BodyKind {
     Form,
     Json,
-}
-
-#[derive(Clone, Debug)]
-pub struct Data {
-    pub fields: Vec<Field>,
 }
 
 #[derive(Clone, Debug)]
@@ -61,23 +64,21 @@ pub struct Field {
 #[derive(Clone, Debug)]
 pub struct Validator {
     pub kind: ValidatorKind,
-    pub message: String,
+    pub message: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub enum Handler {
     Empty,
-    Dsl,
+    Script,
 }
-#[derive(Clone, Debug)]
-pub enum DslHandler {}
 
 #[derive(Clone, Debug)]
 pub struct Endpoint {
-    pub signatures: Vec<Signature>,
-    pub headers: HashMap<String, String>,
+    pub path_specs: Vec<PathSpec>,
+    pub return_type: Option<String>,
     pub query: Vec<Field>,
-    pub body: Option<Body>,
+    pub body: Option<RequestBody>,
     pub handler: Handler,
 }
 

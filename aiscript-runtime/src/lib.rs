@@ -15,20 +15,25 @@ use axum::{
     routing::{delete_service, get, get_service, post_service, put_service},
     Form, Json, Router,
 };
+use lalrpop_util::lalrpop_mod;
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::pin;
 use tower::Service;
 
-mod dsl;
-use dsl::validators::*;
-use dsl::*;
+mod ast;
+use ast::validators::*;
+use ast::*;
+
+lalrpop_mod!(
+    #[rustfmt::skip]
+    grammar
+);
 
 #[derive(Clone)]
 struct EndpointImpl {
-    headers: HashMap<String, String>,
     query: Vec<Field>,
-    body: Option<Body>,
+    body: Option<RequestBody>,
     handler: Handler,
 }
 
@@ -39,9 +44,8 @@ impl EndpointImpl {
 }
 
 struct Raw {
-    headers: HashMap<String, String>,
     query: Vec<Field>,
-    body: Option<Body>,
+    body: Option<RequestBody>,
     handler: Handler,
 }
 
@@ -233,7 +237,6 @@ impl Service<Request> for EndpointImpl {
         // self.clone()
         ExecuteFuture {
             raw: Raw {
-                headers: mem::take(&mut self.headers),
                 query: mem::take(&mut self.query),
                 body: mem::take(&mut self.body),
                 handler: mem::replace(&mut self.handler, Handler::Empty),
@@ -246,88 +249,26 @@ impl Service<Request> for EndpointImpl {
     }
 }
 
-fn get_routes() -> Vec<Route> {
-    vec![Route {
-        prefix: "/poc".into(),
-        endpoints: vec![
-            Endpoint {
-                signatures: vec![Signature {
-                    method: HttpMethod::Get,
-                    route: HttpRoute {
-                        path: "/hello".into(),
-                    },
-                }],
-                headers: HashMap::new(),
-                query: vec![Field {
-                    name: "a".into(),
-                    _type: FieldType::Str,
-                    required: true,
-                    default: None,
-                    validators: vec![Validator {
-                        kind: ValidatorKind::Length(Length {
-                            min: Some(2),
-                            max: Some(5),
-                        }),
-                        message: "".into(),
-                    }],
-                }],
-                body: None,
-                handler: Handler::Dsl,
-            },
-            Endpoint {
-                signatures: vec![
-                    Signature {
-                        method: HttpMethod::Put,
-                        route: HttpRoute {
-                            path: "/test".into(),
-                        },
-                    },
-                    Signature {
-                        method: HttpMethod::Post,
-                        route: HttpRoute {
-                            path: "/test".into(),
-                        },
-                    },
-                ],
-                headers: HashMap::new(),
-                query: Vec::new(),
-                body: Some(Body {
-                    kind: BodyKind::Json,
-                    fields: vec![Field {
-                        name: "test".into(),
-                        _type: FieldType::Bool,
-                        required: true,
-                        default: Some(true.into()),
-                        validators: vec![],
-                    }],
-                }),
-                handler: Handler::Dsl,
-            },
-        ],
-    }]
-}
-
 pub async fn run(port: u16) {
     let mut router = Router::new().route("/", get(|| async { "Hello, World!" }));
 
-    for route in get_routes() {
+    for route in Vec::<Route>::new() {
         let prefix = route.prefix;
         let mut r = Router::new();
         for endpoint in route.endpoints {
             let endpoint_impl = EndpointImpl {
-                headers: endpoint.headers,
                 query: endpoint.query,
                 body: endpoint.body,
                 handler: endpoint.handler,
             };
-            for signature in endpoint.signatures {
-                let service_fn = match signature.method {
+            for path_spec in endpoint.path_specs {
+                let service_fn = match path_spec.method {
                     HttpMethod::Get => get_service,
                     HttpMethod::Post => post_service,
                     HttpMethod::Put => put_service,
                     HttpMethod::Delete => delete_service,
                 };
-                r = r.route(&signature.route.path, service_fn(endpoint_impl.clone()));
+                r = r.route(&path_spec.path, service_fn(endpoint_impl.clone()));
             }
         }
         router = router.nest(&prefix, r);
@@ -336,4 +277,24 @@ pub async fn run(port: u16) {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, router).await.unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_lalrpop() {
+        let input = r#"
+        get /a, put /a  {
+            body {
+                a: str
+                b: bool
+            }
+        }
+        "#;
+
+        let ast = grammar::EndpointParser::new();
+        let r = ast.parse(input).unwrap();
+        println!("{:?}", r);
+    }
 }

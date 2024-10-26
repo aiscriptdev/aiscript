@@ -1,0 +1,137 @@
+use std::str::FromStr;
+
+use crate::ast::*;
+
+grammar;
+
+// Helper macro to capture raw text between braces
+// match {
+//     r"\{" => "{",
+//     r"\}" => "}",
+//     r"//[^\n]*" => { }, // Skip comments
+//     r"\s*" => { },      // Skip whitespace
+//     r"[^{}]+" => BODY_TEXT, // Capture any text that's not a brace
+// } else {
+//     _
+// }
+
+pub Endpoint: Endpoint = {
+     <path_specs:PathSpecs> "{" <body:RequestBody?>  "}" => Endpoint {
+        path_specs,
+        return_type: None,
+        query: Vec::new(),
+        body,
+        handler: Handler::Empty,
+    }
+};
+
+PathSpecs: Vec<PathSpec> = {
+    <paths:(<PathSpec> ",")*> <last:PathSpec> => {
+        let mut paths = paths;
+        paths.push(last);
+        paths
+    }
+};
+
+PathSpec: PathSpec = {
+    <method:HttpMethod> <path:Path> => PathSpec {
+        method,
+        path: path.0,
+        path_params: path.1,
+    }
+};
+
+HttpMethod: HttpMethod = {
+    "get" => HttpMethod::Get,
+    "post" => HttpMethod::Post,
+    "put" => HttpMethod::Put,
+    "delete" => HttpMethod::Delete,
+};
+
+// Example of how paths are parsed:
+// "/users/<id:int>/posts"
+// Gets broken down into segments:
+// - Static("users")
+// - Parameter(PathParameter { name: "id", param_type: "int" })
+// - Static("posts")
+
+// Grammar rules for path parsing remain the same:
+Path: (String, Vec<PathParameter>) = {
+    <segments:PathSegment*> "/"? => {
+        let path = segments.iter()
+            .map(|s| match s {
+                PathSegmentKind::Static(s) => format!("/{}", s),
+                PathSegmentKind::Parameter(p) => format!("/:{}", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        let path = if path.is_empty() { "/".to_string() } else { path };
+        let params = segments.iter()
+            .filter_map(|s| match s {
+                PathSegmentKind::Parameter(p) => Some(p.clone()),
+                _ => None,
+            })
+            .collect();
+        (path, params)
+    }
+};
+
+PathSegment: PathSegmentKind = {
+    "/" <s:r"[a-zA-Z][a-zA-Z0-9_]*"> => PathSegmentKind::Static(s.to_string()),
+    "/" "<" <name:Identifier> ":" <typ:PathParameterType> ">" => PathSegmentKind::Parameter(PathParameter {
+        name: name.to_string(),
+        param_type: typ.to_string(),
+    }),
+};
+
+PathParameterType: String = {
+    "int" => <>.to_string(),
+    "str" => <>.to_string(),
+    "bool" => <>.to_string(),
+}
+
+RequestBody: RequestBody = {
+    <is_json:("@json")?> "body" "{" <fields:Field*> "}" => RequestBody {
+        kind: BodyKind::Json,
+        fields,
+    }
+};
+
+Field: Field = {
+    // <validations:("@" <Validation>)*>
+    <name:Identifier> ":" <typ:PathParameterType> => Field {
+        name: name.to_string(),
+        _type: FieldType::Str,
+        required: true,
+        default: None,
+        validators: Vec::new(),
+    }
+};
+
+HandlerBody: String = {
+    "{" <content:HandlerContent> "}" => content.trim().to_string()
+};
+
+HandlerContent: String = {
+    <parts:HandlerPart*> => parts.join("")
+};
+
+HandlerPart: String = {
+    // BODY_TEXT => <>.to_string(),
+    "{" <content:HandlerContent> "}" => format!("{{{}}}", content),
+};
+
+Identifier: &'input str = r"[a-zA-Z][a-zA-Z0-9_]*" => <>;
+StringLiteral: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_string();
+Number: i64 = r"-?[0-9]+" => i64::from_str(<>).unwrap();
+// Type: &'input str = r"[a-zA-Z][a-zA-Z0-9_\.]*" => <>;
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None=> v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
