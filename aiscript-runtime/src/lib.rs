@@ -286,40 +286,41 @@ mod tests {
     #[test]
     fn test_lalrpop() {
         let input = r#"
-        get /a, put /a  {
-            @form
-            body {
-                @any(
-                    @length(max=10),
-                    @match(regex="^[a-z]+$"),
-                    @another1
-                )
-                @another2
-                a: str
-                b: bool = false
+        route /test/<id:int> {
+            get /a, put /a  {
+                @form
+                body {
+                    @any(
+                        @length(max=10),
+                        @match(regex="^[a-z]+$"),
+                        @another1
+                    )
+                    @another2
+                    a: str
+                    b: bool = false
+                }
+
+                query {
+                    @length
+                    name: str = "hello"
+                    @compare
+                    age: int = 18
+                }
+
             }
 
-            query {
-                @length
-                name: str = "hello"
-                @compare
-                age: int = 18
+            post /hello {
+                @json
+                body {
+                    @not(@length(max=10))
+                    @another2
+                    a: str
+                    b: bool
+                }
             }
+        }"#;
 
-        }
-
-        post /hello {
-            @json
-            body {
-                @not(@length(max=10))
-                @another2
-                a: str
-                b: bool
-            }
-        }
-        "#;
-
-        let ast = grammar::EndpointsParser::new();
+        let ast = grammar::RouteParser::new();
         let r = ast.parse(input).unwrap();
         println!("{:?}", r);
     }

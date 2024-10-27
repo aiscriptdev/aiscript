@@ -29,7 +29,7 @@ pub struct PathParameter {
 pub struct PathSpec {
     pub method: HttpMethod,
     pub path: String,
-    pub path_params: Vec<PathParameter>,
+    pub params: Vec<PathParameter>,
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +102,7 @@ pub struct Endpoint {
 #[derive(Clone, Debug)]
 pub struct Route {
     pub prefix: String,
+    pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,
 }
 

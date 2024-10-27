@@ -5,7 +5,20 @@ use crate::lalrpop_helpers::*;
 
 grammar;
 
-pub Endpoints: Vec<Endpoint> = {
+pub Route: Route = {
+    "route" <path: Path> "{" <endpoints: Endpoint*> "}" => Route {
+        prefix: path.0,
+        params: path.1,
+        endpoints,
+    },
+    <endpoints: Endpoint*> => Route {
+        prefix: "".to_string(),
+        params: Vec::new(),
+        endpoints,
+    }
+};
+
+Endpoints: Vec<Endpoint> = {
     <endpoints: Endpoint*> => <>
 }
 
@@ -31,7 +44,7 @@ PathSpec: PathSpec = {
     <method:HttpMethod> <path:Path> => PathSpec {
         method,
         path: path.0,
-        path_params: path.1,
+        params: path.1,
     }
 };
 
