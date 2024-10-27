@@ -79,16 +79,10 @@ pub enum Directive {
 
 #[derive(Debug, Clone)]
 pub enum DirectiveParam {
-    Named { name: String, value: DirectiveValue },
-    Positional(DirectiveValue),
+    Named { name: String, value: Value },
+    Positional(Value),
 }
 
-#[derive(Debug, Clone)]
-pub enum DirectiveValue {
-    String(String),
-    Number(i64),
-    Boolean(bool),
-}
 
 #[derive(Clone, Debug)]
 pub enum Handler {

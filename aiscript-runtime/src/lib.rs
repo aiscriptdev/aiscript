@@ -296,20 +296,30 @@ mod tests {
                 )
                 @another2
                 a: str
-                b: bool
+                b: bool = false
             }
 
             query {
                 @length
-                name: str
+                name: str = "hello"
                 @compare
-                age: int
+                age: int = 18
             }
 
         }
+
+        post /hello {
+            @json
+            body {
+                @not(@length(max=10))
+                @another2
+                a: str
+                b: bool
+            }
+        }
         "#;
 
-        let ast = grammar::EndpointParser::new();
+        let ast = grammar::EndpointsParser::new();
         let r = ast.parse(input).unwrap();
         println!("{:?}", r);
     }

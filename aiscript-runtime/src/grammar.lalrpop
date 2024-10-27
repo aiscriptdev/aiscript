@@ -5,8 +5,12 @@ use crate::lalrpop_helpers::*;
 
 grammar;
 
-pub Endpoint: Endpoint = {
-     <path_specs:PathSpecs>  <body:RouteBody> => Endpoint {
+pub Endpoints: Vec<Endpoint> = {
+    <endpoints: Endpoint*> => <>
+}
+
+Endpoint: Endpoint = {
+     <path_specs:PathSpecs> <body:RouteBody> => Endpoint {
         path_specs,
         return_type: None,
         query: body.query,
@@ -44,7 +48,6 @@ HttpMethod: HttpMethod = {
 // - Static("users")
 // - Parameter(PathParameter { name: "id", param_type: "int" })
 // - Static("posts")
-
 // Grammar rules for path parsing remain the same:
 Path: (String, Vec<PathParameter>) = {
     <segments:PathSegment*> "/"? => {
@@ -134,11 +137,11 @@ BodyDirective: BodyKind = {
 
 Field: Field = {
     <validations:(<Directive>)*>
-    <name:Identifier> ":" <typ:PathParameterType> => Field {
+    <name:Identifier> ":" <typ:PathParameterType> <default:("=" <Value>)?> => Field {
         name: name.to_string(),
         _type: FieldType::Str,
-        required: true,
-        default: None,
+        required: default.is_none(),
+        default,
         validators: validations,
     }
 };
@@ -178,18 +181,18 @@ DirectiveParams: Vec<DirectiveParam> = {
 };
 
 DirectiveParam: DirectiveParam = {
-    <name:Identifier> "=" <value:DirectiveValue> => DirectiveParam::Named {
+    <name:Identifier> "=" <value:Value> => DirectiveParam::Named {
         name: name.to_string(),
         value,
     },
-    <value:DirectiveValue> => DirectiveParam::Positional(value),
+    <value:Value> => DirectiveParam::Positional(value),
 };
 
-DirectiveValue: DirectiveValue = {
-    StringLiteral => DirectiveValue::String(<>),
-    Num => DirectiveValue::Number(<>),
-    "true" => DirectiveValue::Boolean(true),
-    "false" => DirectiveValue::Boolean(false),
+Value: serde_json::Value = {
+    StringLiteral => serde_json::Value::String(<>),
+    Num => serde_json::Value::Number(<>.into()),
+    "true" => serde_json::Value::Bool(true),
+    "false" => serde_json::Value::Bool(false),
 };
 
 HandlerBody: String = {
