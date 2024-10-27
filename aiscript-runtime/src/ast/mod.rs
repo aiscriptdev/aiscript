@@ -14,12 +14,6 @@ pub enum HttpMethod {
 }
 
 #[derive(Debug, Clone)]
-pub enum PathSegmentKind {
-    Static(String),           // Regular path segment like "users" or "posts"
-    Parameter(PathParameter), // Path parameter like "<id:int>"
-}
-
-#[derive(Debug, Clone)]
 pub struct PathParameter {
     pub name: String,       // Parameter name (e.g., "id")
     pub param_type: String, // Parameter type (e.g., "int")

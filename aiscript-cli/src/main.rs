@@ -20,8 +20,11 @@ struct AIScriptCli {
 enum Commands {
     /// Start the web server.
     Serve {
+        /// The file to run.
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
         /// The web server listening port.
-        #[arg(short, long, default_value_t = 8000)]
+        #[arg(short, long, default_value_t = 8080)]
         port: u16,
     },
 }
@@ -31,10 +34,10 @@ fn main() {
     dotenv::dotenv().ok();
     let cli = AIScriptCli::parse();
     match cli.command {
-        Some(Commands::Serve { port }) => {
+        Some(Commands::Serve { file, port }) => {
             println!("Server listening on port {}", port);
             Runtime::new().unwrap().block_on(async {
-                aiscript_runtime::run(port).await;
+                aiscript_runtime::run(file, port).await;
             });
         }
         None => {

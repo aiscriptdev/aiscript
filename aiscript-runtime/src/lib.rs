@@ -5,6 +5,7 @@ use std::{
     future::Future,
     mem,
     net::SocketAddr,
+    path::PathBuf,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -250,10 +251,13 @@ impl Service<Request> for EndpointImpl {
     }
 }
 
-pub async fn run(port: u16) {
+pub async fn run(path: PathBuf, port: u16) {
+    let input = std::fs::read_to_string(path).unwrap();
+    let parser = grammar::RouteParser::new();
+    let route = parser.parse(&input).unwrap();
     let mut router = Router::new().route("/", get(|| async { "Hello, World!" }));
 
-    for route in Vec::<Route>::new() {
+    for route in vec![route] {
         let prefix = route.prefix;
         let mut r = Router::new();
         for endpoint in route.endpoints {
@@ -274,6 +278,8 @@ pub async fn run(port: u16) {
         }
         router = router.nest(&prefix, r);
     }
+
+    println!("{:?}", router);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await.unwrap();
@@ -309,7 +315,7 @@ mod tests {
 
             }
 
-            post /hello {
+            post / {
                 @json
                 body {
                     @not(@length(max=10))

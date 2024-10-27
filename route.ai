@@ -1,0 +1,22 @@
+route /poc {
+    get /hello {
+        query {
+            @length(min=3, max=10)
+            content: str
+            aget: int = 18
+        }
+    }
+
+    post /hello {
+        query {
+            @length(min=3, max=10)
+            content: str
+            aget: int = 18
+        }
+
+        @json
+        body {
+            test: bool = true
+        }
+    }
+}

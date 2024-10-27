@@ -1,9 +1,15 @@
 use std::str::FromStr;
 
+use lalrpop_util::ParseError;
+
 use crate::ast::*;
 use crate::lalrpop_helpers::*;
 
 grammar;
+
+extern {
+    type Error = String;
+}
 
 pub Route: Route = {
     "route" <path: Path> "{" <endpoints: Endpoint*> "}" => Route {
@@ -63,7 +69,10 @@ HttpMethod: HttpMethod = {
 // - Static("posts")
 // Grammar rules for path parsing remain the same:
 Path: (String, Vec<PathParameter>) = {
-    <segments:PathSegment*> "/"? => {
+    <segments:PathSegment*> =>? {
+        if segments.is_empty() {
+            return Err(ParseError::User{ error: "Path required after http method".into() })
+        }
         let path = segments.iter()
             .map(|s| match s {
                 PathSegmentKind::Static(s) => format!("/{}", s),
@@ -78,7 +87,7 @@ Path: (String, Vec<PathParameter>) = {
                 _ => None,
             })
             .collect();
-        (path, params)
+        Ok((path, params))
     }
 };
 
@@ -150,14 +159,20 @@ BodyDirective: BodyKind = {
 
 Field: Field = {
     <validations:(<Directive>)*>
-    <name:Identifier> ":" <typ:PathParameterType> <default:("=" <Value>)?> => Field {
+    <name:Identifier> ":" <typ:FieldType> <default:("=" <Value>)?> => Field {
         name: name.to_string(),
-        _type: FieldType::Str,
+        _type: typ,
         required: default.is_none(),
         default,
         validators: validations,
     }
 };
+
+FieldType: FieldType = {
+    "int" => FieldType::Number,
+    "str" => FieldType::Str,
+    "bool" => FieldType::Bool,
+}
 
 Directive: Directive = {
     AnyDirective,
