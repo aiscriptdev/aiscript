@@ -58,19 +58,36 @@ pub struct Field {
     pub _type: FieldType,
     pub required: bool,
     pub default: Option<Value>,
-    pub validators: Vec<ValidationRule>,
+    pub validators: Vec<Directive>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Validator {
-    pub kind: ValidatorKind,
-    pub message: Option<String>,
+// #[derive(Clone, Debug)]
+// pub struct Validator {
+//     pub kind: ValidatorKind,
+//     pub message: Option<String>,
+// }
+
+#[derive(Debug, Clone)]
+pub enum Directive {
+    Simple {
+        name: String,
+        params: Vec<DirectiveParam>,
+    },
+    Any(Vec<Directive>), // Must have 2 or more directives
+    Not(Box<Directive>),
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidationRule {
-    pub name: String,
-    pub params: Vec<String>,
+#[derive(Debug, Clone)]
+pub enum DirectiveParam {
+    Named { name: String, value: DirectiveValue },
+    Positional(DirectiveValue),
+}
+
+#[derive(Debug, Clone)]
+pub enum DirectiveValue {
+    String(String),
+    Number(i64),
+    Boolean(bool),
 }
 
 #[derive(Clone, Debug)]
@@ -94,11 +111,11 @@ pub struct Route {
     pub endpoints: Vec<Endpoint>,
 }
 
-impl Validator {
-    pub fn validate(&self, value: &Value) -> Result<(), String> {
-        match &self.kind {
-            ValidatorKind::Length(length) => length.validate(value),
-            ValidatorKind::Format(format) => format.validate(value),
-        }
-    }
-}
+// impl Validator {
+//     pub fn validate(&self, value: &Value) -> Result<(), String> {
+//         match &self.kind {
+//             ValidatorKind::Length(length) => length.validate(value),
+//             ValidatorKind::Format(format) => format.validate(value),
+//         }
+//     }
+// }

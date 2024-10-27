@@ -289,7 +289,12 @@ mod tests {
         get /a, put /a  {
             @form
             body {
-                @match
+                @any(
+                    @length(max=10),
+                    @match(regex="^[a-z]+$"),
+                    @another1
+                )
+                @another2
                 a: str
                 b: bool
             }

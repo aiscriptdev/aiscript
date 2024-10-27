@@ -5,17 +5,6 @@ use crate::lalrpop_helpers::*;
 
 grammar;
 
-// Helper macro to capture raw text between braces
-// match {
-//     r"\{" => "{",
-//     r"\}" => "}",
-//     r"//[^\n]*" => { }, // Skip comments
-//     r"\s*" => { },      // Skip whitespace
-//     r"[^{}]+" => BODY_TEXT, // Capture any text that's not a brace
-// } else {
-//     _
-// }
-
 pub Endpoint: Endpoint = {
      <path_specs:PathSpecs>  <body:RouteBody> => Endpoint {
         path_specs,
@@ -144,7 +133,7 @@ BodyDirective: BodyKind = {
 };
 
 Field: Field = {
-    <validations:("@" <Validation>)*>
+    <validations:(<Directive>)*>
     <name:Identifier> ":" <typ:PathParameterType> => Field {
         name: name.to_string(),
         _type: FieldType::Str,
@@ -154,11 +143,53 @@ Field: Field = {
     }
 };
 
-Validation: ValidationRule = {
-    <name:Identifier> => ValidationRule {
+Directive: Directive = {
+    AnyDirective,
+    NotDirective,
+    SimpleDirective,
+};
+
+// @any requires 2 or more directives
+AnyDirective: Directive = {
+    "@any" "(" <first:Directive> "," <second:Directive> <rest:("," <Directive>)*> ")" => {
+        let mut directives = vec![first, second];
+        directives.extend(rest.into_iter());
+        Directive::Any(directives)
+    },
+};
+
+NotDirective: Directive = {
+    "@not" "(" <d:Directive> ")" => Directive::Not(Box::new(d)),
+};
+
+SimpleDirective: Directive = {
+    "@" <name:Identifier> "(" <params:DirectiveParams> ")" => Directive::Simple {
         name: name.to_string(),
-        params: Vec::new(),
-    }
+        params,
+    },
+    "@" <name:Identifier> => Directive::Simple {
+        name: name.to_string(),
+        params: vec![],
+    },
+};
+
+DirectiveParams: Vec<DirectiveParam> = {
+    <params:Comma<DirectiveParam>> => params
+};
+
+DirectiveParam: DirectiveParam = {
+    <name:Identifier> "=" <value:DirectiveValue> => DirectiveParam::Named {
+        name: name.to_string(),
+        value,
+    },
+    <value:DirectiveValue> => DirectiveParam::Positional(value),
+};
+
+DirectiveValue: DirectiveValue = {
+    StringLiteral => DirectiveValue::String(<>),
+    Num => DirectiveValue::Number(<>),
+    "true" => DirectiveValue::Boolean(true),
+    "false" => DirectiveValue::Boolean(false),
 };
 
 HandlerBody: String = {
@@ -176,7 +207,7 @@ HandlerPart: String = {
 
 Identifier: &'input str = r"[a-zA-Z][a-zA-Z0-9_]*" => <>;
 StringLiteral: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_string();
-Number: i64 = r"-?[0-9]+" => i64::from_str(<>).unwrap();
+Num: i64 = r"-?[0-9]+" => i64::from_str(<>).unwrap();
 // Type: &'input str = r"[a-zA-Z][a-zA-Z0-9_\.]*" => <>;
 
 Comma<T>: Vec<T> = {
