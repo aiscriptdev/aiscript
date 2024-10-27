@@ -92,6 +92,7 @@ Path: (String, Vec<PathParameter>) = {
 };
 
 PathSegment: PathSegmentKind = {
+    "/" => PathSegmentKind::Static(String::new()),
     "/" <s:r"[a-zA-Z][a-zA-Z0-9_]*"> => PathSegmentKind::Static(s.to_string()),
     "/" "<" <name:Identifier> ":" <typ:PathParameterType> ">" => PathSegmentKind::Parameter(PathParameter {
         name: name.to_string(),
