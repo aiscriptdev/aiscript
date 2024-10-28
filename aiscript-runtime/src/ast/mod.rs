@@ -1,8 +1,8 @@
-use std::{collections::HashMap, default};
+use std::{borrow::Cow, collections::HashMap, default};
 
 use serde_json::Value;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HttpMethod {
     Get,
     Post,
@@ -75,7 +75,7 @@ pub struct Endpoint {
     pub return_type: Option<String>,
     pub query: Vec<Field>,
     pub body: RequestBody,
-    pub handler: Handler,
+    pub statements: String,
 }
 
 #[derive(Clone, Debug)]
@@ -83,4 +83,14 @@ pub struct Route {
     pub prefix: String,
     pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,
+}
+
+impl Directive {
+    pub fn name(&self) -> Cow<'static, str> {
+        match self {
+            Directive::Simple { name, .. } => Cow::Owned(name.to_owned()),
+            Directive::Any(directives) => "any".into(),
+            Directive::Not(directive) => "not".into(),
+        }
+    }
 }

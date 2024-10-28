@@ -1,4 +1,8 @@
-use std::{iter::Peekable, str::CharIndices};
+use std::{
+    fmt::{self, Display, Formatter},
+    iter::Peekable,
+    str::{CharIndices, Chars},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -34,21 +38,11 @@ pub enum Token {
     StringLiteral(String),
     NumberLiteral(i64),
     BoolLiteral(bool),
-
-    // Special token for raw script content
-    RawScript(String),
-}
-
-#[derive(Debug)]
-pub enum LexerMode {
-    Normal,
-    RawScript { brace_count: i32 },
 }
 
 pub struct Lexer<'input> {
     input: &'input str,
-    chars: Peekable<CharIndices<'input>>,
-    mode: LexerMode,
+    chars: Peekable<Chars<'input>>,
     current_pos: usize,
 }
 
@@ -56,14 +50,13 @@ impl<'input> Lexer<'input> {
     pub fn new(input: &'input str) -> Self {
         Lexer {
             input,
-            chars: input.char_indices().peekable(),
-            mode: LexerMode::Normal,
+            chars: input.chars().peekable(),
             current_pos: 0,
         }
     }
 
     fn consume_whitespace(&mut self) {
-        while let Some(&(_, ch)) = self.chars.peek() {
+        while let Some(&ch) = self.chars.peek() {
             if ch.is_whitespace() {
                 self.chars.next();
             } else {
@@ -75,7 +68,7 @@ impl<'input> Lexer<'input> {
     fn read_identifier(&mut self) -> String {
         let mut identifier = String::new();
 
-        while let Some(&(_, ch)) = self.chars.peek() {
+        while let Some(&ch) = self.chars.peek() {
             if ch.is_alphanumeric() || ch == '_' {
                 identifier.push(ch);
                 self.chars.next();
@@ -91,11 +84,11 @@ impl<'input> Lexer<'input> {
         let mut string = String::new();
         self.chars.next(); // Skip opening quote
 
-        while let Some((_, ch)) = self.chars.next() {
+        while let Some(ch) = self.chars.next() {
             match ch {
                 '"' => return Ok(string),
                 '\\' => {
-                    if let Some((_, next_ch)) = self.chars.next() {
+                    if let Some(next_ch) = self.chars.next() {
                         string.push(match next_ch {
                             'n' => '\n',
                             'r' => '\r',
@@ -113,95 +106,135 @@ impl<'input> Lexer<'input> {
         Err("Unterminated string literal".to_string())
     }
 
-    fn read_raw_script(&mut self) -> Result<String, String> {
+    pub fn read_raw_script(&mut self, first_token: &Option<Token>) -> Result<String, String> {
         let mut script = String::new();
         let mut brace_count = 1;
 
-        while let Some((_, ch)) = self.chars.next() {
+        // Add the first token that was already consumed if it exists
+        if let Some(token) = first_token {
+            script.push_str(&token.to_string());
+        }
+
+        for ch in self.chars.by_ref() {
             match ch {
-                '{' => brace_count += 1,
+                '{' => {
+                    brace_count += 1;
+                    script.push(ch);
+                }
                 '}' => {
                     brace_count -= 1;
                     if brace_count == 0 {
-                        return Ok(script);
+                        // Don't include the final closing brace
+                        break;
+                    } else {
+                        script.push(ch);
                     }
                 }
-                _ => {}
+                ch => script.push(ch),
             }
-            script.push(ch);
         }
 
-        Err("Unclosed script block".to_string())
+        if brace_count > 0 {
+            return Err("Unclosed script block".to_string());
+        }
+
+        Ok(script)
+    }
+
+    fn parse_token(&mut self, ch: char) -> Result<Token, String> {
+        match ch {
+            '{' => Ok(Token::OpenBrace),
+            '}' => Ok(Token::CloseBrace),
+            '<' => Ok(Token::OpenAngle),
+            '>' => Ok(Token::CloseAngle),
+            ',' => Ok(Token::Comma),
+            ':' => Ok(Token::Colon),
+            '=' => Ok(Token::Equal),
+            '@' => Ok(Token::At),
+            '(' => Ok(Token::OpenParen),
+            ')' => Ok(Token::CloseParen),
+            '/' => Ok(Token::Slash),
+            '"' => self.read_string_literal().map(Token::StringLiteral),
+            ch if ch.is_alphabetic() => {
+                let mut ident = ch.to_string();
+                ident.push_str(&self.read_identifier());
+
+                Ok(match ident.as_str() {
+                    "route" => Token::Route,
+                    "get" => Token::Get,
+                    "post" => Token::Post,
+                    "put" => Token::Put,
+                    "delete" => Token::Delete,
+                    "query" => Token::Query,
+                    "body" => Token::Body,
+                    "str" => Token::TypeStr,
+                    "int" => Token::TypeInt,
+                    "bool" => Token::TypeBool,
+                    "true" => Token::BoolLiteral(true),
+                    "false" => Token::BoolLiteral(false),
+                    _ => Token::Identifier(ident),
+                })
+            }
+            ch if ch.is_numeric() || ch == '-' => {
+                let mut num = ch.to_string();
+                while let Some(&ch) = self.chars.peek() {
+                    if ch.is_numeric() {
+                        num.push(ch);
+                        self.chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                num.parse::<i64>()
+                    .map(Token::NumberLiteral)
+                    .map_err(|e| e.to_string())
+            }
+            ch => Err(format!("Unexpected character: {}", ch)),
+        }
     }
 
     pub fn next_token(&mut self) -> Option<Result<Token, String>> {
         self.consume_whitespace();
-
-        match self.mode {
-            LexerMode::RawScript { .. } => match self.read_raw_script() {
-                Ok(script) => {
-                    self.mode = LexerMode::Normal;
-                    Some(Ok(Token::RawScript(script)))
-                }
-                Err(e) => Some(Err(e)),
-            },
-            LexerMode::Normal => match self.chars.next() {
-                Some((_, ch)) => Some(match ch {
-                    '{' => Ok(Token::OpenBrace),
-                    '}' => Ok(Token::CloseBrace),
-                    '<' => Ok(Token::OpenAngle),
-                    '>' => Ok(Token::CloseAngle),
-                    ',' => Ok(Token::Comma),
-                    ':' => Ok(Token::Colon),
-                    '=' => Ok(Token::Equal),
-                    '@' => Ok(Token::At),
-                    '(' => Ok(Token::OpenParen),
-                    ')' => Ok(Token::CloseParen),
-                    '/' => Ok(Token::Slash),
-                    '"' => self.read_string_literal().map(Token::StringLiteral),
-                    ch if ch.is_alphabetic() => {
-                        let mut ident = ch.to_string();
-                        ident.push_str(&self.read_identifier());
-
-                        Ok(match ident.as_str() {
-                            "route" => Token::Route,
-                            "get" => Token::Get,
-                            "post" => Token::Post,
-                            "put" => Token::Put,
-                            "delete" => Token::Delete,
-                            "query" => Token::Query,
-                            "body" => Token::Body,
-                            "str" => Token::TypeStr,
-                            "int" => Token::TypeInt,
-                            "bool" => Token::TypeBool,
-                            "true" => Token::BoolLiteral(true),
-                            "false" => Token::BoolLiteral(false),
-                            _ => Token::Identifier(ident),
-                        })
-                    }
-                    ch if ch.is_numeric() || ch == '-' => {
-                        let mut num = ch.to_string();
-                        while let Some(&(_, ch)) = self.chars.peek() {
-                            if ch.is_numeric() {
-                                num.push(ch);
-                                self.chars.next();
-                            } else {
-                                break;
-                            }
-                        }
-                        num.parse::<i64>()
-                            .map(Token::NumberLiteral)
-                            .map_err(|e| e.to_string())
-                    }
-                    ch => Err(format!("Unexpected character: {}", ch)),
-                }),
-                None => None,
-            },
-        }
+        let next = self.chars.next()?;
+        Some(self.parse_token(next))
     }
 
-    pub fn switch_to_raw_script(&mut self) {
-        self.mode = LexerMode::RawScript { brace_count: 1 };
+    pub fn peek_token(&mut self) -> Option<Result<Token, String>> {
+        self.consume_whitespace();
+        let next = *self.chars.peek()?;
+        Some(self.parse_token(next))
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Route => write!(f, "route"),
+            Token::Get => write!(f, "get"),
+            Token::Post => write!(f, "post"),
+            Token::Put => write!(f, "put"),
+            Token::Delete => write!(f, "delete"),
+            Token::Query => write!(f, "query"),
+            Token::Body => write!(f, "body"),
+            Token::OpenBrace => write!(f, "{{"),
+            Token::CloseBrace => write!(f, "}}"),
+            Token::OpenAngle => write!(f, "<"),
+            Token::CloseAngle => write!(f, ">"),
+            Token::Comma => write!(f, ","),
+            Token::Colon => write!(f, ":"),
+            Token::Equal => write!(f, "="),
+            Token::At => write!(f, "@"),
+            Token::OpenParen => write!(f, "("),
+            Token::CloseParen => write!(f, ")"),
+            Token::Slash => write!(f, "/"),
+            Token::TypeStr => write!(f, "str"),
+            Token::TypeInt => write!(f, "int"),
+            Token::TypeBool => write!(f, "bool"),
+            Token::Identifier(ident) => write!(f, "{}", ident),
+            Token::StringLiteral(s) => write!(f, "{}", s),
+            Token::NumberLiteral(n) => write!(f, "{}", n),
+            Token::BoolLiteral(b) => write!(f, "{}", b),
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{Field, PathParameter, RequestBody};
 pub(crate) struct RouteBodyParts {
     pub query: Vec<Field>,
     pub body: RequestBody,
-    // handler_code: String,
+    pub statements: String,
 }
 
 pub(crate) enum RoutePartKind {

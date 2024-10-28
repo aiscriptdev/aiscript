@@ -26,6 +26,7 @@ use tower::Service;
 
 mod ast;
 mod lexer;
+mod parser;
 mod validator;
 use ast::*;
 use validator::{convert_from_directive, Validator};
@@ -245,7 +246,7 @@ impl Service<Request> for EndpointImpl {
                 query: mem::take(&mut self.query),
                 body_kind: mem::take(&mut self.body_kind),
                 body: mem::take(&mut self.body),
-                statements: mem::replace(&mut self.statements, String::new()),
+                statements: mem::take(&mut self.statements),
             },
             req,
             query: HashMap::new(),

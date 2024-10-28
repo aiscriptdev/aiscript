@@ -35,7 +35,7 @@ Endpoint: Endpoint = {
         return_type: None,
         query: body.query,
         body: body.body,
-        handler: Handler::Empty,
+        statements: String::new(),
     }
 };
 
@@ -108,10 +108,10 @@ PathParameterType: String = {
 }
 
 RouteBody: RouteBodyParts = {
-    "{" <parts:RoutePart*> "}" => {
+    "{" <parts:RoutePart*> /* how to parse here? */ "}" => {
         let mut query = Vec::new();
         let mut body = RequestBody::default();
-        // let mut handler_code = String::new();
+        let mut statements = String::new();
         
         // FIXME: only one query and one body is allowed
         for part in parts {
@@ -125,7 +125,7 @@ RouteBody: RouteBodyParts = {
         RouteBodyParts {
             query,
             body,
-            // handler_code,
+            statements, // how to parse the rest to string?
         }
     }
 };
@@ -222,23 +222,9 @@ Value: serde_json::Value = {
     "false" => serde_json::Value::Bool(false),
 };
 
-HandlerBody: String = {
-    "{" <content:HandlerContent> "}" => content.trim().to_string()
-};
-
-HandlerContent: String = {
-    <parts:HandlerPart*> => parts.join("")
-};
-
-HandlerPart: String = {
-    // BODY_TEXT => <>.to_string(),
-    "{" <content:HandlerContent> "}" => format!("{{{}}}", content),
-};
-
 Identifier: &'input str = r"[a-zA-Z][a-zA-Z0-9_]*" => <>;
 StringLiteral: String = <s:r#""[^"]*""#> => s[1..s.len()-1].to_string();
 Num: i64 = r"-?[0-9]+" => i64::from_str(<>).unwrap();
-// Type: &'input str = r"[a-zA-Z][a-zA-Z0-9_\.]*" => <>;
 
 Comma<T>: Vec<T> = {
     <mut v:(<T> ",")*> <e:T?> => match e {
