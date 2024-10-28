@@ -40,15 +40,21 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_route(&mut self) -> Result<Route, String> {
-        self.expect_token(Token::Route)?;
-        let path = self.parse_path()?;
-        self.expect_token(Token::OpenBrace)?;
+        let top_route = self.current_token == Some(Token::Route);
+        let mut path = (String::from("/"), Vec::new());
+        if top_route {
+            self.expect_token(Token::Route)?;
+            path = self.parse_path()?;
+            self.expect_token(Token::OpenBrace)?;
+        }
 
         let mut endpoints = Vec::new();
-        while self.current_token != Some(Token::CloseBrace) {
+        while self.current_token.is_some() && self.current_token != Some(Token::CloseBrace) {
             endpoints.push(self.parse_endpoint()?);
         }
-        self.expect_token(Token::CloseBrace)?;
+        if top_route {
+            self.expect_token(Token::CloseBrace)?;
+        }
 
         Ok(Route {
             prefix: path.0,
@@ -61,7 +67,7 @@ impl<'a> Parser<'a> {
         let mut path_str = String::new();
         let mut params = Vec::new();
 
-        while let Some(token) = self.current_token.clone() {
+        while let Some(token) = &self.current_token {
             match token {
                 Token::Slash => {
                     path_str.push('/');
@@ -87,7 +93,7 @@ impl<'a> Parser<'a> {
                     params.push(PathParameter { name, param_type });
                 }
                 Token::Identifier(segment) => {
-                    path_str.push_str(&segment);
+                    path_str.push_str(segment);
                     self.next_token();
                 }
                 Token::OpenBrace | Token::Comma => break,
@@ -164,7 +170,12 @@ impl<'a> Parser<'a> {
                 Some(Token::Post) => HttpMethod::Post,
                 Some(Token::Put) => HttpMethod::Put,
                 Some(Token::Delete) => HttpMethod::Delete,
-                _ => return Err("Expected HTTP method".to_string()),
+                _ => {
+                    return Err(format!(
+                        "Expected HTTP method, found {:?}",
+                        &self.current_token
+                    ))
+                }
             };
             self.next_token();
 
@@ -365,6 +376,28 @@ mod tests {
         // Verify script capture
         assert!(endpoint.statements.contains("let greeting"));
         assert!(endpoint.statements.contains("return greeting, 200"));
+    }
+
+    #[test]
+    fn test_no_top_route() {
+        let input = r#"
+            get / {
+                return "hello", 200
+            }
+
+            post / {
+                return "hello", 200
+            }
+        "#;
+        let mut parser = Parser::new(input);
+        let result = parser.parse_route();
+        // assert!(result.is_ok());
+        let route = result.unwrap();
+        assert_eq!(route.endpoints.len(), 2);
+        assert_eq!(route.endpoints[0].path_specs[0].method, HttpMethod::Get);
+        assert_eq!(route.endpoints[1].path_specs[0].method, HttpMethod::Post);
+        assert_eq!(route.endpoints[0].path_specs[0].path, "/");
+        assert_eq!(route.endpoints[1].path_specs[0].path, "/");
     }
 
     #[test]
