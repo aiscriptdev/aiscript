@@ -1,9 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
 use serde_json::Value;
-use validators::*;
-
-pub(crate) mod validators;
 
 #[derive(Clone, Debug)]
 pub enum HttpMethod {
@@ -26,15 +23,16 @@ pub struct PathSpec {
     pub params: Vec<PathParameter>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct RequestBody {
     pub kind: BodyKind,
     pub fields: Vec<Field>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum BodyKind {
     Form,
+    #[default]
     Json,
 }
 
@@ -52,31 +50,18 @@ pub struct Field {
     pub _type: FieldType,
     pub required: bool,
     pub default: Option<Value>,
-    pub validators: Vec<Directive>,
+    pub directives: Vec<Directive>,
 }
-
-// #[derive(Clone, Debug)]
-// pub struct Validator {
-//     pub kind: ValidatorKind,
-//     pub message: Option<String>,
-// }
 
 #[derive(Debug, Clone)]
 pub enum Directive {
     Simple {
         name: String,
-        params: Vec<DirectiveParam>,
+        params: HashMap<String, Value>,
     },
     Any(Vec<Directive>), // Must have 2 or more directives
     Not(Box<Directive>),
 }
-
-#[derive(Debug, Clone)]
-pub enum DirectiveParam {
-    Named { name: String, value: Value },
-    Positional(Value),
-}
-
 
 #[derive(Clone, Debug)]
 pub enum Handler {
@@ -89,7 +74,7 @@ pub struct Endpoint {
     pub path_specs: Vec<PathSpec>,
     pub return_type: Option<String>,
     pub query: Vec<Field>,
-    pub body: Option<RequestBody>,
+    pub body: RequestBody,
     pub handler: Handler,
 }
 
@@ -99,12 +84,3 @@ pub struct Route {
     pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,
 }
-
-// impl Validator {
-//     pub fn validate(&self, value: &Value) -> Result<(), String> {
-//         match &self.kind {
-//             ValidatorKind::Length(length) => length.validate(value),
-//             ValidatorKind::Format(format) => format.validate(value),
-//         }
-//     }
-// }

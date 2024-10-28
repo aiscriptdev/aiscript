@@ -1,7 +1,7 @@
 route /poc {
     get /hello {
         query {
-            @length(min=3, max=10)
+            @string(min_len=3, max_len=10)
             content: str
             aget: int = 18
         }
@@ -9,7 +9,7 @@ route /poc {
 
     post /hello {
         query {
-            @length(min=3, max=10)
+            @string(min_len=3, max_len=10)
             content: str
             aget: int = 18
         }

@@ -3,7 +3,7 @@ use crate::{Field, PathParameter, RequestBody};
 // Helper structs for parsing
 pub(crate) struct RouteBodyParts {
     pub query: Vec<Field>,
-    pub body: Option<RequestBody>,
+    pub body: RequestBody,
     // handler_code: String,
 }
 

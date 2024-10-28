@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::collections::HashMap;
 
 use lalrpop_util::ParseError;
 
@@ -109,13 +110,14 @@ PathParameterType: String = {
 RouteBody: RouteBodyParts = {
     "{" <parts:RoutePart*> "}" => {
         let mut query = Vec::new();
-        let mut body = None;
+        let mut body = RequestBody::default();
         // let mut handler_code = String::new();
         
+        // FIXME: only one query and one body is allowed
         for part in parts {
             match part {
                 RoutePartKind::Query(q) => query = q,
-                RoutePartKind::Body(b) => body = Some(b),
+                RoutePartKind::Body(b) => body = b,
                 // RoutePartKind::Code(c) => handler_code = c,
             }
         }
@@ -159,13 +161,13 @@ BodyDirective: BodyKind = {
 };
 
 Field: Field = {
-    <validations:(<Directive>)*>
+    <directives:(<Directive>)*>
     <name:Identifier> ":" <typ:FieldType> <default:("=" <Value>)?> => Field {
         name: name.to_string(),
         _type: typ,
         required: default.is_none(),
         default,
-        validators: validations,
+        directives,
     }
 };
 
@@ -185,7 +187,7 @@ Directive: Directive = {
 AnyDirective: Directive = {
     "@any" "(" <first:Directive> "," <second:Directive> <rest:("," <Directive>)*> ")" => {
         let mut directives = vec![first, second];
-        directives.extend(rest.into_iter());
+        directives.extend(rest);
         Directive::Any(directives)
     },
 };
@@ -201,20 +203,16 @@ SimpleDirective: Directive = {
     },
     "@" <name:Identifier> => Directive::Simple {
         name: name.to_string(),
-        params: vec![],
+        params: HashMap::new(),
     },
 };
 
-DirectiveParams: Vec<DirectiveParam> = {
-    <params:Comma<DirectiveParam>> => params
+DirectiveParams: HashMap<String, serde_json::Value> = {
+    <params:Comma<DirectiveParam>> => params.into_iter().collect()
 };
 
-DirectiveParam: DirectiveParam = {
-    <name:Identifier> "=" <value:Value> => DirectiveParam::Named {
-        name: name.to_string(),
-        value,
-    },
-    <value:Value> => DirectiveParam::Positional(value),
+DirectiveParam: (String, serde_json::Value) = {
+    <name:Identifier> "=" <value:Value> => (name.to_string(), value)
 };
 
 Value: serde_json::Value = {

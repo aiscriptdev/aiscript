@@ -7,6 +7,8 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     pin::Pin,
+    rc::Rc,
+    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -23,8 +25,9 @@ use tokio::pin;
 use tower::Service;
 
 mod ast;
-use ast::validators::*;
+mod validator;
 use ast::*;
+use validator::{convert_from_directive, Validator};
 mod lalrpop_helpers;
 
 lalrpop_mod!(
@@ -34,20 +37,25 @@ lalrpop_mod!(
 
 #[derive(Clone)]
 struct EndpointImpl {
-    query: Vec<Field>,
-    body: Option<RequestBody>,
+    query: Vec<Field2>,
+    body_kind: BodyKind,
+    body: Vec<Field2>,
     handler: Handler,
 }
 
-impl EndpointImpl {
-    fn execute(&mut self, req: Request) -> Result<Response, Infallible> {
-        Ok(format!("Query: {:?}, Body: {:?}", self.query, self.body).into_response())
-    }
+#[derive(Clone)]
+struct Field2 {
+    name: String,
+    _type: FieldType,
+    required: bool,
+    default: Option<Value>,
+    validators: Arc<Vec<Box<dyn Validator>>>,
 }
 
 struct Raw {
-    query: Vec<Field>,
-    body: Option<RequestBody>,
+    query: Vec<Field2>,
+    body_kind: BodyKind,
+    body: Vec<Field2>,
     handler: Handler,
 }
 
@@ -99,15 +107,15 @@ impl Future for ExecuteFuture {
                                 || (matches!(field._type, FieldType::Bool) && value.is_boolean())
                                 || (matches!(field._type, FieldType::Array) && value.is_array())
                             {
-                                // for validator in &field.validators {
-                                //     if let Err(e) = validator.validate(value) {
-                                //         return Poll::Ready(Ok(format!(
-                                //             "Field validation failed: {}",
-                                //             e
-                                //         )
-                                //         .into_response()));
-                                //     }
-                                // }
+                                for validator in &*field.validators {
+                                    if let Err(e) = validator.validate(value) {
+                                        return Poll::Ready(Ok(format!(
+                                            "Field validation failed: {}",
+                                            e
+                                        )
+                                        .into_response()));
+                                    }
+                                }
                                 self.query.insert(field.name.clone(), value.clone());
                             } else {
                                 // Field type mismatch
@@ -123,82 +131,76 @@ impl Future for ExecuteFuture {
                     self.state = ExecuteFutureState::Body;
                 }
                 ExecuteFutureState::Body => {
-                    if let Some(mut raw_body) = mem::take(&mut self.raw.body) {
-                        let body = match raw_body.kind {
-                            BodyKind::Json => {
-                                let fut = extract::Json::<Value>::from_request(
-                                    mem::take(&mut self.req),
-                                    &(),
-                                );
-                                pin!(fut);
-                                let Json(body) = match fut.poll(cx) {
-                                    Poll::Pending => return Poll::Pending,
-                                    Poll::Ready(Ok(body)) => body,
-                                    Poll::Ready(Err(e)) => {
-                                        return Poll::Ready(Ok(
-                                            format!("Error: {:?}", e).into_response()
-                                        ));
-                                    }
-                                };
-                                body
-                            }
-                            BodyKind::Form => {
-                                let fut = extract::Form::<Value>::from_request(
-                                    mem::take(&mut self.req),
-                                    &(),
-                                );
-                                pin!(fut);
-                                let Form(body) = match fut.poll(cx) {
-                                    Poll::Pending => return Poll::Pending,
-                                    Poll::Ready(Ok(body)) => body,
-                                    Poll::Ready(Err(e)) => {
-                                        return Poll::Ready(Ok(
-                                            format!("Error: {:?}", e).into_response()
-                                        ));
-                                    }
-                                };
-                                body
-                            }
-                        };
+                    let mut raw_body = mem::take(&mut self.raw.body);
+                    let body = match self.raw.body_kind {
+                        BodyKind::Json => {
+                            let fut =
+                                extract::Json::<Value>::from_request(mem::take(&mut self.req), &());
+                            pin!(fut);
+                            let Json(body) = match fut.poll(cx) {
+                                Poll::Pending => return Poll::Pending,
+                                Poll::Ready(Ok(body)) => body,
+                                Poll::Ready(Err(e)) => {
+                                    return Poll::Ready(Ok(
+                                        format!("Error: {:?}", e).into_response()
+                                    ));
+                                }
+                            };
+                            body
+                        }
+                        BodyKind::Form => {
+                            let fut =
+                                extract::Form::<Value>::from_request(mem::take(&mut self.req), &());
+                            pin!(fut);
+                            let Form(body) = match fut.poll(cx) {
+                                Poll::Pending => return Poll::Pending,
+                                Poll::Ready(Ok(body)) => body,
+                                Poll::Ready(Err(e)) => {
+                                    return Poll::Ready(Ok(
+                                        format!("Error: {:?}", e).into_response()
+                                    ));
+                                }
+                            };
+                            body
+                        }
+                    };
 
-                        for field in &mut raw_body.fields {
-                            let field_value = body.get(&field.name);
-                            if field.required && field_value.is_none() {
-                                if let Some(default) = field.default.take() {
-                                    self.body.insert(field.name.clone(), default);
-                                } else {
-                                    return Poll::Ready(Ok(format!(
-                                        "Field is required but not found in body: {}",
-                                        field.name
-                                    )
-                                    .into_response()));
-                                }
-                            } else if let Some(value) = field_value {
-                                if (matches!(field._type, FieldType::Str) && value.is_string())
-                                    || (matches!(field._type, FieldType::Number)
-                                        && value.is_number())
-                                    || (matches!(field._type, FieldType::Bool)
-                                        && value.is_boolean())
-                                    || (matches!(field._type, FieldType::Array) && value.is_array())
-                                {
-                                    // for validator in &field.validators {
-                                    //     if let Err(e) = validator.validate(value) {
-                                    //         return Poll::Ready(Ok(format!(
-                                    //             "Field validation failed: {}",
-                                    //             e
-                                    //         )
-                                    //         .into_response()));
-                                    //     }
-                                    // }
-                                    self.body.insert(field.name.clone(), value.clone());
-                                } else {
-                                    return Poll::Ready(Ok(format!(
-                                        "Field type mismatch: {}",
-                                        field.name
-                                    )
-                                    .into_response()));
-                                }
+                    for field in &mut raw_body {
+                        let field_value = body.get(&field.name);
+                        if field.required && field_value.is_none() {
+                            if let Some(default) = field.default.take() {
+                                self.body.insert(field.name.clone(), default);
+                            } else {
+                                return Poll::Ready(Ok(format!(
+                                    "Field is required but not found in body: {}",
+                                    field.name
+                                )
+                                .into_response()));
                             }
+                        } else if let Some(value) = field_value {
+                            if (matches!(field._type, FieldType::Str) && value.is_string())
+                                || (matches!(field._type, FieldType::Number) && value.is_number())
+                                || (matches!(field._type, FieldType::Bool) && value.is_boolean())
+                                || (matches!(field._type, FieldType::Array) && value.is_array())
+                            {
+                                for validator in &*field.validators {
+                                    if let Err(e) = validator.validate(value) {
+                                        return Poll::Ready(Ok(format!(
+                                            "Field validation failed: {}",
+                                            e
+                                        )
+                                        .into_response()));
+                                    }
+                                }
+                                self.body.insert(field.name.clone(), value.clone());
+                            } else {
+                                return Poll::Ready(Ok(format!(
+                                    "Field type mismatch: {}",
+                                    field.name
+                                )
+                                .into_response()));
+                            }
+                            // }
                         }
                     }
 
@@ -240,6 +242,7 @@ impl Service<Request> for EndpointImpl {
         ExecuteFuture {
             raw: Raw {
                 query: mem::take(&mut self.query),
+                body_kind: mem::take(&mut self.body_kind),
                 body: mem::take(&mut self.body),
                 handler: mem::replace(&mut self.handler, Handler::Empty),
             },
@@ -257,13 +260,23 @@ pub async fn run(path: PathBuf, port: u16) {
     let route = parser.parse(&input).unwrap();
     let mut router = Router::new().route("/", get(|| async { "Hello, World!" }));
 
-    for route in vec![route] {
+    for route in [route] {
         let prefix = route.prefix;
         let mut r = Router::new();
         for endpoint in route.endpoints {
             let endpoint_impl = EndpointImpl {
-                query: endpoint.query,
-                body: endpoint.body,
+                query: endpoint
+                    .query
+                    .into_iter()
+                    .map(convert_field_to_field2)
+                    .collect(),
+                body_kind: endpoint.body.kind,
+                body: endpoint
+                    .body
+                    .fields
+                    .into_iter()
+                    .map(convert_field_to_field2)
+                    .collect(),
                 handler: endpoint.handler,
             };
             for path_spec in endpoint.path_specs {
@@ -286,6 +299,21 @@ pub async fn run(path: PathBuf, port: u16) {
     axum::serve(listener, router).await.unwrap();
 }
 
+fn convert_field_to_field2(field: Field) -> Field2 {
+    let validators = field
+        .directives
+        .into_iter()
+        .map(|v| convert_from_directive(v))
+        .collect();
+    Field2 {
+        name: field.name,
+        _type: field._type,
+        required: field.required,
+        default: field.default,
+        validators: Arc::new(validators),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,7 +329,6 @@ mod tests {
                         @match(regex="^[a-z]+$"),
                         @another1
                     )
-                    @another2
                     a: str
                     b: bool = false
                 }
