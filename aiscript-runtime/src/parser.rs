@@ -1,7 +1,5 @@
 use serde_json::Value;
 use std::collections::HashMap;
-use std::iter::Peekable;
-use std::str::CharIndices;
 
 use crate::ast::*;
 use crate::lexer::{Lexer, Token};

@@ -5,6 +5,8 @@ route /poc {
             content: str
             aget: int = 18
         }
+
+        return "hello", 200
     }
 
     post /hello {
@@ -18,5 +20,7 @@ route /poc {
         body {
             test: bool = true
         }
+
+        return "hello", 200
     }
 }

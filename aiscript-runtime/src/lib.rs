@@ -1,4 +1,3 @@
-#![allow(unused)]
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -7,7 +6,6 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     pin::Pin,
-    rc::Rc,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -18,7 +16,7 @@ use axum::{
     routing::{delete_service, get, get_service, post_service, put_service},
     Form, Json, Router,
 };
-use lalrpop_util::lalrpop_mod;
+use parser::parse_route;
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::pin;
@@ -30,12 +28,6 @@ mod parser;
 mod validator;
 use ast::*;
 use validator::{convert_from_directive, Validator};
-mod lalrpop_helpers;
-
-lalrpop_mod!(
-    #[rustfmt::skip]
-    grammar
-);
 
 #[derive(Clone)]
 struct EndpointImpl {
@@ -258,8 +250,7 @@ impl Service<Request> for EndpointImpl {
 
 pub async fn run(path: PathBuf, port: u16) {
     let input = std::fs::read_to_string(path).unwrap();
-    let parser = grammar::RouteParser::new();
-    let route = parser.parse(&input).unwrap();
+    let route = parse_route(&input).unwrap();
     let mut router = Router::new().route("/", get(|| async { "Hello, World!" }));
 
     for route in [route] {
@@ -313,45 +304,5 @@ fn convert_field_to_field2(field: Field) -> Field2 {
         required: field.required,
         default: field.default,
         validators: Arc::new(validators),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[ignore]
-    fn test_lalrpop() {
-        let input = r#"
-        route /test/<id:int> {
-            get /a, put /a  {
-                @form
-                body {
-                    @length(max=10),
-                    a: str
-                    queryx: bool = false
-                }
-
-                query {
-                    @length
-                    name: str = "hello"
-                    @compare
-                    age: int = 18
-                }
-            }
-
-            post / {
-                @json
-                body {
-                    @not(@length(max=10))
-                    @another2
-                    a: str
-                    b: bool
-                }
-            }
-        }"#;
-
-        let ast = grammar::RouteParser::new();
-        let r = ast.parse(input).unwrap();
-        println!("{:?}", r);
     }
 }

@@ -1,4 +1,5 @@
-use std::{borrow::Cow, collections::HashMap, default};
+#![allow(unused)]
+use std::{borrow::Cow, collections::HashMap};
 
 use serde_json::Value;
 
@@ -41,6 +42,7 @@ pub enum FieldType {
     Str,
     Number,
     Bool,
+    #[allow(unused)]
     Array,
 }
 
@@ -64,14 +66,9 @@ pub enum Directive {
 }
 
 #[derive(Clone, Debug)]
-pub enum Handler {
-    Empty,
-    Script,
-}
-
-#[derive(Clone, Debug)]
 pub struct Endpoint {
     pub path_specs: Vec<PathSpec>,
+    #[allow(unused)]
     pub return_type: Option<String>,
     pub query: Vec<Field>,
     pub body: RequestBody,

@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter},
     iter::Peekable,
-    str::{CharIndices, Chars},
+    str::Chars,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,17 +41,17 @@ pub enum Token {
 }
 
 pub struct Lexer<'input> {
-    input: &'input str,
+    // input: &'input str,
     chars: Peekable<Chars<'input>>,
-    current_pos: usize,
+    // current_pos: usize,
 }
 
 impl<'input> Lexer<'input> {
     pub fn new(input: &'input str) -> Self {
         Lexer {
-            input,
+            // input,
             chars: input.chars().peekable(),
-            current_pos: 0,
+            // current_pos: 0,
         }
     }
 
@@ -199,6 +199,7 @@ impl<'input> Lexer<'input> {
         Some(self.parse_token(next))
     }
 
+    #[allow(unused)]
     pub fn peek_token(&mut self) -> Option<Result<Token, String>> {
         self.consume_whitespace();
         let next = *self.chars.peek()?;
