@@ -6,6 +6,7 @@ use crate::{
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
     string::InternedString,
     vm::VmError,
+    ReturnValue,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -242,7 +243,13 @@ impl<'gc> From<Gc<'gc, BoundMethod<'gc>>> for Value<'gc> {
     }
 }
 
-// #[allow(unused)]
-// pub fn intern_str(s: &str) -> Ustr {
-//     Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
-// }
+impl<'gc> From<Value<'gc>> for ReturnValue {
+    fn from(value: Value<'gc>) -> Self {
+        match value {
+            Value::Number(value) => ReturnValue::Number(value),
+            Value::Boolean(value) => ReturnValue::Boolean(value),
+            Value::String(value) => ReturnValue::String(value.to_string()),
+            _ => ReturnValue::Nil,
+        }
+    }
+}

@@ -1,4 +1,1 @@
-ai fn f1() {}
-let p = "What is AIScript?";
-let a = prompt p;
-print a; // expect: AI: What is AIScript?
+return 1 + 2 * 3;

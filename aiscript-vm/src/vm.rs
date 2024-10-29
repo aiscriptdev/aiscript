@@ -13,11 +13,15 @@ use crate::{
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
-    OpCode, Value,
+    OpCode, ReturnValue, Value,
 };
 
 const FRAME_MAX_SIZE: usize = 64;
+#[cfg(not(test))]
 const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
+#[cfg(test)]
+const STACK_MAX_SIZE: usize = 128;
+
 static NUMBER_OPERATOR_ERROR: &str = "Operands must be numbers.";
 
 macro_rules! binary_op {
@@ -142,7 +146,7 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, source: &'static str) -> Result<(), VmError> {
+    pub fn interpret(&mut self, source: &'static str) -> Result<ReturnValue, VmError> {
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
@@ -181,16 +185,14 @@ impl Vm {
             }
 
             match result {
-                Ok(finished) => {
-                    if finished {
-                        break;
+                Ok(result) => {
+                    if let Some(value) = result {
+                        return Ok(value);
                     }
                 }
                 Err(err) => return Err(err),
             }
         }
-
-        Ok(())
     }
 }
 
@@ -223,7 +225,7 @@ impl<'gc> State<'gc> {
     //
     // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
     // do, and returns `Ok(true)` if no more progress can be made.
-    async fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
+    async fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
         loop {
             // Debug stack info
             #[cfg(feature = "debug")]
@@ -278,7 +280,7 @@ impl<'gc> State<'gc> {
                     self.frame_count -= 1;
                     if self.frame_count == 0 {
                         self.pop_stack();
-                        return Ok(true);
+                        return Ok(Some(return_value.into()));
                     }
                     self.stack_top = frame_slot_start;
                     self.push_stack(return_value);
@@ -489,7 +491,7 @@ impl<'gc> State<'gc> {
             fuel.consume(FUEL_PER_STEP);
 
             if !fuel.should_continue() {
-                return Ok(false);
+                return Ok(None);
             }
         }
     }

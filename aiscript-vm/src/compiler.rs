@@ -82,7 +82,7 @@ struct ClassCompiler {
 }
 
 impl<'gc> Parser<'gc> {
-    fn new(ctx: Context<'gc>, source: &'static str) -> Self {
+    fn new(ctx: Context<'gc>, source: &'gc str) -> Self {
         Parser {
             ctx,
             // Let the default top level <script> function name to empty.
@@ -295,9 +295,9 @@ impl<'gc> Parser<'gc> {
     }
 
     fn return_statement(&mut self) {
-        if self.compiler.fn_type == FunctionType::Script {
-            self.error("Can't return from top-level code.");
-        }
+        // if self.compiler.fn_type == FunctionType::Script {
+        //     self.error("Can't return from top-level code.");
+        // }
 
         if self._match(TokenType::Semicolon) {
             self.emit_return();
@@ -1024,7 +1024,7 @@ impl<'gc> ParseRule<'gc> {
     }
 }
 
-pub fn compile<'gc>(ctx: Context<'gc>, source: &'static str) -> Result<Function<'gc>, VmError> {
+pub fn compile<'gc>(ctx: Context<'gc>, source: &'gc str) -> Result<Function<'gc>, VmError> {
     let mut parser = Parser::new(ctx, source);
     parser.compile()?;
     Ok(parser.compiler.function)
