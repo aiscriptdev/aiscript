@@ -271,6 +271,13 @@ impl<'a> Parser<'a> {
                 self.expect_token(Token::CloseParen)?;
                 Ok(Directive::Not(Box::new(directive)))
             }
+            Some(Token::Identifier(name)) if name == "in" => {
+                // Parse @in directive
+                self.expect_token(Token::OpenParen)?;
+                let values = self.parse_array_values()?;
+                self.expect_token(Token::CloseParen)?;
+                Ok(Directive::In(values))
+            }
             Some(Token::Identifier(name)) => {
                 // Parse simple directive
                 let mut params = HashMap::new();
@@ -300,6 +307,21 @@ impl<'a> Parser<'a> {
             }
             _ => Err("Expected directive name".to_string()),
         }
+    }
+
+    fn parse_array_values(&mut self) -> Result<Vec<Value>, String> {
+        self.expect_token(Token::OpenBracket)?;
+        let mut values = Vec::new();
+        // FIXME: don't allow empty arrays and nested arrays
+        // FIXME: don't allow heterogeneous arrays
+        while self.current_token != Some(Token::CloseBracket) {
+            values.push(self.parse_value()?);
+            if self.current_token == Some(Token::Comma) {
+                self.next_token();
+            }
+        }
+        self.expect_token(Token::CloseBracket)?;
+        Ok(values)
     }
 
     fn parse_value(&mut self) -> Result<Value, String> {
@@ -429,6 +451,12 @@ mod tests {
                         @length(max=10)
                         @not(@another)
                         field: str
+                        @in(["a" ,"b", "c"])
+                        x: str = "a"
+                        @in([1, 2, 3])
+                        y: int = 1
+                        @any(@a, @b(arg=1), @c)
+                        z: str
                     }
                     return "ok", 200
                 }
@@ -441,10 +469,67 @@ mod tests {
 
         let route = result.unwrap();
         let endpoint = &route.endpoints[0];
-        let field = &endpoint.body.fields[0];
 
+        let field = &endpoint.body.fields[0];
         assert_eq!(field.name, "field");
         assert_eq!(field.directives.len(), 2);
+        assert_eq!(
+            field.directives[0],
+            Directive::Simple {
+                name: String::from("length"),
+                params: [(String::from("max"), Value::from(10)).into()]
+                    .into_iter()
+                    .collect::<HashMap<String, Value>>()
+            }
+        );
+        assert_eq!(
+            field.directives[1],
+            Directive::Not(Box::new(Directive::Simple {
+                name: String::from("another"),
+                params: HashMap::new(),
+            }))
+        );
+
+        let field = &endpoint.body.fields[1];
+        assert_eq!(field.name, "x");
+        assert_eq!(field.default, Some(Value::from("a")));
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::In(vec![Value::from("a"), Value::from("b"), Value::from("c"),])
+        );
+
+        let field = &endpoint.body.fields[2];
+        assert_eq!(field.name, "y");
+        assert_eq!(field.default, Some(Value::from(1)));
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::In(vec![Value::from(1), Value::from(2), Value::from(3),])
+        );
+
+        let field = &endpoint.body.fields[3];
+        assert_eq!(field.name, "z");
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::Any(vec![
+                Directive::Simple {
+                    name: String::from("a"),
+                    params: HashMap::new(),
+                },
+                Directive::Simple {
+                    name: String::from("b"),
+                    params: [(String::from("arg"), Value::from(1)).into()]
+                        .into_iter()
+                        .collect::<HashMap<String, Value>>(),
+                },
+                Directive::Simple {
+                    name: String::from("c"),
+                    params: HashMap::new(),
+                },
+            ])
+        );
     }
 
     #[test]

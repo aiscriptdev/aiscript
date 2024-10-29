@@ -55,7 +55,7 @@ pub struct Field {
     pub directives: Vec<Directive>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Directive {
     Simple {
         name: String,
@@ -63,6 +63,7 @@ pub enum Directive {
     },
     Any(Vec<Directive>), // Must have 2 or more directives
     Not(Box<Directive>),
+    In(Vec<Value>),
 }
 
 #[derive(Clone, Debug)]
@@ -88,6 +89,7 @@ impl Directive {
             Directive::Simple { name, .. } => Cow::Owned(name.to_owned()),
             Directive::Any(directives) => "any".into(),
             Directive::Not(directive) => "not".into(),
+            Directive::In(values) => "in".into(),
         }
     }
 }

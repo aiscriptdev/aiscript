@@ -16,17 +16,19 @@ pub enum Token {
     Body,
 
     // Symbols
-    OpenBrace,  // {
-    CloseBrace, // }
-    OpenAngle,  // <
-    CloseAngle, // >
-    Comma,      // ,
-    Colon,      // :
-    Equal,      // =
-    At,         // @
-    OpenParen,  // (
-    CloseParen, // )
-    Slash,      // /
+    OpenBrace,    // {
+    CloseBrace,   // }
+    OpenAngle,    // <
+    CloseAngle,   // >
+    Comma,        // ,
+    Colon,        // :
+    Equal,        // =
+    At,           // @
+    OpenParen,    // (
+    CloseParen,   // )
+    Slash,        // /
+    OpenBracket,  // [
+    CloseBracket, // ]
 
     // Types
     TypeStr,
@@ -82,8 +84,6 @@ impl<'input> Lexer<'input> {
 
     fn read_string_literal(&mut self) -> Result<String, String> {
         let mut string = String::new();
-        self.chars.next(); // Skip opening quote
-
         while let Some(ch) = self.chars.next() {
             match ch {
                 '"' => return Ok(string),
@@ -154,6 +154,8 @@ impl<'input> Lexer<'input> {
             '(' => Ok(Token::OpenParen),
             ')' => Ok(Token::CloseParen),
             '/' => Ok(Token::Slash),
+            '[' => Ok(Token::OpenBracket),
+            ']' => Ok(Token::CloseBracket),
             '"' => self.read_string_literal().map(Token::StringLiteral),
             ch if ch.is_alphabetic() => {
                 let mut ident = ch.to_string();
@@ -228,6 +230,8 @@ impl Display for Token {
             Token::OpenParen => write!(f, "("),
             Token::CloseParen => write!(f, ")"),
             Token::Slash => write!(f, "/"),
+            Token::OpenBracket => write!(f, "["),
+            Token::CloseBracket => write!(f, "]"),
             Token::TypeStr => write!(f, "str"),
             Token::TypeInt => write!(f, "int"),
             Token::TypeBool => write!(f, "bool"),
@@ -258,6 +262,8 @@ mod tests {
                         @any(@number(min=100), @is_admin))
                         id: int = 1
                         test: bool = false
+                        @in(["a", "b", "c"])
+                        choice: str = "a"
                     }
                 }
             }"#;
@@ -315,7 +321,7 @@ mod tests {
                 "Colon",
                 "TypeStr",
                 "Equal",
-                "StringLiteral(\"ohn\")",
+                "StringLiteral(\"John\")",
                 // flag: bool = true
                 "Identifier(\"flag\")",
                 "Colon",
@@ -359,6 +365,24 @@ mod tests {
                 "TypeBool",
                 "Equal",
                 "BoolLiteral(false)",
+                // @in(["a", "b", "c"])
+                "At",
+                "Identifier(\"in\")",
+                "OpenParen",
+                "OpenBracket",
+                "StringLiteral(\"a\")",
+                "Comma",
+                "StringLiteral(\"b\")",
+                "Comma",
+                "StringLiteral(\"c\")",
+                "CloseBracket",
+                "CloseParen",
+                // choice: str = "a"
+                "Identifier(\"choice\")",
+                "Colon",
+                "TypeStr",
+                "Equal",
+                "StringLiteral(\"a\")",
                 "CloseBrace",
                 "CloseBrace",
                 "CloseBrace",

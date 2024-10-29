@@ -31,7 +31,7 @@ pub struct NumberValidator {
     equal: Option<f64>,
 }
 
-pub struct InValidator<T>(Vec<T>);
+pub struct InValidator(Vec<Value>);
 
 impl<V: Validator> Validator for AnyValidator<V> {
     fn validate(&self, value: &Value) -> Result<(), String> {
@@ -141,6 +141,16 @@ impl Validator for NumberValidator {
     }
 }
 
+impl Validator for InValidator {
+    fn validate(&self, value: &Value) -> Result<(), String> {
+        if self.0.contains(value) {
+            Ok(())
+        } else {
+            Err("Value is not in the list of allowed values".into())
+        }
+    }
+}
+
 pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
     match directive {
         Directive::Simple { name, params } => match &*name {
@@ -177,5 +187,6 @@ pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
                 .into_boxed_slice(),
         )),
         Directive::Not(directive) => Box::new(NotValidator(convert_from_directive(*directive))),
+        Directive::In(values) => Box::new(InValidator(values)),
     }
 }

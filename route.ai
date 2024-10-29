@@ -3,7 +3,7 @@ route /poc {
         query {
             @string(min_len=3, max_len=10)
             content: str
-            aget: int = 18
+            age: int = 18
         }
 
         return "hello", 200
@@ -13,7 +13,9 @@ route /poc {
         query {
             @string(min_len=3, max_len=10)
             content: str
-            aget: int = 18
+            age: int = 18
+            @in(["ios", "android"])
+            platform: str = "ios" 
         }
 
         @json
