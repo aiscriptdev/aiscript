@@ -10,6 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use aiscript_vm::{ReturnValue, VmError};
 use axum::{
     extract::{self, FromRequest, Request},
     response::{IntoResponse, Response},
@@ -18,8 +19,8 @@ use axum::{
 };
 use parser::parse_route;
 use serde_json::Value;
-use tokio::net::TcpListener;
-use tokio::pin;
+use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{pin, task};
 use tower::Service;
 
 mod ast;
@@ -65,16 +66,15 @@ enum ExecuteFutureState {
     Pending,
     Query,
     Body,
-    Execute,
-    Done,
+    Execute(JoinHandle<Result<ReturnValue, VmError>>),
 }
 
 impl Future for ExecuteFuture {
     type Output = Result<Response, Infallible>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            match self.state {
+        let result = loop {
+            match &mut self.state {
                 ExecuteFutureState::Pending => {
                     self.state = ExecuteFutureState::Query;
                 }
@@ -194,24 +194,24 @@ impl Future for ExecuteFuture {
                                 )
                                 .into_response()));
                             }
-                            // }
                         }
                     }
-
-                    self.state = ExecuteFutureState::Execute;
+                    let source: &'static str = Box::new(self.raw.statements.clone()).leak();
+                    let handle = task::spawn_blocking(move || aiscript_vm::eval(source));
+                    self.state = ExecuteFutureState::Execute(handle);
                 }
-                ExecuteFutureState::Execute => {
-                    self.state = ExecuteFutureState::Done;
-                }
-                ExecuteFutureState::Done => {
-                    break;
-                }
+                ExecuteFutureState::Execute(handle) => match Pin::new(handle).poll(cx) {
+                    Poll::Ready(result) => {
+                        break result;
+                    }
+                    Poll::Pending => return Poll::Pending,
+                },
             }
-        }
+        };
 
         Poll::Ready(Ok(format!(
-            "Query: {:?}, Body: {:?}",
-            self.query, self.body
+            "Query: {:?}, Body: {:?}, Result: {:?}",
+            self.query, self.body, result,
         )
         .into_response()))
     }

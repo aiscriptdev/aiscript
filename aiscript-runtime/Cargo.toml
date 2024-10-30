@@ -6,6 +6,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+aiscript-vm = { path = "../aiscript-vm" }
 hyper = "1.4.1"
 hyper-util = "0.1.7"
 tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }

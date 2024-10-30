@@ -6,7 +6,9 @@ route /poc {
             age: int = 18
         }
 
-        return "hello", 200
+        let name = "aiscript";
+        print name;
+        return "get: hello" + name;
     }
 
     post /hello {
@@ -23,6 +25,7 @@ route /poc {
             test: bool = true
         }
 
-        return "hello", 200
+        let answer = prompt "What is the moon of Pluto?";
+        return "AI answer: " + answer;
     }
 }

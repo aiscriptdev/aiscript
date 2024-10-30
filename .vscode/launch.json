@@ -7,7 +7,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'aiscript-cli'",
+      "name": "Debug script",
       "cargo": {
         "args": ["build", "--bin=aiscript-cli", "--package=aiscript-cli"],
         "filter": {
@@ -16,6 +16,20 @@
         }
       },
       "args": ["main.ai"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug serve",
+      "cargo": {
+        "args": ["build", "--bin=aiscript-cli", "--package=aiscript-cli"],
+        "filter": {
+          "name": "aiscript-cli",
+          "kind": "bin"
+        }
+      },
+      "args": ["serve", "route.ai"],
       "cwd": "${workspaceFolder}"
     }
   ]
