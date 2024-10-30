@@ -1,4 +1,4 @@
-use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault, ops};
+use std::{array, borrow::Cow, collections::HashMap, fmt::Display, hash::BuildHasherDefault, ops};
 
 use ahash::AHasher;
 use gc_arena::{
@@ -39,6 +39,17 @@ pub type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefaul
 pub enum VmError {
     CompileError,
     RuntimeError(std::string::String),
+}
+
+impl std::error::Error for VmError {}
+
+impl Display for VmError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CompileError => write!(f, "CompileError"),
+            Self::RuntimeError(s) => write!(f, "RuntimeError: {s}"),
+        }
+    }
 }
 
 struct State<'gc> {

@@ -67,6 +67,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "serde_json",
+ "thiserror",
  "tokio",
  "tower",
 ]

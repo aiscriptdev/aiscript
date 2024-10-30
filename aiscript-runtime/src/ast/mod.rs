@@ -37,13 +37,23 @@ pub enum BodyKind {
     Json,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum FieldType {
     Str,
     Number,
     Bool,
     #[allow(unused)]
     Array,
+}
+impl FieldType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FieldType::Str => "str",
+            FieldType::Number => "number",
+            FieldType::Bool => "bool",
+            FieldType::Array => "array",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
