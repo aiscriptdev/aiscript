@@ -25,7 +25,8 @@ pub enum ReturnValue {
 
 pub fn eval(source: &'static str) -> Result<ReturnValue, VmError> {
     let mut vm = Vm::new();
-    vm.interpret(source)
+    vm.compile(source)?;
+    vm.interpret()
 }
 
 #[cfg(test)]

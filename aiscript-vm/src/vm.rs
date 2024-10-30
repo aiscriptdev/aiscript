@@ -2,10 +2,10 @@ use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault, op
 
 use ahash::AHasher;
 use gc_arena::{
+    arena::CollectionPhase,
     lock::{GcRefLock, RefLock},
-    Arena, Collect, Collection, CollectionPhase, Gc, Mutation, Rootable,
+    Arena, Collect, Collection, Gc, Mutation, Rootable,
 };
-use tokio::runtime::Runtime;
 
 use crate::{
     ai, builtins,
@@ -17,8 +17,9 @@ use crate::{
 };
 
 const FRAME_MAX_SIZE: usize = 64;
+// const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
 #[cfg(not(test))]
-const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
+const STACK_MAX_SIZE: usize = 4096; // Temporary reduce the stack size due to tokio thread stack size limit
 #[cfg(test)]
 const STACK_MAX_SIZE: usize = 128;
 
@@ -146,7 +147,7 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, source: &'static str) -> Result<ReturnValue, VmError> {
+    pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
@@ -160,27 +161,26 @@ impl Vm {
             state.push_stack(Value::from(closure));
             state.call(closure, 0)
         })?;
+        Ok(())
+    }
 
+    pub fn interpret(&mut self) -> Result<ReturnValue, VmError> {
         loop {
             const FUEL_PER_GC: i32 = 1024 * 10;
             let mut fuel = Fuel::new(FUEL_PER_GC);
             // periodically exit the arena in order to collect garbage concurrently with running the VM.
-            let result = self.arena.mutate_root(|_, state| {
-                Runtime::new()
-                    .unwrap()
-                    .block_on(async { state.step(&mut fuel).await })
-            });
+            let result = self.arena.mutate_root(|_, state| state.step(&mut fuel));
 
             const COLLECTOR_GRANULARITY: f64 = 10240.0;
             if self.arena.metrics().allocation_debt() > COLLECTOR_GRANULARITY {
                 // Do garbage collection.
                 #[cfg(feature = "debug")]
                 println!("Collecting...");
-                if self.arena.collection_phase() == CollectionPhase::Collecting {
+                if self.arena.collection_phase() == CollectionPhase::Sweeping {
                     self.arena.collect_debt();
                 } else {
-                    // Immediately transition to `CollectionPhase::Collecting`.
-                    self.arena.mark_all().unwrap().start_collecting();
+                    // Immediately transition to `CollectionPhase::Sweeping`.
+                    self.arena.mark_all().unwrap().start_sweeping();
                 }
             }
 
@@ -225,7 +225,7 @@ impl<'gc> State<'gc> {
     //
     // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
     // do, and returns `Ok(true)` if no more progress can be made.
-    async fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
+    fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
         loop {
             // Debug stack info
             #[cfg(feature = "debug")]
@@ -482,7 +482,7 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::Prompt => {
                     let message = self.pop_stack().as_string().unwrap().to_string();
-                    let result = Value::from(self.intern(ai::prompt(&message).await.as_bytes()));
+                    let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
                     self.push_stack(result);
                 }
             }

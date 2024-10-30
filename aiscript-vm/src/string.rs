@@ -10,7 +10,7 @@ use std::{
 use ahash::AHasher;
 use gc_arena::{
     allocator_api::MetricsAlloc, barrier::Unlock, lock::RefLock, metrics::Metrics, Collect,
-    Collection, Gc, GcWeak, Mutation, StaticCollect,
+    Collection, Gc, GcWeak, Mutation, Static,
 };
 use hashbrown::{hash_map, raw::RawTable, HashMap};
 
@@ -311,7 +311,7 @@ struct InternedStaticStrings<'gc>(
         'gc,
         RefLock<
             HashMap<
-                StaticCollect<*const [u8]>,
+                Static<*const [u8]>,
                 InternedString<'gc>,
                 BuildHasherDefault<AHasher>,
                 MetricsAlloc<'gc>,
@@ -332,7 +332,7 @@ impl<'gc> InternedStaticStrings<'gc> {
     }
 
     fn intern(self, mc: &Mutation<'gc>, s: &'static [u8]) -> InternedString<'gc> {
-        let key = StaticCollect(s as *const _);
+        let key = Static(s as *const _);
 
         // SAFETY: If a new string is added, we call the write barrier.
         let mut static_strings = unsafe { self.0.unlock_unchecked() }.borrow_mut();
@@ -381,13 +381,13 @@ impl<'gc> InternedStringSet<'gc> {
 
 #[cfg(test)]
 mod tests {
-    use gc_arena::arena::rootless_arena;
+    use gc_arena::arena::rootless_mutate;
 
     use super::*;
 
     #[test]
     fn test_string_header() {
-        rootless_arena(|mc| {
+        rootless_mutate(|mc| {
             let test1 = InternedString::from_buffer(mc, Box::from(b"test 1".as_slice()));
             let test2 = InternedString::from_buffer(mc, Box::from(b"test 2".as_slice()));
 

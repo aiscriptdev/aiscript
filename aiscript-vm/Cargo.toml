@@ -5,7 +5,11 @@ edition = "2021"
 
 [dependencies]
 ahash = "0.8"
-gc-arena = { version = "0.5.3", features = ["allocator-api2", "hashbrown"] }
+gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "3dbc6c4263700312ef63ceee3f02943b38828130", features = [
+    "allocator-api2",
+    "hashbrown",
+] }
+# gc-arena = { path = "../../gc-arena", features = ["allocator-api2", "hashbrown"] }
 hashbrown = { version = "0.14", features = ["raw"] }
 langchain-rust = "4.6.0"
 num_enum = "0.7.3"
