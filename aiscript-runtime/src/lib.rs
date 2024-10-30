@@ -1,4 +1,4 @@
-use aiscript_vm::{ReturnValue, VmError};
+use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     body::Body,
     extract::{self, FromRequest, Request},
@@ -234,7 +234,16 @@ impl Future for RequestProcessor {
 
                     let script = self.endpoint.script.clone();
                     let script = Box::leak(script.into_boxed_str());
-                    let handle = tokio::task::spawn_blocking(move || aiscript_vm::eval(script));
+                    let query_data = self.query_data.clone();
+                    let body_data = self.body_data.clone();
+                    let handle = tokio::task::spawn_blocking(move || {
+                        // aiscript_vm::eval(script)
+                        let mut vm = Vm::new();
+                        vm.compile(script)?;
+                        vm.inject_variables(query_data);
+                        vm.inject_variables(body_data);
+                        vm.interpret()
+                    });
                     self.state = ProcessingState::Executing(handle);
                 }
                 ProcessingState::Executing(handle) => {

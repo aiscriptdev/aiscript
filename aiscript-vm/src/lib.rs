@@ -10,6 +10,8 @@ mod string_utils;
 mod value;
 mod vm;
 
+use std::collections::HashMap;
+
 pub(crate) use chunk::{Chunk, OpCode};
 pub use value::Value;
 pub use vm::Vm;
@@ -20,7 +22,17 @@ pub enum ReturnValue {
     Number(f64),
     Boolean(bool),
     String(String),
+    Object(HashMap<String, serde_json::Value>),
     Nil,
+}
+
+impl ReturnValue {
+    pub fn as_object(&self) -> Option<HashMap<String, serde_json::Value>> {
+        match self {
+            ReturnValue::Object(obj) => Some(obj.clone()),
+            _ => None,
+        }
+    }
 }
 
 pub fn eval(source: &'static str) -> Result<ReturnValue, VmError> {

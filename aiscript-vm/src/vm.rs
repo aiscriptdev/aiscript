@@ -765,6 +765,55 @@ impl<'gc> State<'gc> {
     }
 }
 
+impl Vm {
+    pub fn inject_variables(&mut self, variables: HashMap<String, serde_json::Value>) {
+        self.arena.mutate_root(|_mc, state| {
+            for (key, value) in variables {
+                let name = state.intern(key.as_bytes());
+                let v = match value {
+                    serde_json::Value::Bool(b) => Value::Boolean(b),
+                    serde_json::Value::Number(number) => Value::Number(number.as_f64().unwrap()),
+                    serde_json::Value::String(str) => {
+                        let s = state.intern(str.as_bytes());
+                        Value::String(s)
+                    }
+                    serde_json::Value::Null => Value::Nil,
+                    _ => continue,
+                };
+                state.globals.insert(name, v);
+            }
+        });
+    }
+
+    pub fn inject_instance(
+        &mut self,
+        name: &'static str,
+        fields: HashMap<&'static str, serde_json::Value>,
+    ) {
+        self.arena.mutate_root(|mc, state| {
+            let name = state.intern_static(name);
+            let class = Gc::new(mc, RefLock::new(Class::new(name)));
+            let mut instance = Instance::new(class);
+            for (key, value) in fields {
+                let v = match value {
+                    serde_json::Value::Bool(b) => Value::Boolean(b),
+                    serde_json::Value::Number(number) => Value::Number(number.as_f64().unwrap()),
+                    serde_json::Value::String(str) => {
+                        let s = state.intern(str.as_bytes());
+                        Value::from(s)
+                    }
+                    serde_json::Value::Null => Value::Nil,
+                    _ => continue,
+                };
+                instance.fields.insert(state.intern_static(key), v);
+            }
+            state
+                .globals
+                .insert(name, Gc::new(mc, RefLock::new(instance)).into());
+        });
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct Context<'gc> {
     mutation: &'gc Mutation<'gc>,
@@ -787,5 +836,50 @@ impl<'gc> ops::Deref for Context<'gc> {
 
     fn deref(&self) -> &Self::Target {
         self.mutation
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inject_variables() {
+        let mut vm = Vm::new();
+        vm.inject_variables({
+            let mut map = HashMap::new();
+            map.insert("test".into(), "abc".into());
+            map.insert("test2".into(), 123.into());
+            map.insert("test3".into(), true.into());
+            map
+        });
+        vm.compile("return test;").unwrap();
+        let result = vm.interpret().unwrap();
+        assert_eq!(result, ReturnValue::String("abc".into()));
+        vm.compile("return test2;").unwrap();
+        let result = vm.interpret().unwrap();
+        assert_eq!(result, ReturnValue::Number(123.0));
+        vm.compile("return test3;").unwrap();
+        let result = vm.interpret().unwrap();
+        assert_eq!(result, ReturnValue::Boolean(true));
+    }
+
+    #[test]
+    fn test_inject_instance() {
+        let mut vm = Vm::new();
+        vm.inject_instance("request", {
+            let mut map = HashMap::new();
+            map.insert("method", "get".into());
+            map.insert("code", 200.0.into());
+            map.insert("test", true.into());
+            map
+        });
+        vm.compile("return request;").unwrap();
+        let result = vm.interpret().unwrap();
+        let request = result.as_object().unwrap();
+        assert_eq!(request.get("method").unwrap(), "get");
+        assert_eq!(request.get("code").unwrap(), 200.0);
+        assert_eq!(request.get("test").unwrap(), true);
+        assert!(request.get("abc").is_none());
     }
 }

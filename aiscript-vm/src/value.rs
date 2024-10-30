@@ -249,6 +249,20 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
             Value::Number(value) => ReturnValue::Number(value),
             Value::Boolean(value) => ReturnValue::Boolean(value),
             Value::String(value) => ReturnValue::String(value.to_string()),
+            Value::Instance(instance) => {
+                let mut map = std::collections::HashMap::new();
+                for (key, value) in &instance.borrow().fields {
+                    let v = match value {
+                        Value::Number(n) => (*n).into(),
+                        Value::Boolean(b) => (*b).into(),
+                        Value::String(str) => str.to_string().into(),
+                        Value::Nil => serde_json::Value::Null,
+                        _ => continue,
+                    };
+                    map.insert(key.to_string(), v);
+                }
+                ReturnValue::Object(map)
+            }
             _ => ReturnValue::Nil,
         }
     }

@@ -13,7 +13,7 @@ route /poc {
 
     post /hello {
         query {
-            @string(min_len=3, max_len=10)
+            @string(min_len=3, max_len=30)
             content: str
             age: int = 18
             @in(["ios", "android"])
@@ -25,7 +25,7 @@ route /poc {
             test: bool = true
         }
 
-        let answer = prompt "What is the moon of Pluto?";
+        let answer = prompt content;
         return "AI answer: " + answer;
     }
 }
