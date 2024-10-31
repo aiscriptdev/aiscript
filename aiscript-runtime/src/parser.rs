@@ -382,11 +382,16 @@ mod tests {
                         b: bool = false
                     }
 
-                    let greeting = "Hello, {name}"
+                    let greeting = "Hello" + name;
                     if greeting {
-                        print greeting
+                        print greeting;
                     }
-                    return greeting, 200
+                    return greeting;
+                }
+
+                /// Test endpoint2
+                post /b {
+                    return "endpoint2";
                 }
             }
         "#;
@@ -421,18 +426,25 @@ mod tests {
 
         // Verify script capture
         assert!(endpoint.statements.contains("let greeting"));
-        assert!(endpoint.statements.contains("return greeting, 200"));
+        assert!(endpoint.statements.contains("return greeting"));
+
+        // Verify endpoint2
+        let endpoint2 = &route.endpoints[1];
+        assert_eq!(endpoint2.docs, "Test endpoint2");
+        assert_eq!(endpoint2.path_specs[0].method, HttpMethod::Post);
+        assert_eq!(endpoint2.path_specs[0].path, "/b");
+        assert_eq!(endpoint2.statements, "return \"endpoint2\";");
     }
 
     #[test]
     fn test_no_top_route() {
         let input = r#"
             get / {
-                return "hello", 200
+                return "hello";
             }
 
             post / {
-                return "hello", 200
+                return "hello";
             }
         "#;
         let mut parser = Parser::new(input);
@@ -451,7 +463,7 @@ mod tests {
         let input = r#"
             route /api {
                 get /, post / {
-                    return "hello", 200
+                    return "hello";
                 }
             }
         "#;
@@ -484,7 +496,7 @@ mod tests {
                         @any(@a, @b(arg=1), @c)
                         z: str
                     }
-                    return "ok", 200
+                    return "ok";
                 }
             }
         "#;
@@ -563,7 +575,7 @@ mod tests {
         let input = r#"
             route /api {
                 get /, post / {
-                    return "hello", 200
+                    return "hello";
                 }
             }
         "#;
@@ -587,7 +599,7 @@ mod tests {
         let input = r#"
             route /api {
                 get /users/<id:int>, post /users {
-                    return "ok", 200
+                    return "ok";
                 }
             }
         "#;
@@ -613,7 +625,7 @@ mod tests {
         let input = r#"
             route / {
                 get /, post /, put / {
-                    return "root", 200
+                    return "root";
                 }
             }
         "#;

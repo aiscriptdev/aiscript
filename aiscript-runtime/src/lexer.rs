@@ -29,6 +29,7 @@ pub enum Token {
     Slash,        // /
     OpenBracket,  // [
     CloseBracket, // ]
+    Semicolon,    // ;
 
     // Types
     TypeStr,  // str
@@ -151,7 +152,7 @@ impl<'s> Lexer<'s> {
             script.push_str(&token.to_string());
         }
 
-        for ch in self.chars.by_ref() {
+        while let Some(ch) = self.advance() {
             match ch {
                 '{' => {
                     brace_count += 1;
@@ -174,7 +175,7 @@ impl<'s> Lexer<'s> {
             return Err("Unclosed script block".to_string());
         }
 
-        Ok(script)
+        Ok(script.trim().to_owned())
     }
 
     fn parse_token(&mut self, ch: char) -> Result<Token, String> {
@@ -191,6 +192,7 @@ impl<'s> Lexer<'s> {
             ')' => Ok(Token::CloseParen),
             '[' => Ok(Token::OpenBracket),
             ']' => Ok(Token::CloseBracket),
+            ';' => Ok(Token::Semicolon),
             '"' => self.read_string_literal().map(Token::StringLiteral),
             '/' => {
                 if self.peek_slash(2) {
@@ -274,6 +276,7 @@ impl Display for Token {
             Token::Slash => write!(f, "/"),
             Token::OpenBracket => write!(f, "["),
             Token::CloseBracket => write!(f, "]"),
+            Token::Semicolon => write!(f, ";"),
             Token::TypeStr => write!(f, "str"),
             Token::TypeInt => write!(f, "int"),
             Token::TypeBool => write!(f, "bool"),
@@ -314,6 +317,11 @@ mod tests {
                     }
 
                     // comment should be ignored
+                }
+
+                /// Test endpoint
+                get /b {
+                    return "endpoint b";
                 }
             }"#;
         let mut lexer = Lexer::new(input);
@@ -438,6 +446,18 @@ mod tests {
                 "Equal",
                 "StringLiteral(\"a\")",
                 "CloseBrace",
+                "CloseBrace",
+                // Test endpoint
+                "DocLine(\"Test endpoint\")",
+                // get /b
+                "Get",
+                "Slash",
+                "Identifier(\"b\")",
+                "OpenBrace",
+                // return "endpoint b"
+                "Identifier(\"return\")",
+                "StringLiteral(\"endpoint b\")",
+                "Semicolon",
                 "CloseBrace",
                 "CloseBrace",
             ]
