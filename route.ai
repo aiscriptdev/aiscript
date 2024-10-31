@@ -12,10 +12,12 @@ route /poc {
         return "get: hello" + name + request.path;
     }
 
-    post /hello {
+    /// get
+    post /hello, put /hello2 {
         query {
             @string(min_len=3, max_len=30)
             content: str
+            /// age
             age: int = 18
             @in(["ios", "android"])
             platform: str = "ios" 
@@ -26,7 +28,11 @@ route /poc {
             test: bool = true
         }
 
-        let answer = prompt content;
+        ai fn ask(question) {
+            return prompt content;
+        }
+
+        let answer = ask(content);
         return "AI answer: " + answer;
     }
 }

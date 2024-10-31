@@ -63,6 +63,7 @@ pub struct Field {
     pub required: bool,
     pub default: Option<Value>,
     pub directives: Vec<Directive>,
+    pub docs: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -84,6 +85,7 @@ pub struct Endpoint {
     pub query: Vec<Field>,
     pub body: RequestBody,
     pub statements: String,
+    pub docs: String,
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +93,7 @@ pub struct Route {
     pub prefix: String,
     pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,
+    pub docs: String,
 }
 
 impl Directive {

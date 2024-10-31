@@ -6,14 +6,14 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    // Keywords
-    Route,
-    Get,
-    Post,
-    Put,
-    Delete,
-    Query,
-    Body,
+    // Endpoint Keywords
+    Route,  // route
+    Get,    // get
+    Post,   // post
+    Put,    // put
+    Delete, // delete
+    Query,  // query
+    Body,   // body
 
     // Symbols
     OpenBrace,    // {
@@ -31,40 +31,64 @@ pub enum Token {
     CloseBracket, // ]
 
     // Types
-    TypeStr,
-    TypeInt,
-    TypeBool,
+    TypeStr,  // str
+    TypeInt,  // int
+    TypeBool, // bool
 
     // Values
     Identifier(String),
     StringLiteral(String),
     NumberLiteral(i64),
     BoolLiteral(bool),
+    DocLine(String),
 }
 
-pub struct Lexer<'input> {
-    // input: &'input str,
-    chars: Peekable<Chars<'input>>,
-    // current_pos: usize,
+pub struct Lexer<'s> {
+    source: &'s str,
+    chars: Peekable<Chars<'s>>,
+    current_pos: usize,
 }
 
-impl<'input> Lexer<'input> {
-    pub fn new(input: &'input str) -> Self {
+impl<'s> Lexer<'s> {
+    pub fn new(source: &'s str) -> Self {
         Lexer {
-            // input,
-            chars: input.chars().peekable(),
-            // current_pos: 0,
+            source,
+            chars: source.chars().peekable(),
+            current_pos: 0,
         }
+    }
+
+    fn advance(&mut self) -> Option<char> {
+        self.current_pos += 1;
+        self.chars.next()
     }
 
     fn consume_whitespace(&mut self) {
         while let Some(&ch) = self.chars.peek() {
             if ch.is_whitespace() {
-                self.chars.next();
+                self.advance();
+            }
+            // Skip comments line starts with // but not ///, which is docs
+            else if ch == '/' {
+                if self.peek_slash(3) {
+                    break;
+                }
+
+                if self.peek_slash(2) {
+                    while matches!(self.chars.peek(), Some(c) if *c != '\n') {
+                        self.advance();
+                    }
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
         }
+    }
+
+    fn peek_slash(&self, n: usize) -> bool {
+        self.source[self.current_pos..self.current_pos + n] == "/".repeat(n)
     }
 
     fn read_identifier(&mut self) -> String {
@@ -73,7 +97,7 @@ impl<'input> Lexer<'input> {
         while let Some(&ch) = self.chars.peek() {
             if ch.is_alphanumeric() || ch == '_' {
                 identifier.push(ch);
-                self.chars.next();
+                self.advance();
             } else {
                 break;
             }
@@ -82,13 +106,25 @@ impl<'input> Lexer<'input> {
         identifier
     }
 
+    fn read_to_line_end(&mut self) -> String {
+        let mut line = String::new();
+        while let Some(&ch) = self.chars.peek() {
+            if ch == '\n' {
+                break;
+            }
+            line.push(ch);
+            self.advance();
+        }
+        line.trim_start_matches('/').trim().to_string()
+    }
+
     fn read_string_literal(&mut self) -> Result<String, String> {
         let mut string = String::new();
-        while let Some(ch) = self.chars.next() {
+        while let Some(ch) = self.advance() {
             match ch {
                 '"' => return Ok(string),
                 '\\' => {
-                    if let Some(next_ch) = self.chars.next() {
+                    if let Some(next_ch) = self.advance() {
                         string.push(match next_ch {
                             'n' => '\n',
                             'r' => '\r',
@@ -153,10 +189,16 @@ impl<'input> Lexer<'input> {
             '@' => Ok(Token::At),
             '(' => Ok(Token::OpenParen),
             ')' => Ok(Token::CloseParen),
-            '/' => Ok(Token::Slash),
             '[' => Ok(Token::OpenBracket),
             ']' => Ok(Token::CloseBracket),
             '"' => self.read_string_literal().map(Token::StringLiteral),
+            '/' => {
+                if self.peek_slash(2) {
+                    Ok(Token::DocLine(self.read_to_line_end()))
+                } else {
+                    Ok(Token::Slash)
+                }
+            }
             ch if ch.is_alphabetic() => {
                 let mut ident = ch.to_string();
                 ident.push_str(&self.read_identifier());
@@ -182,7 +224,7 @@ impl<'input> Lexer<'input> {
                 while let Some(&ch) = self.chars.peek() {
                     if ch.is_numeric() {
                         num.push(ch);
-                        self.chars.next();
+                        self.advance();
                     } else {
                         break;
                     }
@@ -197,7 +239,7 @@ impl<'input> Lexer<'input> {
 
     pub fn next_token(&mut self) -> Option<Result<Token, String>> {
         self.consume_whitespace();
-        let next = self.chars.next()?;
+        let next = self.advance()?;
         Some(self.parse_token(next))
     }
 
@@ -239,6 +281,7 @@ impl Display for Token {
             Token::StringLiteral(s) => write!(f, "{}", s),
             Token::NumberLiteral(n) => write!(f, "{}", n),
             Token::BoolLiteral(b) => write!(f, "{}", b),
+            Token::DocLine(s) => write!(f, "/// {}", s),
         }
     }
 }
@@ -249,9 +292,13 @@ mod tests {
     #[test]
     fn test_lexer() {
         let input = r#"
+            /// Users API line1
+            /// Users API line2
             route /api/users {
+                /// Test endpoint
                 get /<id: int>, put /, post /, delete / {
                     query {
+                        /// Field name
                         @string(max_len=10)
                         name: str = "John"
                         flag: bool = true
@@ -265,6 +312,8 @@ mod tests {
                         @in(["a", "b", "c"])
                         choice: str = "a"
                     }
+
+                    // comment should be ignored
                 }
             }"#;
         let mut lexer = Lexer::new(input);
@@ -278,6 +327,9 @@ mod tests {
                 .map(|token| format!("{:?}", token.unwrap()))
                 .collect::<Vec<String>>(),
             vec![
+                "DocLine(\"Users API line1\")",
+                "DocLine(\"Users API line2\")",
+                // route
                 "Route",
                 "Slash",
                 "Identifier(\"api\")",
@@ -285,6 +337,7 @@ mod tests {
                 "Identifier(\"users\")",
                 "OpenBrace",
                 // get
+                "DocLine(\"Test endpoint\")",
                 "Get",
                 "Slash",
                 "OpenAngle",
@@ -308,6 +361,7 @@ mod tests {
                 // query
                 "Query",
                 "OpenBrace",
+                "DocLine(\"Field name\")",
                 // @string(max_len=10)
                 "At",
                 "Identifier(\"string\")",

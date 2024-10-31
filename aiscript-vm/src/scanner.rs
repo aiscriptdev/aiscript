@@ -2,52 +2,53 @@ use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Dot,
-    Minus,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
+    LeftParen,  // (
+    RightParen, // )
+    LeftBrace,  // {
+    RightBrace, // }
+    Comma,      // ,
+    Dot,        // .
+    Minus,      // -
+    Plus,       // +
+    Semicolon,  // ;
+    Slash,      // /
+    Star,       // *
 
-    Bang,
-    BangEqual,
-    Equal,
-    EqualEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
+    Bang,         // !
+    BangEqual,    // !=
+    Equal,        // =
+    EqualEqual,   // ==
+    Greater,      // >
+    GreaterEqual, // >=
+    Less,         // <
+    LessEqual,    // <=
 
     Identifier,
     String,
     Number,
 
-    And,
-    Class,
-    Else,
-    False,
-    For,
-    Fn,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Let,
-    While,
+    // Normal keywords
+    And,    // and
+    Class,  // class
+    Else,   // else
+    False,  // false
+    For,    // for
+    Fn,     // fn
+    If,     // if
+    Nil,    // nil
+    Or,     // or
+    Print,  // print
+    Return, // return
+    Super,  // super
+    This,   // this
+    True,   // true
+    Let,    // let
+    While,  // while
 
     // AI keywords
-    AI,
-    Prompt,
-    Agent,
+    AI,     // ai
+    Prompt, // prompt
+    Agent,  // agent
 
     Error,
     Eof,

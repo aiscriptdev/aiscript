@@ -20,7 +20,7 @@ pub struct StringValidator {
     min_len: Option<u32>,
     max_len: Option<u32>,
     exact_len: Option<u32>,
-    regex: Option<String>,
+    // regex: Option<String>,
     start_with: Option<String>,
     end_with: Option<String>,
 }
@@ -165,9 +165,9 @@ pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
                 exact_len: params
                     .get("exact_len")
                     .and_then(|v| v.as_u64().map(|v| v as u32)),
-                regex: params
-                    .get("regex")
-                    .and_then(|v| v.as_str().map(|v| v.to_string())),
+                // regex: params
+                //     .get("regex")
+                //     .and_then(|v| v.as_str().map(|v| v.to_string())),
                 start_with: params
                     .get("start_with")
                     .and_then(|v| v.as_str().map(|v| v.to_string())),

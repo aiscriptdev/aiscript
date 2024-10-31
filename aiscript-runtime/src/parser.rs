@@ -37,7 +37,19 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_docs(&mut self) -> Result<String, String> {
+        let mut docs = Vec::new();
+        while let Some(Token::DocLine(_)) = &self.current_token {
+            match self.next_token() {
+                Some(Token::DocLine(line)) => docs.push(line),
+                _ => return Err("Expected doc line".to_string()),
+            }
+        }
+        Ok(docs[..].join("\n"))
+    }
+
     pub fn parse_route(&mut self) -> Result<Route, String> {
+        let docs = self.parse_docs()?;
         let top_route = self.current_token == Some(Token::Route);
         let mut path = (String::from("/"), Vec::new());
         if top_route {
@@ -58,6 +70,7 @@ impl<'a> Parser<'a> {
             prefix: path.0,
             params: path.1,
             endpoints,
+            docs,
         })
     }
 
@@ -102,6 +115,7 @@ impl<'a> Parser<'a> {
         Ok((path_str, params))
     }
     fn parse_endpoint(&mut self) -> Result<Endpoint, String> {
+        let docs = self.parse_docs()?;
         let path_specs = self.parse_path_specs()?;
 
         self.expect_token(Token::OpenBrace)?;
@@ -156,6 +170,7 @@ impl<'a> Parser<'a> {
             query,
             body,
             statements,
+            docs,
         })
     }
 
@@ -206,6 +221,7 @@ impl<'a> Parser<'a> {
 
         let mut fields = Vec::new();
         while self.current_token != Some(Token::CloseBrace) {
+            let docs = self.parse_docs()?;
             // Parse directives
             let mut directives = Vec::new();
             while let Some(Token::At) = self.current_token {
@@ -240,6 +256,7 @@ impl<'a> Parser<'a> {
                 required: default.is_none(),
                 default,
                 directives,
+                docs,
             });
         }
 
@@ -348,13 +365,18 @@ mod tests {
     #[test]
     fn test_basic_route() {
         let input = r#"
+            /// Test route line1
+            /// Test route line2
             route /test/<id:int> {
+                /// Test endpoint
                 get /a {
                     query {
+                        /// field name
                         name: str = "hello"
                         age: int = 18
                     }
                     body {
+                        /// field a
                         @length(max=10)
                         a: str
                         b: bool = false
@@ -371,25 +393,29 @@ mod tests {
 
         let mut parser = Parser::new(input);
         let result = parser.parse_route();
-        assert!(result.is_ok());
+        // assert!(result.is_ok());
 
         let route = result.unwrap();
+        assert_eq!(route.docs, "Test route line1\nTest route line2");
         assert_eq!(route.prefix, "/test/:id");
         assert_eq!(route.params.len(), 1);
         assert_eq!(route.params[0].name, "id");
         assert_eq!(route.params[0].param_type, "int");
 
         let endpoint = &route.endpoints[0];
+        assert_eq!(endpoint.docs, "Test endpoint");
         assert_eq!(endpoint.path_specs[0].method, HttpMethod::Get);
         assert_eq!(endpoint.path_specs[0].path, "/a");
 
         // Verify query parameters
         assert_eq!(endpoint.query.len(), 2);
+        assert_eq!(endpoint.query[0].docs, "field name");
         assert_eq!(endpoint.query[0].name, "name");
         assert_eq!(endpoint.query[1].name, "age");
 
         // Verify body fields
         assert_eq!(endpoint.body.fields.len(), 2);
+        assert_eq!(endpoint.body.fields[0].docs, "field a");
         assert_eq!(endpoint.body.fields[0].name, "a");
         assert_eq!(endpoint.body.fields[1].name, "b");
 
