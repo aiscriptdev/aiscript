@@ -7,4 +7,4 @@ class Foo {
   }
 }
 
-print Foo(); // expect: Foo instance
+print Foo(); // expect: Foo {}

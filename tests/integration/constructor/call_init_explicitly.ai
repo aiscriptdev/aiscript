@@ -9,7 +9,7 @@ let foo = Foo("one"); // expect: Foo.init(one)
 foo.field = "field";
 
 let foo2 = foo.init("two"); // expect: Foo.init(two)
-print foo2; // expect: Foo instance
+print foo2; // expect: Foo {field: init}
 
 // Make sure init() doesn't create a fresh instance.
 print foo.field; // expect: init

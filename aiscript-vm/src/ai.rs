@@ -1,5 +1,3 @@
-use tokio::sync::oneshot;
-
 pub fn prompt(message: String) -> String {
     // let claude = Claude::default()
     //     .with_api_key(std::env::var("CLAUDE_API_KEY").unwrap())
@@ -10,6 +8,7 @@ pub fn prompt(message: String) -> String {
     #[cfg(not(feature = "ai_test"))]
     {
         use langchain_rust::{language_models::llm::LLM, llm::OpenAI};
+        use tokio::sync::oneshot;
         // Create a channel to receive the result
         let (tx, rx) = oneshot::channel();
 

@@ -61,7 +61,15 @@ impl<'gc> Display for Value<'gc> {
             Value::NativeFunction(_) => write!(f, "<native fn>"),
             Value::Class(class) => write!(f, "{}", class.borrow().name),
             Value::Instance(instance) => {
-                write!(f, "{} instance", instance.borrow().class.borrow().name)
+                let mut s = format!("{} {{", instance.borrow().class.borrow().name);
+                for (i, (key, value)) in instance.borrow().fields.iter().enumerate() {
+                    s.push_str(&format!("{}: {}", key, value));
+                    if i != instance.borrow().fields.len() - 1 {
+                        s.push_str(", ");
+                    }
+                }
+                s.push('}');
+                write!(f, "{}", s)
             }
             Value::BoundMethod(bm) => write!(f, "{}", bm.method.function),
             Value::Nil => write!(f, "nil"),

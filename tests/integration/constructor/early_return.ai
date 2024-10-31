@@ -7,4 +7,4 @@ class Foo {
 }
 
 let foo = Foo(); // expect: init
-print foo; // expect: Foo instance
+print foo; // expect: Foo {}

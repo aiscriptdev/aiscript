@@ -20,7 +20,10 @@ use std::{
     task::{Context, Poll},
 };
 use thiserror::Error;
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{
+    net::TcpListener,
+    task::{self, JoinHandle},
+};
 use tower::Service;
 
 mod ast;
@@ -148,6 +151,30 @@ impl RequestProcessor {
             .map(|Form(body)| body)
             .map_err(ServerError::FormParseError)
     }
+
+    fn request_instance(&self) -> HashMap<&'static str, Value> {
+        let uri = self.request.uri();
+        [
+            ("method", self.request.method().as_str().into()),
+            if let Some(authority) = uri.authority() {
+                ("authority", authority.as_str().into())
+            } else {
+                ("authority", serde_json::Value::Null)
+            },
+            if let Some(host) = uri.host() {
+                ("host", host.into())
+            } else {
+                ("host", serde_json::Value::Null)
+            },
+            ("path", uri.path().into()),
+            ("query", uri.query().into()),
+            ("protocol", uri.scheme_str().into()),
+            ("port", uri.port_u16().into()),
+            // ("fragment", uri.fragment().into()),
+        ]
+        .into_iter()
+        .collect()
+    }
 }
 
 impl Future for RequestProcessor {
@@ -190,6 +217,7 @@ impl Future for RequestProcessor {
                     self.state = ProcessingState::ValidatingBody;
                 }
                 ProcessingState::ValidatingBody => {
+                    let request_instance = self.request_instance();
                     let request = mem::take(&mut self.request);
                     let body_fut: BoxFuture<Result<Value, ServerError>> =
                         match self.endpoint.body_type {
@@ -232,16 +260,17 @@ impl Future for RequestProcessor {
                         return Poll::Ready(Ok(error.into_response()));
                     }
 
-                    let script = self.endpoint.script.clone();
+                    let script = mem::take(&mut self.endpoint.script);
                     let script = Box::leak(script.into_boxed_str());
-                    let query_data = self.query_data.clone();
-                    let body_data = self.body_data.clone();
-                    let handle = tokio::task::spawn_blocking(move || {
+                    let query_data = mem::take(&mut self.query_data);
+                    let body_data = mem::take(&mut self.body_data);
+                    let handle = task::spawn_blocking(move || {
                         // aiscript_vm::eval(script)
                         let mut vm = Vm::new();
                         vm.compile(script)?;
                         vm.inject_variables(query_data);
                         vm.inject_variables(body_data);
+                        vm.inject_instance("request", request_instance);
                         vm.interpret()
                     });
                     self.state = ProcessingState::Executing(handle);
