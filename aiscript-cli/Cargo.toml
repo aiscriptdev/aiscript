@@ -19,7 +19,7 @@ required-features = ["ai_test"]
 aiscript-vm = { path = "../aiscript-vm" }
 aiscript-runtime = { path = "../aiscript-runtime" }
 clap = { version = "4.5", features = ["derive"] }
-tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.41.0", features = ["rt-multi-thread", "macros"] }
 dotenv = "0.15.0"
 
 [features]
