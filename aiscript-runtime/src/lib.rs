@@ -1,5 +1,5 @@
 use ast::HttpMethod;
-use axum::routing::*;
+use axum::{response::Html, routing::*};
 use std::{fs, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpListener;
 
@@ -18,7 +18,12 @@ pub async fn run(path: PathBuf, port: u16) {
 
     let routes = [route];
     let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
-    router = router.route("/openapi.json", get(move || async { openapi }));
+    router = router
+        .route("/openapi.json", get(move || async { openapi }))
+        .route(
+            "/redoc",
+            get(|| async { Html(include_str!("openapi/redoc.html")) }),
+        );
     for route in routes {
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
