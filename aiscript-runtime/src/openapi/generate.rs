@@ -114,7 +114,7 @@ impl OpenAPIGenerator {
         endpoint: &Endpoint,
         route_params: &[PathParameter],
         full_path: &str,
-        components: &Components,
+        _components: &Components,
     ) -> Operation {
         let mut parameters = Vec::new();
 
