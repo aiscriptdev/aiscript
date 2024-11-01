@@ -1,8 +1,12 @@
+/// Test POC API
 route /poc {
+    /// Get hello API
     get /hello {
         query {
+            /// hello content
             @string(min_len=3, max_len=30)
             content: str
+            /// hello age
             age: int = 18
         }
 
@@ -12,7 +16,7 @@ route /poc {
         return "get: hello" + name + request.path;
     }
 
-    /// get
+    /// Post and put hello API
     post /hello, put /hello2 {
         query {
             @string(min_len=3, max_len=30)
@@ -25,6 +29,7 @@ route /poc {
 
         @json
         body {
+            /// test flag
             test: bool = true
         }
 

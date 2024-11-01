@@ -8,6 +8,7 @@ mod ast;
 mod endpoint;
 mod error;
 mod lexer;
+mod openapi;
 mod parser;
 mod validator;
 
@@ -15,7 +16,10 @@ pub async fn run(path: PathBuf, port: u16) {
     let route = parser::parse_route(&fs::read_to_string(path).unwrap()).unwrap();
     let mut router = Router::new();
 
-    for route in [route] {
+    let routes = [route];
+    let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
+    router = router.route("/openapi.json", get(move || async { openapi }));
+    for route in routes {
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
             let endpoint = Endpoint {
