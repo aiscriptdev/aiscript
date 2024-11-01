@@ -2,6 +2,7 @@ use ast::HttpMethod;
 use axum::{response::Html, routing::*};
 use std::{fs, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpListener;
+use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
 mod ast;
@@ -12,11 +13,36 @@ mod openapi;
 mod parser;
 mod validator;
 
-pub async fn run(path: PathBuf, port: u16) {
-    let route = parser::parse_route(&fs::read_to_string(path).unwrap()).unwrap();
+fn read_routes() -> Vec<ast::Route> {
+    let mut routes = Vec::new();
+    for entry in WalkDir::new("routes")
+        .contents_first(true)
+        .into_iter()
+        .filter_entry(|e| {
+            e.file_type().is_file()
+                && e.file_name()
+                    .to_str()
+                    .map(|s| s.ends_with(".ai"))
+                    .unwrap_or(false)
+        })
+        .filter_map(|e| e.ok())
+    {
+        let file_path = entry.path();
+        let input = fs::read_to_string(file_path).unwrap();
+        let route = parser::parse_route(&input).unwrap();
+        routes.push(route);
+    }
+    routes
+}
+
+pub async fn run(path: Option<PathBuf>, port: u16) {
+    let routes = if let Some(path) = path {
+        vec![parser::parse_route(&fs::read_to_string(path).unwrap()).unwrap()]
+    } else {
+        read_routes()
+    };
     let mut router = Router::new();
 
-    let routes = [route];
     let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
     router = router
         .route("/openapi.json", get(move || async { openapi }))

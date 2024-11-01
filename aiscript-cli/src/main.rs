@@ -22,7 +22,7 @@ enum Commands {
     Serve {
         /// The file to run.
         #[arg(value_name = "FILE")]
-        file: PathBuf,
+        file: Option<PathBuf>,
         /// The web server listening port.
         #[arg(short, long, default_value_t = 8080)]
         port: u16,

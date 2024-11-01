@@ -1,0 +1,10 @@
+/// Repo API
+get /repo {
+    query {
+        /// repo name
+        @string(min_len=3, max_len=30)
+        name: str
+    }
+
+    return "repo: " + name;
+}
