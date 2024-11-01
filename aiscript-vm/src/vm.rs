@@ -8,7 +8,9 @@ use gc_arena::{
 };
 
 use crate::{
-    ai, builtins,
+    ai,
+    ast::ParseError,
+    builtins,
     compiler::compile,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
@@ -37,6 +39,7 @@ pub type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefaul
 
 #[derive(Debug)]
 pub enum VmError {
+    ParseError(ParseError),
     CompileError,
     RuntimeError(std::string::String),
 }
@@ -46,6 +49,7 @@ impl std::error::Error for VmError {}
 impl Display for VmError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            VmError::ParseError(parse_error) => write!(f, "ParseError: {parse_error}"),
             Self::CompileError => write!(f, "CompileError"),
             Self::RuntimeError(s) => write!(f, "RuntimeError: {s}"),
         }
@@ -167,6 +171,25 @@ impl Vm {
             let function = compile(context, source)?;
             #[cfg(feature = "debug")]
             function.disassemble("script");
+            state.define_builtins();
+            let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
+            state.push_stack(Value::from(closure));
+            state.call(closure, 0)
+        })?;
+        Ok(())
+    }
+
+    pub fn compile2(&mut self, source: &'static str) -> Result<(), VmError> {
+        self.arena.mutate_root(|mc, state| {
+            let context = Context {
+                mutation: mc,
+                strings: state.strings,
+            };
+            let function = crate::codegen::compile(context, source)?;
+
+            #[cfg(feature = "debug")]
+            function.disassemble("script");
+
             state.define_builtins();
             let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
             state.push_stack(Value::from(closure));

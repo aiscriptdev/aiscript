@@ -72,7 +72,7 @@ impl OpCode {
 #[derive(Clone, Debug, Collect)]
 #[collect[no_drop]]
 pub struct Chunk<'gc> {
-    code: Vec<OpCode>,
+    pub code: Vec<OpCode>,
     constans: Vec<Value<'gc>>,
     lines: Vec<u32>,
 }

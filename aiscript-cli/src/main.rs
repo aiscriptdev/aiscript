@@ -60,7 +60,10 @@ fn run_file(path: PathBuf) {
     let source = fs::read_to_string(path).unwrap();
     let source: &'static str = Box::leak(source.into_boxed_str());
     let mut vm = Vm::new();
-    if let Err(VmError::CompileError) = vm.compile(source) {
+    if let Err(err) = vm.compile2(source) {
+        if let VmError::ParseError(parse_error) = err {
+            eprintln!("{}", parse_error.message)
+        }
         exit(65);
     }
     if let Err(VmError::RuntimeError(err)) = vm.interpret() {
