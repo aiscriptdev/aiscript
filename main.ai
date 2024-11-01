@@ -1,3 +1,7 @@
 let p = "What is the moon of Pluto?";
-let a = prompt p;
-print a;
+ai fn ask(question) {
+    return prompt question;
+}
+
+let answer = ask(p);
+print answer;

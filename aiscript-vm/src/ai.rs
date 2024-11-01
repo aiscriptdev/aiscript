@@ -8,19 +8,20 @@ pub fn prompt(message: String) -> String {
     #[cfg(not(feature = "ai_test"))]
     {
         use langchain_rust::{language_models::llm::LLM, llm::OpenAI};
-        use tokio::sync::oneshot;
-        // Create a channel to receive the result
-        let (tx, rx) = oneshot::channel();
+        use tokio::runtime::Handle;
 
-        // Spawn a new task to handle the async work
-        tokio::spawn(async move {
+        async fn _prompt(message: String) -> String {
             let open_ai = OpenAI::default().with_model("gpt-3.5-turbo");
-            let result = open_ai.invoke(&message).await.unwrap();
-            let _ = tx.send(result); // Ignore send errors since rx is definitely alive
-        });
+            open_ai.invoke(&message).await.unwrap()
+        }
 
-        // Wait for the result synchronously
-        rx.blocking_recv()
-            .unwrap_or_else(|_| "Error getting data".to_string())
+        if Handle::try_current().is_ok() {
+            // We're in an async context, use await
+            Handle::current().block_on(async { _prompt(message).await })
+        } else {
+            // We're in a sync context, create a new runtime
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async { _prompt(message).await })
+        }
     }
 }
