@@ -146,6 +146,22 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
                 }
                 Ok(())
             }
+            Expr::Invoke {
+                object,
+                method,
+                arguments,
+                line,
+            } => {
+                writeln!(f, "{indent}Invoke [line {line}]")?;
+                write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;
+                write!(f, "{}", PrettyPrint::new(object, self.indent + 2))?;
+                writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
+                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
+                for arg in arguments {
+                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
+                }
+                Ok(())
+            }
             Expr::Get { object, name, line } => {
                 writeln!(f, "{indent}Get [line {line}]")?;
                 write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;

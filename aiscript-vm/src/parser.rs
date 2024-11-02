@@ -116,7 +116,7 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
-            methods.push(self.method()?);
+            methods.push(self.function(FunctionType::Method)?);
         }
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body.")?;
@@ -129,19 +129,12 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn method(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        self.consume(TokenType::Identifier, "Expect method name.")?;
-        // let name_constant = self.identifier_constant(self.previous.lexeme);
-        let mut fn_type = FunctionType::Method;
-        if self.previous.lexeme == "init" {
-            fn_type = FunctionType::Initializer;
-        }
-        self.function(fn_type)
-        // self.emit_byte(OpCode::Method(name_constant as u8));
-    }
-
     fn function(&mut self, fn_type: FunctionType) -> Result<Stmt<'gc>, ParseError> {
-        let name = self.consume(TokenType::Identifier, "Expect function name.")?;
+        let type_name = match fn_type {
+            FunctionType::Method => "method",
+            _ => "function",
+        };
+        let name = self.consume(TokenType::Identifier, &format!("Expect {type_name} name."))?;
         self.consume(TokenType::LeftParen, "Expect '(' after function name.")?;
 
         let mut params = Vec::new();
@@ -460,6 +453,24 @@ impl<'gc> Parser<'gc> {
                 object,
                 name,
                 value,
+                line: self.previous.line,
+            })
+        } else if self.match_token(TokenType::LeftParen) {
+            let mut arguments = Vec::new();
+            if !self.check(TokenType::RightParen) {
+                loop {
+                    arguments.push(self.expression()?);
+                    if !self.match_token(TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+            self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+
+            Ok(Expr::Invoke {
+                object,
+                method: name,
+                arguments,
                 line: self.previous.line,
             })
         } else {

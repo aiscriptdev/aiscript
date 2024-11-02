@@ -47,6 +47,12 @@ pub enum Expr<'gc> {
         arguments: Vec<Expr<'gc>>,
         line: u32,
     },
+    Invoke {
+        object: Box<Expr<'gc>>,
+        method: Token<'gc>,
+        arguments: Vec<Expr<'gc>>,
+        line: u32,
+    },
     Get {
         object: Box<Expr<'gc>>,
         name: Token<'gc>,
@@ -85,6 +91,7 @@ impl<'gc> Expr<'gc> {
             | Self::And { line, .. }
             | Self::Or { line, .. }
             | Self::Call { line, .. }
+            | Self::Invoke { line, .. }
             | Self::Get { line, .. }
             | Self::Set { line, .. }
             | Self::This { line, .. }

@@ -205,6 +205,8 @@ impl<'gc> CodeGen<'gc> {
                     self.mark_initialized();
                 }
 
+                // Load class for defining methods
+                self.emit(OpCode::GetGlobal(name_constant as u8));
                 if let Some(superclass) = superclass {
                     self.generate_expr(superclass)?;
                 }
@@ -223,8 +225,15 @@ impl<'gc> CodeGen<'gc> {
                             FunctionType::Method
                         };
                         self.generate_function(method_name.lexeme, params, body, fn_type)?;
+                        // Register method with class
+                        let method_constant = self.identifier_constant(method_name.lexeme);
+                        self.emit(OpCode::Method(method_constant as u8));
                     }
                 }
+
+                // Once we’ve reached the end of the methods, we no longer need
+                // the class and tell the VM to pop it off the stack.
+                self.emit(OpCode::Pop);
             }
         }
         Ok(())
@@ -300,6 +309,16 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(arg)?;
                 }
                 self.emit(OpCode::Call(arguments.len() as u8));
+            }
+            Expr::Invoke {
+                object,
+                method,
+                arguments,
+                ..
+            } => {
+                self.generate_expr(object)?;
+                let method_constant = self.identifier_constant(method.lexeme);
+                self.emit(OpCode::Invoke(method_constant as u8, arguments.len() as u8));
             }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
@@ -603,7 +622,7 @@ pub fn compile<'gc>(ctx: Context<'gc>, source: &'gc str) -> Result<Function<'gc>
     // Step 1: Parse source into AST
     let mut parser = Parser::new(ctx, source);
     let program = parser.parse().map_err(VmError::ParseError)?;
-    println!("AST: {}", program);
+    // println!("AST: {}", program);
     // Step 2: Generate bytecode from AST
     CodeGen::generate(program, ctx)
 }
