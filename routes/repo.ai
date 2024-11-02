@@ -8,3 +8,25 @@ get /repo {
 
     return "repo: " + name;
 }
+
+/// Create a repository
+post /repo {
+    body {
+        /// The repository name
+        @string(min_len=3, max_len=30)
+        name: str
+    }
+
+    return "create repo: " + name;
+}
+
+/// Update a repository API
+put /repo/<id:int> {
+    body {
+        /// The repository name
+        @string(min_len=3, max_len=30)
+        name: str
+    }
+
+    return "update repo: " + name;
+}

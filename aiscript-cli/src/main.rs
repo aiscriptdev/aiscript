@@ -26,6 +26,9 @@ enum Commands {
         /// The web server listening port.
         #[arg(short, long, default_value_t = 8080)]
         port: u16,
+        /// Reload the file on change
+        #[arg(short, long, default_value_t = false)]
+        reload: bool,
     },
 }
 
@@ -34,9 +37,9 @@ async fn main() {
     dotenv::dotenv().ok();
     let cli = AIScriptCli::parse();
     match cli.command {
-        Some(Commands::Serve { file, port }) => {
-            println!("Server listening on port {}", port);
-            aiscript_runtime::run(file, port).await;
+        Some(Commands::Serve { file, port, reload }) => {
+            println!("Server listening on port http://localhost:{}", port);
+            aiscript_runtime::run(file, port, reload).await;
         }
         None => {
             if let Some(path) = cli.file {

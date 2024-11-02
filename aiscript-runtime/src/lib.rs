@@ -1,7 +1,12 @@
 use ast::HttpMethod;
 use axum::{response::Html, routing::*};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 use std::{fs, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpListener;
+use tokio::sync::broadcast;
 use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
@@ -13,6 +18,9 @@ mod openapi;
 mod parser;
 mod utils;
 mod validator;
+
+#[derive(Debug, Clone)]
+struct ReloadSignal;
 
 fn read_routes() -> Vec<ast::Route> {
     let mut routes = Vec::new();
@@ -29,21 +37,107 @@ fn read_routes() -> Vec<ast::Route> {
         .filter_map(|e| e.ok())
     {
         let file_path = entry.path();
-        let input = fs::read_to_string(file_path).unwrap();
-        let route = parser::parse_route(&input).unwrap();
-        routes.push(route);
+        if let Some(route) = read_single_route(file_path) {
+            routes.push(route);
+        }
     }
     routes
 }
 
-pub async fn run(path: Option<PathBuf>, port: u16) {
-    let routes = if let Some(path) = path {
-        vec![parser::parse_route(&fs::read_to_string(path).unwrap()).unwrap()]
+fn read_single_route(file_path: &Path) -> Option<ast::Route> {
+    match fs::read_to_string(file_path) {
+        Ok(input) => match parser::parse_route(&input) {
+            Ok(route) => return Some(route),
+            Err(e) => eprintln!("Error parsing route file {:?}: {}", file_path, e),
+        },
+        Err(e) => eprintln!("Error reading route file {:?}: {}", file_path, e),
+    }
+
+    None
+}
+
+pub async fn run(path: Option<PathBuf>, port: u16, reload: bool) {
+    if !reload {
+        // Run without reload functionality
+        run_server(path, port, None).await;
+        return;
+    }
+
+    // Create a channel for reload coordination
+    let (tx, _) = broadcast::channel::<ReloadSignal>(1);
+    let tx = Arc::new(tx);
+
+    // Set up file watcher
+    let watcher_tx = tx.clone();
+    let mut watcher = setup_watcher(move |event| {
+        // Only trigger reload for .ai files
+        if let Some(path) = event.paths.first().and_then(|p| p.to_str()) {
+            if path.ends_with(".ai") {
+                watcher_tx.send(ReloadSignal).unwrap();
+            }
+        }
+    })
+    .expect("Failed to setup watcher");
+
+    // Watch the routes directory
+    watcher
+        .watch(Path::new("routes"), RecursiveMode::Recursive)
+        .expect("Failed to watch routes directory");
+
+    loop {
+        let mut rx = tx.subscribe();
+        let server_handle = tokio::spawn(run_server(path.clone(), port, Some(rx.resubscribe())));
+
+        // Wait for reload signal
+        match rx.recv().await {
+            Ok(_) => {
+                println!("📑 Routes changed, reloading server...");
+                // Give some time for pending requests to complete
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                server_handle.abort();
+            }
+            Err(_) => {
+                break;
+            }
+        }
+    }
+}
+
+fn setup_watcher<F>(mut callback: F) -> notify::Result<RecommendedWatcher>
+where
+    F: FnMut(notify::Event) + Send + 'static,
+{
+    let watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        match res {
+            Ok(event) => {
+                // Only trigger on write/create/remove events
+                if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
+                    callback(event);
+                }
+            }
+            Err(e) => println!("Watch error: {:?}", e),
+        }
+    })?;
+    Ok(watcher)
+}
+
+async fn run_server(
+    path: Option<PathBuf>,
+    port: u16,
+    reload_rx: Option<broadcast::Receiver<ReloadSignal>>,
+) {
+    let routes = if let Some(file_path) = path {
+        read_single_route(&file_path).into_iter().collect()
     } else {
         read_routes()
     };
-    let mut router = Router::new();
 
+    if routes.is_empty() {
+        eprintln!("Warning: No valid routes found!");
+        return;
+    }
+
+    let mut router = Router::new();
     let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
     router = router
         .route("/openapi.json", get(move || async { openapi }))
@@ -91,7 +185,33 @@ pub async fn run(path: Option<PathBuf>, port: u16) {
     }
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    axum::serve(TcpListener::bind(addr).await.unwrap(), router)
-        .await
-        .unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
+
+    match reload_rx {
+        Some(mut rx) => {
+            // Create a shutdown signal for reload case
+            let (close_tx, close_rx) = tokio::sync::oneshot::channel();
+
+            // Handle reload messages
+            let shutdown_task = tokio::spawn(async move {
+                if rx.recv().await.is_ok() {
+                    close_tx.send(()).unwrap();
+                }
+            });
+
+            // Run the server with graceful shutdown
+            axum::serve(listener, router)
+                .with_graceful_shutdown(async {
+                    let _ = close_rx.await;
+                })
+                .await
+                .unwrap();
+
+            shutdown_task.abort();
+        }
+        None => {
+            // Run without reload capability
+            axum::serve(listener, router).await.unwrap();
+        }
+    }
 }
