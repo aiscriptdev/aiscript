@@ -357,9 +357,9 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::JumpIfFalse(offset) => {
                     let is_falsy = self.peek(0).is_falsy();
-                    let frame = self.current_frame();
                     // Alwasy jump to the next instruction, do not move this line into if block
                     if is_falsy {
+                        let frame = self.current_frame();
                         frame.ip += offset as usize;
                     }
                 }
