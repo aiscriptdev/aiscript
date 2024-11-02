@@ -3,13 +3,14 @@ use std::ops::Add;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
-    ast::{Expr, LiteralValue, ParseError, Program, Stmt},
+    ast::{Expr, LiteralValue, Program, Stmt},
     object::FunctionType,
     scanner::{Scanner, Token, TokenType},
     vm::Context,
+    VmError,
 };
 
-type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Result<Expr<'gc>, ParseError>;
+type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc>>;
 
 pub struct Parser<'gc> {
     ctx: Context<'gc>,
@@ -34,28 +35,28 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program<'gc>, ParseError> {
+    pub fn parse(&mut self) -> Result<Program<'gc>, VmError> {
         let mut program = Program::new();
         self.advance();
 
         while !self.is_at_end() {
-            if let Some(stmt) = self.declaration()? {
+            if let Some(stmt) = self.declaration() {
                 program.statements.push(stmt);
             }
         }
 
         if self.had_error {
-            Err(ParseError::new("Failed to parse program", 0))
+            Err(VmError::CompileError)
         } else {
             Ok(program)
         }
     }
 
-    fn declaration(&mut self) -> Result<Option<Stmt<'gc>>, ParseError> {
+    fn declaration(&mut self) -> Option<Stmt<'gc>> {
         let stmt = if self.match_token(TokenType::Class) {
             self.class_declaration()
         } else if self.match_token(TokenType::AI) {
-            self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.")?;
+            self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
             self.function(FunctionType::AiFunction)
         } else if self.match_token(TokenType::Fn) {
             self.function(FunctionType::Function)
@@ -67,18 +68,18 @@ impl<'gc> Parser<'gc> {
 
         if self.panic_mode {
             self.synchronize();
-            Ok(None)
+            None
         } else {
-            stmt.map(Some)
+            stmt
         }
     }
 
-    fn statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
+    fn statement(&mut self) -> Option<Stmt<'gc>> {
         if self.match_token(TokenType::Print) {
             self.print_statement()
         } else if self.match_token(TokenType::LeftBrace) {
-            Ok(Stmt::Block {
-                statements: self.block()?,
+            Some(Stmt::Block {
+                statements: self.block(),
                 line: self.previous.line,
             })
         } else if self.match_token(TokenType::If) {
@@ -94,15 +95,14 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn class_declaration(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+    fn class_declaration(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect class name.");
+        let name = self.previous;
         let superclass = if self.match_token(TokenType::Less) {
-            let superclass_name = self.consume(TokenType::Identifier, "Expect superclass name.")?;
+            self.consume(TokenType::Identifier, "Expect superclass name.");
+            let superclass_name = self.previous;
             if name.lexeme == superclass_name.lexeme {
-                return Err(ParseError::new(
-                    "A class can't inherit from itself.",
-                    name.line,
-                ));
+                self.error("A class can't inherit from itself.");
             }
             Some(Expr::Variable {
                 name: superclass_name,
@@ -112,16 +112,16 @@ impl<'gc> Parser<'gc> {
             None
         };
 
-        self.consume(TokenType::LeftBrace, "Expect '{' before class body.")?;
+        self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
 
         let mut methods = Vec::new();
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             methods.push(self.function(FunctionType::Method)?);
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after class body.")?;
+        self.consume(TokenType::RightBrace, "Expect '}' after class body.");
 
-        Ok(Stmt::Class {
+        Some(Stmt::Class {
             name,
             superclass,
             methods,
@@ -129,35 +129,35 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn function(&mut self, fn_type: FunctionType) -> Result<Stmt<'gc>, ParseError> {
+    fn function(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
         let type_name = match fn_type {
             FunctionType::Method => "method",
             _ => "function",
         };
-        let name = self.consume(TokenType::Identifier, &format!("Expect {type_name} name."))?;
-        self.consume(TokenType::LeftParen, "Expect '(' after function name.")?;
+
+        self.consume(TokenType::Identifier, &format!("Expect {type_name} name."));
+        let name = self.previous;
+        self.consume(TokenType::LeftParen, "Expect '(' after function name.");
 
         let mut params = Vec::new();
         if !self.check(TokenType::RightParen) {
             loop {
                 if params.len() >= 255 {
-                    return Err(ParseError::new(
-                        "Can't have more than 255 parameters.",
-                        self.peek().line,
-                    ));
+                    self.error_at_current("Can't have more than 255 parameters.");
                 }
 
-                params.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+                self.consume(TokenType::Identifier, "Expect parameter name.");
+                params.push(self.previous);
 
                 if !self.match_token(TokenType::Comma) {
                     break;
                 }
             }
         }
-        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
-        self.consume(TokenType::LeftBrace, "Expect '{' before function body.")?;
-        let body = self.block()?;
-        Ok(Stmt::Function {
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.");
+        self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+        let body = self.block();
+        Some(Stmt::Function {
             name,
             params,
             body,
@@ -166,8 +166,9 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn var_declaration(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
+    fn var_declaration(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect variable name.");
+        let name = self.previous;
 
         let initializer = if self.match_token(TokenType::Equal) {
             Some(self.expression()?)
@@ -178,29 +179,29 @@ impl<'gc> Parser<'gc> {
         self.consume(
             TokenType::Semicolon,
             "Expect ';' after variable declaration.",
-        )?;
-        Ok(Stmt::Let {
+        );
+        Some(Stmt::Let {
             name,
             initializer,
             line: name.line,
         })
     }
 
-    fn while_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+    fn while_statement(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after condition.")?;
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
         let body = Box::new(self.statement()?);
 
-        Ok(Stmt::While {
+        Some(Stmt::While {
             condition,
             body,
             line: self.previous.line,
         })
     }
 
-    fn for_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+    fn for_statement(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
 
         let initializer = if self.match_token(TokenType::Semicolon) {
             None
@@ -215,14 +216,14 @@ impl<'gc> Parser<'gc> {
         } else {
             None
         };
-        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
         let increment = if !self.check(TokenType::RightParen) {
             Some(self.expression()?)
         } else {
             None
         };
-        self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
 
         let mut body = self.statement()?;
 
@@ -256,13 +257,13 @@ impl<'gc> Parser<'gc> {
             };
         }
 
-        Ok(body)
+        Some(body)
     }
 
-    fn if_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+    fn if_statement(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after condition.")?;
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         let then_branch = Box::new(self.statement()?);
         let else_branch = if self.match_token(TokenType::Else) {
@@ -271,7 +272,7 @@ impl<'gc> Parser<'gc> {
             None
         };
 
-        Ok(Stmt::If {
+        Some(Stmt::If {
             condition,
             then_branch,
             else_branch,
@@ -279,82 +280,82 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn print_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
+    fn print_statement(&mut self) -> Option<Stmt<'gc>> {
         let value = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        Ok(Stmt::Print {
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        Some(Stmt::Print {
             expression: value,
             line: self.previous.line,
         })
     }
 
-    fn return_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
+    fn return_statement(&mut self) -> Option<Stmt<'gc>> {
         let value = if !self.check(TokenType::Semicolon) {
             Some(self.expression()?)
         } else {
             None
         };
 
-        self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
-        Ok(Stmt::Return {
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+        Some(Stmt::Return {
             value,
             line: self.previous.line,
         })
     }
 
-    fn expression_statement(&mut self) -> Result<Stmt<'gc>, ParseError> {
+    fn expression_statement(&mut self) -> Option<Stmt<'gc>> {
         let expr = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
-        Ok(Stmt::Expression {
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        Some(Stmt::Expression {
             expression: expr,
             line: self.previous.line,
         })
     }
 
-    fn block(&mut self) -> Result<Vec<Stmt<'gc>>, ParseError> {
+    fn block(&mut self) -> Vec<Stmt<'gc>> {
         let mut statements = Vec::new();
 
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
-            if let Some(declaration) = self.declaration()? {
+            if let Some(declaration) = self.declaration() {
                 statements.push(declaration);
             }
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
-        Ok(statements)
+        self.consume(TokenType::RightBrace, "Expect '}' after block.");
+        statements
     }
 
-    fn expression(&mut self) -> Result<Expr<'gc>, ParseError> {
+    fn expression(&mut self) -> Option<Expr<'gc>> {
         self.parse_precedence(Precedence::Assignment)
     }
 
-    fn number(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn number(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let value = self.previous.lexeme.parse::<f64>().unwrap();
-        Ok(Expr::Literal {
+        Some(Expr::Literal {
             value: LiteralValue::Number(value),
             line: self.previous.line,
         })
     }
 
-    fn string(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let string = self.previous.lexeme.trim_matches('"');
-        Ok(Expr::Literal {
+        Some(Expr::Literal {
             value: LiteralValue::String(self.ctx.intern(string.as_bytes())),
             line: self.previous.line,
         })
     }
 
-    fn literal(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn literal(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         match self.previous.kind {
-            TokenType::False => Ok(Expr::Literal {
+            TokenType::False => Some(Expr::Literal {
                 value: LiteralValue::Boolean(false),
                 line: self.previous.line,
             }),
-            TokenType::True => Ok(Expr::Literal {
+            TokenType::True => Some(Expr::Literal {
                 value: LiteralValue::Boolean(true),
                 line: self.previous.line,
             }),
-            TokenType::Nil => Ok(Expr::Literal {
+            TokenType::Nil => Some(Expr::Literal {
                 value: LiteralValue::Nil,
                 line: self.previous.line,
             }),
@@ -362,32 +363,32 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn grouping(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn grouping(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let expr = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-        Ok(Expr::Grouping {
+        self.consume(TokenType::RightParen, "Expect ')' after expression.");
+        Some(Expr::Grouping {
             expression: Box::new(expr),
             line: self.previous.line,
         })
     }
 
-    fn unary(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn unary(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let operator = self.previous;
         let right = Box::new(self.parse_precedence(Precedence::Unary)?);
-        Ok(Expr::Unary {
+        Some(Expr::Unary {
             operator,
             right,
             line: operator.line,
         })
     }
 
-    fn binary(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn binary(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let operator = self.previous;
         let rule = get_rule(operator.kind);
         let left = Box::new(self.previous_expr.take().unwrap());
         let right = Box::new(self.parse_precedence(rule.precedence + 1)?);
 
-        Ok(Expr::Binary {
+        Some(Expr::Binary {
             left,
             operator,
             right,
@@ -395,61 +396,59 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn and(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn and(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let left = Box::new(self.previous_expr.take().unwrap());
         let right = Box::new(self.parse_precedence(Precedence::And)?);
-        Ok(Expr::And {
+        Some(Expr::And {
             left,
             right,
             line: self.previous.line,
         })
     }
 
-    fn or(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn or(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let left = Box::new(self.previous_expr.take().unwrap());
         let right = Box::new(self.parse_precedence(Precedence::Or)?);
-        Ok(Expr::Or {
+        Some(Expr::Or {
             left,
             right,
             line: self.previous.line,
         })
     }
 
-    fn call(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let mut arguments = Vec::new();
         let callee = Box::new(self.previous_expr.take().unwrap());
 
         if !self.check(TokenType::RightParen) {
             loop {
-                if arguments.len() >= 255 {
-                    return Err(ParseError::new(
-                        "Can't have more than 255 arguments.",
-                        self.peek().line,
-                    ));
-                }
                 arguments.push(self.expression()?);
+                if arguments.len() > 255 {
+                    self.error("Can't have more than 255 arguments.");
+                    break;
+                }
                 if !self.match_token(TokenType::Comma) {
                     break;
                 }
             }
         }
-        self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+        self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
-        Ok(Expr::Call {
+        Some(Expr::Call {
             callee,
             arguments,
             line: self.previous.line,
         })
     }
 
-    fn dot(&mut self, can_assign: bool) -> Result<Expr<'gc>, ParseError> {
-        self.consume(TokenType::Identifier, "Expect property name after '.'.")?;
+    fn dot(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
+        self.consume(TokenType::Identifier, "Expect property name after '.'.");
         let name = self.previous;
         let object = Box::new(self.previous_expr.take().unwrap());
 
         if can_assign && self.match_token(TokenType::Equal) {
             let value = Box::new(self.expression()?);
-            Ok(Expr::Set {
+            Some(Expr::Set {
                 object,
                 name,
                 value,
@@ -465,16 +464,16 @@ impl<'gc> Parser<'gc> {
                     }
                 }
             }
-            self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+            self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
-            Ok(Expr::Invoke {
+            Some(Expr::Invoke {
                 object,
                 method: name,
                 arguments,
                 line: self.previous.line,
             })
         } else {
-            Ok(Expr::Get {
+            Some(Expr::Get {
                 object,
                 name,
                 line: self.previous.line,
@@ -482,28 +481,28 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn variable(&mut self, can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn variable(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
         let name = self.previous;
 
         if can_assign && self.match_token(TokenType::Equal) {
             let value = Box::new(self.expression()?);
-            Ok(Expr::Assign {
+            Some(Expr::Assign {
                 name,
                 value,
                 line: self.previous.line,
             })
         } else {
-            Ok(Expr::Variable {
+            Some(Expr::Variable {
                 name,
                 line: name.line,
             })
         }
     }
 
-    fn super_(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn super_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let keyword = self.previous;
-        self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
-        self.consume(TokenType::Identifier, "Expect superclass method name.")?;
+        self.consume(TokenType::Dot, "Expect '.' after 'super'.");
+        self.consume(TokenType::Identifier, "Expect superclass method name.");
         let method = self.previous;
 
         let mut arguments = Vec::new();
@@ -517,15 +516,15 @@ impl<'gc> Parser<'gc> {
                     }
                 }
             }
-            self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+            self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
-            Ok(Expr::Super {
+            Some(Expr::Super {
                 method,
                 arguments,
                 line: keyword.line,
             })
         } else {
-            Ok(Expr::Super {
+            Some(Expr::Super {
                 method,
                 arguments: Vec::new(),
                 line: keyword.line,
@@ -533,22 +532,22 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn this(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
-        Ok(Expr::This {
+    fn this(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        Some(Expr::This {
             line: self.previous.line,
         })
     }
 
-    fn prompt(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
+    fn prompt(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let expr = Box::new(self.expression()?);
-        Ok(Expr::Prompt {
+        Some(Expr::Prompt {
             expression: expr,
             line: self.previous.line,
         })
     }
 
     // Pratt parsing implementation
-    fn parse_precedence(&mut self, precedence: Precedence) -> Result<Expr<'gc>, ParseError> {
+    fn parse_precedence(&mut self, precedence: Precedence) -> Option<Expr<'gc>> {
         self.advance();
         let prefix_rule = get_rule(self.previous.kind).prefix;
         let can_assign = precedence <= Precedence::Assignment;
@@ -556,10 +555,11 @@ impl<'gc> Parser<'gc> {
         let expr = if let Some(prefix_fn) = prefix_rule {
             (prefix_fn)(self, can_assign)
         } else {
-            Err(ParseError::new("Expect expression.", self.previous.line))
-        }?;
+            self.error("Expect expression.");
+            return None;
+        };
 
-        self.previous_expr = Some(expr);
+        self.previous_expr = expr;
 
         while precedence <= get_rule(self.current.kind).precedence {
             self.advance();
@@ -572,12 +572,9 @@ impl<'gc> Parser<'gc> {
 
         let expr = self.previous_expr.take().unwrap();
         if can_assign && self.match_token(TokenType::Equal) {
-            return Err(ParseError::new(
-                "Invalid assignment target.",
-                self.previous.line,
-            ));
+            self.error("Invalid assignment target.");
         }
-        Ok(expr)
+        Some(expr)
     }
 
     // Helper methods
@@ -593,13 +590,12 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn consume(&mut self, kind: TokenType, message: &str) -> Result<Token<'gc>, ParseError> {
+    fn consume(&mut self, kind: TokenType, message: &str) {
         if self.check(kind) {
             self.advance();
-            Ok(self.previous)
-        } else {
-            Err(ParseError::new(message, self.current.line))
+            return;
         }
+        self.error_at_current(message);
     }
 
     fn match_token(&mut self, kind: TokenType) -> bool {
@@ -619,17 +615,13 @@ impl<'gc> Parser<'gc> {
         self.current.kind == TokenType::Eof
     }
 
-    fn peek(&self) -> &Token<'gc> {
-        &self.current
-    }
-
     fn error_at_current(&mut self, message: &str) {
         self.error_at(self.current, message);
     }
 
-    // fn error(&mut self, message: &str) {
-    //     self.error_at(self.previous, message);
-    // }
+    fn error(&mut self, message: &str) {
+        self.error_at(self.previous, message);
+    }
 
     fn error_at(&mut self, token: Token<'gc>, message: &str) {
         // if self.panic_mode {

@@ -8,9 +8,7 @@ use gc_arena::{
 };
 
 use crate::{
-    ai,
-    ast::ParseError,
-    builtins,
+    ai, builtins,
     compiler::compile,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
@@ -39,7 +37,6 @@ pub type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefaul
 
 #[derive(Debug)]
 pub enum VmError {
-    ParseError(ParseError),
     CompileError,
     RuntimeError(std::string::String),
 }
@@ -49,7 +46,6 @@ impl std::error::Error for VmError {}
 impl Display for VmError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VmError::ParseError(parse_error) => write!(f, "ParseError: {parse_error}"),
             Self::CompileError => write!(f, "CompileError"),
             Self::RuntimeError(s) => write!(f, "RuntimeError: {s}"),
         }

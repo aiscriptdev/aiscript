@@ -1,5 +1,4 @@
 use crate::{scanner::Token, string::InternedString};
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Expr<'gc> {
@@ -185,29 +184,6 @@ impl<'gc> Program<'gc> {
     pub fn new() -> Self {
         Self {
             statements: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ParseError {
-    pub message: String,
-    pub line: u32,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[line {}] Error: {}", self.line, self.message)
-    }
-}
-
-impl std::error::Error for ParseError {}
-
-impl ParseError {
-    pub fn new(message: impl Into<String>, line: u32) -> Self {
-        Self {
-            message: message.into(),
-            line,
         }
     }
 }
