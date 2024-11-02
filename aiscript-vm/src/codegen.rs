@@ -195,22 +195,38 @@ impl<'gc> CodeGen<'gc> {
                 methods,
                 ..
             } => {
+                // Emit class declaration
                 let name_constant = self.identifier_constant(name.lexeme);
-                self.declare_variable(*name);
                 self.emit(OpCode::Class(name_constant as u8));
-                if self.scope_depth == 0 {
-                    let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8));
-                } else {
-                    self.mark_initialized();
-                }
+                self.emit(OpCode::DefineGlobal(name_constant as u8));
 
-                // Load class for defining methods
-                self.emit(OpCode::GetGlobal(name_constant as u8));
+                // Handle inheritance
                 if let Some(superclass) = superclass {
+                    // Begin a new scope for 'super'
+                    self.begin_scope();
+
+                    // First get the superclass
                     self.generate_expr(superclass)?;
+
+                    // Create local variable 'super'
+                    let super_token = Token::new(TokenType::Super, "super", name.line);
+                    self.declare_variable(super_token);
+                    self.mark_initialized();
+
+                    // Then get the class we just defined
+                    self.emit(OpCode::GetGlobal(name_constant as u8));
+
+                    // Emit inherit instruction
+                    self.emit(OpCode::Inherit);
+
+                    // Load class again for method definitions
+                    self.emit(OpCode::GetGlobal(name_constant as u8));
+                } else {
+                    // Load class for method definitions
+                    self.emit(OpCode::GetGlobal(name_constant as u8));
                 }
 
+                // Generate methods
                 for method in methods {
                     if let Stmt::Function {
                         name: method_name,
@@ -225,7 +241,6 @@ impl<'gc> CodeGen<'gc> {
                             FunctionType::Method
                         };
                         self.generate_function(method_name.lexeme, params, body, fn_type)?;
-                        // Register method with class
                         let method_constant = self.identifier_constant(method_name.lexeme);
                         self.emit(OpCode::Method(method_constant as u8));
                     }
@@ -234,6 +249,11 @@ impl<'gc> CodeGen<'gc> {
                 // Once we’ve reached the end of the methods, we no longer need
                 // the class and tell the VM to pop it off the stack.
                 self.emit(OpCode::Pop);
+
+                // Close the scope created for 'super' if there was inheritance
+                if superclass.is_some() {
+                    self.end_scope();
+                }
             }
         }
         Ok(())
@@ -339,11 +359,33 @@ impl<'gc> CodeGen<'gc> {
             Expr::This { .. } => {
                 self.named_variable(&Token::new(TokenType::This, "this", 0), false)?;
             }
-            Expr::Super { method, .. } => {
-                let name_constant = self.identifier_constant(method.lexeme);
-                self.named_variable(&Token::new(TokenType::This, "this", 0), false)?;
-                self.named_variable(&Token::new(TokenType::Super, "super", 0), false)?;
-                self.emit(OpCode::GetSuper(name_constant as u8));
+            Expr::Super {
+                method, arguments, ..
+            } => {
+                // Get the receiver ('this')
+                self.emit(OpCode::GetLocal(0));
+
+                // Generate arguments
+                for arg in arguments {
+                    self.generate_expr(arg)?;
+                }
+
+                // Look up 'super' in upvalues
+                let method_constant = self.identifier_constant(method.lexeme);
+                if let Some((pos, _)) = self
+                    .resolve_upvalue("super")
+                    .map_err(|e| VmError::RuntimeError(e.into()))?
+                {
+                    self.emit(OpCode::GetUpvalue(pos));
+                } else {
+                    return Err(VmError::RuntimeError("Unable to resolve 'super'".into()));
+                }
+
+                // Use SuperInvoke
+                self.emit(OpCode::SuperInvoke(
+                    method_constant as u8,
+                    arguments.len() as u8,
+                ));
             }
             Expr::And { left, right, .. } => {
                 self.generate_expr(left)?;

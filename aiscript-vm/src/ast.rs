@@ -71,6 +71,7 @@ pub enum Expr<'gc> {
     Super {
         // keyword: Token<'gc>,
         method: Token<'gc>,
+        arguments: Vec<Expr<'gc>>,
         line: u32,
     },
     Prompt {
