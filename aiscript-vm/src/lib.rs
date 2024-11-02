@@ -7,6 +7,7 @@ mod compiler;
 mod fuel;
 mod object;
 mod parser;
+mod pretty;
 mod scanner;
 mod string;
 mod string_utils;

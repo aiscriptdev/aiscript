@@ -391,8 +391,8 @@ impl<'gc> Parser<'gc> {
     fn binary(&mut self, _can_assign: bool) -> Result<Expr<'gc>, ParseError> {
         let operator = self.previous;
         let rule = get_rule(operator.kind);
-        let right = Box::new(self.parse_precedence(rule.precedence + 1)?);
         let left = Box::new(self.previous_expr.take().unwrap());
+        let right = Box::new(self.parse_precedence(rule.precedence + 1)?);
 
         Ok(Expr::Binary {
             left,
