@@ -1,0 +1,5 @@
+nav {
+    Users => page.Users,
+    Subscriptions => page.Subscriptions,
+}
+
