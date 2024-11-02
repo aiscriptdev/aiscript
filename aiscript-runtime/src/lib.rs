@@ -11,6 +11,7 @@ mod error;
 mod lexer;
 mod openapi;
 mod parser;
+mod utils;
 mod validator;
 
 fn read_routes() -> Vec<ast::Route> {

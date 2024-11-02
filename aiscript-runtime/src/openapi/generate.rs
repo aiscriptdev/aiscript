@@ -1,6 +1,7 @@
 use super::*;
-use crate::ast::{
-    BodyKind, Directive, Endpoint, Field, FieldType, PathParameter, RequestBody, Route,
+use crate::{
+    ast::{BodyKind, Directive, Endpoint, Field, FieldType, PathParameter, RequestBody, Route},
+    utils,
 };
 
 pub struct OpenAPIGenerator;
@@ -98,7 +99,8 @@ impl OpenAPIGenerator {
     ) {
         for endpoint in &route.endpoints {
             for path_spec in &endpoint.path_specs {
-                let full_path = format!("{}{}", route.prefix, path_spec.path);
+                let full_path =
+                    utils::normalize_path(&format!("{}{}", route.prefix, path_spec.path));
                 let operation =
                     Self::create_operation(endpoint, &route.params, &full_path, components);
 

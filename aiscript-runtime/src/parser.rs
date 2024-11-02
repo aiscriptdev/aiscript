@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
+use std::mem;
 
 use crate::ast::*;
 use crate::lexer::{Lexer, Token};
@@ -49,7 +50,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_route(&mut self) -> Result<Route, String> {
-        let docs = self.parse_docs()?;
+        let mut docs = self.parse_docs()?;
         let top_route = self.current_token == Some(Token::Route);
         let mut path = (String::from("/"), Vec::new());
         if top_route {
@@ -59,8 +60,14 @@ impl<'a> Parser<'a> {
         }
 
         let mut endpoints = Vec::new();
+        let mut first_endpoint = true;
         while self.current_token.is_some() && self.current_token != Some(Token::CloseBrace) {
-            endpoints.push(self.parse_endpoint()?);
+            let mut endpoint = self.parse_endpoint()?;
+            if first_endpoint && !top_route {
+                endpoint.docs = mem::take(&mut docs);
+            }
+            endpoints.push(endpoint);
+            first_endpoint = false;
         }
         if top_route {
             self.expect_token(Token::CloseBrace)?;
