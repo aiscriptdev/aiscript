@@ -289,7 +289,8 @@ impl<'gc> CodeGen<'gc> {
             }
             Expr::Assign { name, value, .. } => {
                 self.generate_expr(value)?;
-                self.named_variable(name, true)?;
+                let name_constant = self.identifier_constant(name.lexeme);
+                self.emit(OpCode::SetGlobal(name_constant as u8));
             }
             Expr::Call {
                 callee, arguments, ..
@@ -602,7 +603,7 @@ pub fn compile<'gc>(ctx: Context<'gc>, source: &'gc str) -> Result<Function<'gc>
     // Step 1: Parse source into AST
     let mut parser = Parser::new(ctx, source);
     let program = parser.parse().map_err(VmError::ParseError)?;
-
+    println!("AST: {}", program);
     // Step 2: Generate bytecode from AST
     CodeGen::generate(program, ctx)
 }
