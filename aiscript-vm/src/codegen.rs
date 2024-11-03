@@ -174,9 +174,7 @@ impl<'gc> CodeGen<'gc> {
             Stmt::Return { value, .. } => {
                 if let Some(expr) = value {
                     if self.fn_type == FunctionType::Initializer {
-                        return Err(VmError::RuntimeError(
-                            "Can't return a value from an initializer.".into(),
-                        ));
+                        self.error("Can't return a value from an initializer.");
                     }
                     self.generate_expr(expr)?;
                     self.emit(OpCode::Return);
@@ -374,11 +372,14 @@ impl<'gc> CodeGen<'gc> {
                 let method_constant = self.identifier_constant(method.lexeme);
                 if let Some((pos, _)) = self
                     .resolve_upvalue("super")
-                    .map_err(|e| VmError::RuntimeError(e.into()))?
+                    .inspect_err(|err| self.error(err))
+                    .ok()
+                    .flatten()
                 {
                     self.emit(OpCode::GetUpvalue(pos));
                 } else {
-                    return Err(VmError::RuntimeError("Unable to resolve 'super'".into()));
+                    self.error("Unable to resolve 'super'");
+                    return Err(VmError::CompileError);
                 }
 
                 // Use SuperInvoke
@@ -432,21 +433,8 @@ impl<'gc> CodeGen<'gc> {
         self.begin_scope();
 
         // Compile parameters
+        self.function.arity = params.len() as u8;
         for param in params {
-            // self.function.arity += 1;
-            // if self.function.arity > 255 {
-            //     return Err(VmError::RuntimeError(
-            //         "Can't have more than 255 parameters.".into(),
-            //     ));
-            // }
-            if let Some(v) = self.function.arity.checked_add(1) {
-                self.function.arity = v;
-            } else {
-                // self.error_at_current("Can't have more than 255 parameters.");
-                return Err(VmError::RuntimeError(
-                    "Can't have more than 255 parameters.".into(),
-                ));
-            }
             self.declare_variable(*param);
             self.mark_initialized();
         }
@@ -460,6 +448,9 @@ impl<'gc> CodeGen<'gc> {
         let function = self.function.clone();
 
         // Restore the original compiler
+        if self.had_error {
+            return Err(VmError::CompileError);
+        }
         if let Some(enclosing) = self.enclosing.take() {
             *self = *enclosing;
         }
@@ -514,14 +505,14 @@ impl<'gc> CodeGen<'gc> {
     fn named_variable(&mut self, name: &Token<'gc>, can_assign: bool) -> Result<(), VmError> {
         let (get_op, set_op) = if let Some((pos, depth)) = self.resolve_local(name.lexeme) {
             if depth == UNINITIALIZED_LOCAL_DEPTH {
-                return Err(VmError::RuntimeError(
-                    "Can't read local variable in its own initializer.".into(),
-                ));
+                self.error("Can't read local variable in its own initializer.");
             }
             (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
         } else if let Some((pos, _)) = self
             .resolve_upvalue(name.lexeme)
-            .map_err(|e| VmError::RuntimeError(e.into()))?
+            .inspect_err(|err| self.error(err))
+            .ok()
+            .flatten()
         {
             (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
         } else {

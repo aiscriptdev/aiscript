@@ -18,8 +18,15 @@ pub struct Parser<'gc> {
     current: Token<'gc>,
     previous: Token<'gc>,
     previous_expr: Option<Expr<'gc>>,
+    class_compiler: Option<Box<ClassCompiler>>,
     had_error: bool,
     panic_mode: bool,
+}
+
+#[derive(Default)]
+struct ClassCompiler {
+    has_superclass: bool,
+    enclosing: Option<Box<ClassCompiler>>,
 }
 
 impl<'gc> Parser<'gc> {
@@ -30,6 +37,7 @@ impl<'gc> Parser<'gc> {
             current: Token::default(),
             previous: Token::default(),
             previous_expr: None,
+            class_compiler: None,
             had_error: false,
             panic_mode: false,
         }
@@ -112,6 +120,12 @@ impl<'gc> Parser<'gc> {
             None
         };
 
+        let class_compiler = ClassCompiler {
+            has_superclass: superclass.is_some(),
+            enclosing: self.class_compiler.take(),
+        };
+        self.class_compiler = Some(Box::new(class_compiler));
+
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
 
         let mut methods = Vec::new();
@@ -121,6 +135,8 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body.");
 
+        // pop that compiler off the stack and restore the enclosing class compiler.
+        self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
         Some(Stmt::Class {
             name,
             superclass,
@@ -385,7 +401,7 @@ impl<'gc> Parser<'gc> {
     fn binary(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let operator = self.previous;
         let rule = get_rule(operator.kind);
-        let left = Box::new(self.previous_expr.take().unwrap());
+        let left = Box::new(self.previous_expr.take()?);
         let right = Box::new(self.parse_precedence(rule.precedence + 1)?);
 
         Some(Expr::Binary {
@@ -397,7 +413,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn and(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        let left = Box::new(self.previous_expr.take().unwrap());
+        let left = Box::new(self.previous_expr.take()?);
         let right = Box::new(self.parse_precedence(Precedence::And)?);
         Some(Expr::And {
             left,
@@ -407,7 +423,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn or(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        let left = Box::new(self.previous_expr.take().unwrap());
+        let left = Box::new(self.previous_expr.take()?);
         let right = Box::new(self.parse_precedence(Precedence::Or)?);
         Some(Expr::Or {
             left,
@@ -418,7 +434,7 @@ impl<'gc> Parser<'gc> {
 
     fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let mut arguments = Vec::new();
-        let callee = Box::new(self.previous_expr.take().unwrap());
+        let callee = Box::new(self.previous_expr.take()?);
 
         if !self.check(TokenType::RightParen) {
             loop {
@@ -444,7 +460,7 @@ impl<'gc> Parser<'gc> {
     fn dot(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
         self.consume(TokenType::Identifier, "Expect property name after '.'.");
         let name = self.previous;
-        let object = Box::new(self.previous_expr.take().unwrap());
+        let object = Box::new(self.previous_expr.take()?);
 
         if can_assign && self.match_token(TokenType::Equal) {
             let value = Box::new(self.expression()?);
@@ -500,6 +516,12 @@ impl<'gc> Parser<'gc> {
     }
 
     fn super_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        if self.class_compiler.is_none() {
+            self.error("Can't use 'super' outside of a class.");
+        } else if self.class_compiler.as_ref().map(|c| c.has_superclass) == Some(false) {
+            self.error("Can't use 'super' in a class with no superclass.");
+        }
+
         let keyword = self.previous;
         self.consume(TokenType::Dot, "Expect '.' after 'super'.");
         self.consume(TokenType::Identifier, "Expect superclass method name.");
@@ -533,6 +555,11 @@ impl<'gc> Parser<'gc> {
     }
 
     fn this(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        if self.class_compiler.is_none() {
+            self.error("Can't use 'this' outside of a class.");
+            return None;
+        }
+
         Some(Expr::This {
             line: self.previous.line,
         })
@@ -570,7 +597,7 @@ impl<'gc> Parser<'gc> {
             }
         }
 
-        let expr = self.previous_expr.take().unwrap();
+        let expr = self.previous_expr.take()?;
         if can_assign && self.match_token(TokenType::Equal) {
             self.error("Invalid assignment target.");
         }
@@ -624,11 +651,6 @@ impl<'gc> Parser<'gc> {
     }
 
     fn error_at(&mut self, token: Token<'gc>, message: &str) {
-        // if self.panic_mode {
-        //     return Ok(());
-        // }
-        // self.panic_mode = true;
-        // Err(ParseError::new(message, token.line))
         if self.panic_mode {
             return;
         }
