@@ -129,7 +129,7 @@ pub enum Stmt<'gc> {
         else_branch: Option<Box<Stmt<'gc>>>,
         line: u32,
     },
-    While {
+    Loop {
         condition: Expr<'gc>,
         body: Box<Stmt<'gc>>,
         line: u32,
@@ -142,7 +142,6 @@ pub enum Stmt<'gc> {
         line: u32,
     },
     Return {
-        // keyword: Token<'gc>,
         value: Option<Expr<'gc>>,
         line: u32,
     },
@@ -162,7 +161,7 @@ impl<'gc> Stmt<'gc> {
             | Self::Let { line, .. }
             | Self::Block { line, .. }
             | Self::If { line, .. }
-            | Self::While { line, .. }
+            | Self::Loop { line, .. }
             | Self::Function { line, .. }
             | Self::Return { line, .. }
             | Self::Class { line, .. } => *line,

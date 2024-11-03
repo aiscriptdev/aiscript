@@ -268,7 +268,7 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Stmt<'gc>> {
                 }
                 Ok(())
             }
-            Stmt::While {
+            Stmt::Loop {
                 condition,
                 body,
                 line,

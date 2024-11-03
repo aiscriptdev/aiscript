@@ -132,7 +132,7 @@ impl<'gc> CodeGen<'gc> {
                 }
                 self.patch_jump(else_jump);
             }
-            Stmt::While {
+            Stmt::Loop {
                 condition, body, ..
             } => {
                 let loop_start = self.function.code_size();

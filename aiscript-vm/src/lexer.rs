@@ -2,10 +2,10 @@ use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    LeftParen,  // (
-    RightParen, // )
-    LeftBrace,  // {
-    RightBrace, // }
+    OpenParen,  // (
+    CloseParen, // )
+    OpenBrace,  // {
+    CloseBrace, // }
     Comma,      // ,
     Dot,        // .
     Minus,      // -
@@ -231,10 +231,10 @@ impl<'a> Scanner<'a> {
             }
 
             match c {
-                '(' => return self.make_token(TokenType::LeftParen),
-                ')' => return self.make_token(TokenType::RightParen),
-                '{' => return self.make_token(TokenType::LeftBrace),
-                '}' => return self.make_token(TokenType::RightBrace),
+                '(' => return self.make_token(TokenType::OpenParen),
+                ')' => return self.make_token(TokenType::CloseParen),
+                '{' => return self.make_token(TokenType::OpenBrace),
+                '}' => return self.make_token(TokenType::CloseBrace),
                 ';' => return self.make_token(TokenType::Semicolon),
                 ',' => return self.make_token(TokenType::Comma),
                 '.' => return self.make_token(TokenType::Dot),

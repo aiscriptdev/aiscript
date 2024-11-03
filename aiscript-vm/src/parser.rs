@@ -87,7 +87,7 @@ impl<'gc> Parser<'gc> {
     fn statement(&mut self) -> Option<Stmt<'gc>> {
         if self.match_token(TokenType::Print) {
             self.print_statement()
-        } else if self.match_token(TokenType::LeftBrace) {
+        } else if self.match_token(TokenType::OpenBrace) {
             Some(Stmt::Block {
                 statements: self.block(),
                 line: self.previous.line,
@@ -128,14 +128,14 @@ impl<'gc> Parser<'gc> {
         };
         self.class_compiler = Some(Box::new(class_compiler));
 
-        self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
+        self.consume(TokenType::OpenBrace, "Expect '{' before class body.");
 
         let mut methods = Vec::new();
-        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             methods.push(self.function(FunctionType::Method)?);
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after class body.");
+        self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
 
         // pop that compiler off the stack and restore the enclosing class compiler.
         self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
@@ -161,10 +161,10 @@ impl<'gc> Parser<'gc> {
         if self.fn_type == FunctionType::Method && name.lexeme == "init" {
             self.fn_type = FunctionType::Initializer;
         }
-        self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+        self.consume(TokenType::OpenParen, "Expect '(' after function name.");
 
         let mut params = Vec::new();
-        if !self.check(TokenType::RightParen) {
+        if !self.check(TokenType::CloseParen) {
             loop {
                 if params.len() >= 255 {
                     self.error_at_current("Can't have more than 255 parameters.");
@@ -178,8 +178,8 @@ impl<'gc> Parser<'gc> {
                 }
             }
         }
-        self.consume(TokenType::RightParen, "Expect ')' after parameters.");
-        self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+        self.consume(TokenType::CloseParen, "Expect ')' after parameters.");
+        self.consume(TokenType::OpenBrace, "Expect '{' before function body.");
         let body = self.block();
         // Restore previous function type
         self.fn_type = previous_fn_type;
@@ -214,12 +214,12 @@ impl<'gc> Parser<'gc> {
     }
 
     fn while_statement(&mut self) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
+        self.consume(TokenType::OpenParen, "Expect '(' after 'while'.");
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+        self.consume(TokenType::CloseParen, "Expect ')' after condition.");
         let body = Box::new(self.statement()?);
 
-        Some(Stmt::While {
+        Some(Stmt::Loop {
             condition,
             body,
             line: self.previous.line,
@@ -227,7 +227,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn for_statement(&mut self) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
+        self.consume(TokenType::OpenParen, "Expect '(' after 'for'.");
 
         let initializer = if self.match_token(TokenType::Semicolon) {
             None
@@ -244,12 +244,12 @@ impl<'gc> Parser<'gc> {
         };
         self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
-        let increment = if !self.check(TokenType::RightParen) {
+        let increment = if !self.check(TokenType::CloseParen) {
             Some(self.expression()?)
         } else {
             None
         };
-        self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+        self.consume(TokenType::CloseParen, "Expect ')' after for clauses.");
 
         let mut body = self.statement()?;
 
@@ -267,7 +267,7 @@ impl<'gc> Parser<'gc> {
             };
         }
 
-        body = Stmt::While {
+        body = Stmt::Loop {
             condition: condition.unwrap_or(Expr::Literal {
                 value: LiteralValue::Boolean(true),
                 line: self.previous.line,
@@ -287,9 +287,9 @@ impl<'gc> Parser<'gc> {
     }
 
     fn if_statement(&mut self) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.consume(TokenType::OpenParen, "Expect '(' after 'if'.");
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+        self.consume(TokenType::CloseParen, "Expect ')' after condition.");
 
         let then_branch = Box::new(self.statement()?);
         let else_branch = if self.match_token(TokenType::Else) {
@@ -344,13 +344,13 @@ impl<'gc> Parser<'gc> {
     fn block(&mut self) -> Vec<Stmt<'gc>> {
         let mut statements = Vec::new();
 
-        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             if let Some(declaration) = self.declaration() {
                 statements.push(declaration);
             }
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after block.");
+        self.consume(TokenType::CloseBrace, "Expect '}' after block.");
         statements
     }
 
@@ -394,7 +394,7 @@ impl<'gc> Parser<'gc> {
 
     fn grouping(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let expr = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after expression.");
+        self.consume(TokenType::CloseParen, "Expect ')' after expression.");
         Some(Expr::Grouping {
             expression: Box::new(expr),
             line: self.previous.line,
@@ -448,7 +448,7 @@ impl<'gc> Parser<'gc> {
     fn argument_list(&mut self) -> Option<Vec<Expr<'gc>>> {
         let mut arguments = Vec::new();
 
-        if !self.check(TokenType::RightParen) {
+        if !self.check(TokenType::CloseParen) {
             loop {
                 arguments.push(self.expression()?);
                 if arguments.len() > 255 {
@@ -468,7 +468,7 @@ impl<'gc> Parser<'gc> {
         let callee = Box::new(self.previous_expr.take()?);
 
         let arguments = self.argument_list()?;
-        self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+        self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
         Some(Expr::Call {
             callee,
@@ -490,9 +490,9 @@ impl<'gc> Parser<'gc> {
                 value,
                 line: self.previous.line,
             })
-        } else if self.match_token(TokenType::LeftParen) {
+        } else if self.match_token(TokenType::OpenParen) {
             let arguments = self.argument_list()?;
-            self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+            self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
             Some(Expr::Invoke {
                 object,
@@ -539,9 +539,9 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, "Expect superclass method name.");
         let method = self.previous;
 
-        if self.match_token(TokenType::LeftParen) {
+        if self.match_token(TokenType::OpenParen) {
             let arguments = self.argument_list()?;
-            self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+            self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
             Some(Expr::SuperInvoke {
                 method,
@@ -744,7 +744,7 @@ impl<'gc> ParseRule<'gc> {
 
 fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
     match kind {
-        TokenType::LeftParen => {
+        TokenType::OpenParen => {
             ParseRule::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
         }
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
