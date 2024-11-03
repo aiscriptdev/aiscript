@@ -336,6 +336,9 @@ impl<'gc> CodeGen<'gc> {
             } => {
                 self.generate_expr(object)?;
                 let method_constant = self.identifier_constant(method.lexeme);
+                for arg in arguments {
+                    self.generate_expr(arg)?;
+                }
                 self.emit(OpCode::Invoke(method_constant as u8, arguments.len() as u8));
             }
             Expr::Get { object, name, .. } => {
