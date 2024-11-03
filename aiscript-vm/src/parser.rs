@@ -439,9 +439,8 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+    fn argument_list(&mut self) -> Option<Vec<Expr<'gc>>> {
         let mut arguments = Vec::new();
-        let callee = Box::new(self.previous_expr.take()?);
 
         if !self.check(TokenType::RightParen) {
             loop {
@@ -455,6 +454,14 @@ impl<'gc> Parser<'gc> {
                 }
             }
         }
+
+        Some(arguments)
+    }
+
+    fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let callee = Box::new(self.previous_expr.take()?);
+
+        let arguments = self.argument_list()?;
         self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
         Some(Expr::Call {
@@ -478,15 +485,7 @@ impl<'gc> Parser<'gc> {
                 line: self.previous.line,
             })
         } else if self.match_token(TokenType::LeftParen) {
-            let mut arguments = Vec::new();
-            if !self.check(TokenType::RightParen) {
-                loop {
-                    arguments.push(self.expression()?);
-                    if !self.match_token(TokenType::Comma) {
-                        break;
-                    }
-                }
-            }
+            let arguments = self.argument_list()?;
             self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
             Some(Expr::Invoke {
