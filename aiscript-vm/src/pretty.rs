@@ -197,6 +197,19 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
                 }
                 Ok(())
             }
+            Expr::SuperInvoke {
+                method,
+                arguments,
+                line,
+            } => {
+                writeln!(f, "{indent}SuperInvoke [line {line}]")?;
+                writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
+                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
+                for arg in arguments {
+                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
+                }
+                Ok(())
+            }
             Expr::Prompt { expression, line } => {
                 writeln!(f, "{indent}Prompt [line {line}]")?;
                 write!(f, "{}Expression: ", "  ".repeat(self.indent + 1))?;

@@ -385,7 +385,30 @@ impl<'gc> CodeGen<'gc> {
                     return Err(VmError::CompileError);
                 }
 
-                // Use SuperInvoke
+                self.emit(OpCode::GetSuper(method_constant as u8));
+            }
+            Expr::SuperInvoke {
+                method, arguments, ..
+            } => {
+                // Get this instance
+                self.emit(OpCode::GetLocal(0));
+
+                // Generate arguments
+                for arg in arguments {
+                    self.generate_expr(arg)?;
+                }
+
+                // Get superclass and invoke method
+                if let Some((pos, _)) = self
+                    .resolve_upvalue("super")
+                    .map_err(|e| VmError::RuntimeError(e.into()))?
+                {
+                    self.emit(OpCode::GetUpvalue(pos));
+                } else {
+                    return Err(VmError::RuntimeError("Unable to resolve 'super'".into()));
+                }
+
+                let method_constant = self.identifier_constant(method.lexeme);
                 self.emit(OpCode::SuperInvoke(
                     method_constant as u8,
                     arguments.len() as u8,

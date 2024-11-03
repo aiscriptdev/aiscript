@@ -533,20 +533,11 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, "Expect superclass method name.");
         let method = self.previous;
 
-        let mut arguments = Vec::new();
         if self.match_token(TokenType::LeftParen) {
-            // Parse arguments
-            if !self.check(TokenType::RightParen) {
-                loop {
-                    arguments.push(self.expression()?);
-                    if !self.match_token(TokenType::Comma) {
-                        break;
-                    }
-                }
-            }
+            let arguments = self.argument_list()?;
             self.consume(TokenType::RightParen, "Expect ')' after arguments.");
 
-            Some(Expr::Super {
+            Some(Expr::SuperInvoke {
                 method,
                 arguments,
                 line: keyword.line,

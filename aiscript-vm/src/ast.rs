@@ -42,7 +42,6 @@ pub enum Expr<'gc> {
     },
     Call {
         callee: Box<Expr<'gc>>,
-        // paren: Token<'gc>,
         arguments: Vec<Expr<'gc>>,
         line: u32,
     },
@@ -64,11 +63,14 @@ pub enum Expr<'gc> {
         line: u32,
     },
     This {
-        // keyword: Token<'gc>,
         line: u32,
     },
     Super {
-        // keyword: Token<'gc>,
+        method: Token<'gc>,
+        arguments: Vec<Expr<'gc>>,
+        line: u32,
+    },
+    SuperInvoke {
         method: Token<'gc>,
         arguments: Vec<Expr<'gc>>,
         line: u32,
@@ -96,6 +98,7 @@ impl<'gc> Expr<'gc> {
             | Self::Set { line, .. }
             | Self::This { line, .. }
             | Self::Super { line, .. }
+            | Self::SuperInvoke { line, .. }
             | Self::Prompt { line, .. } => *line,
         }
     }
