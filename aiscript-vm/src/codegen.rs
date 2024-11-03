@@ -312,12 +312,11 @@ impl<'gc> CodeGen<'gc> {
                 }
             }
             Expr::Variable { name, .. } => {
-                self.named_variable(name, true)?;
+                self.named_variable(name, false)?;
             }
             Expr::Assign { name, value, .. } => {
                 self.generate_expr(value)?;
-                let name_constant = self.identifier_constant(name.lexeme);
-                self.emit(OpCode::SetGlobal(name_constant as u8));
+                self.named_variable(name, true)?;
             }
             Expr::Call {
                 callee, arguments, ..
@@ -546,7 +545,7 @@ impl<'gc> CodeGen<'gc> {
             (OpCode::GetGlobal(pos), OpCode::SetGlobal(pos))
         };
 
-        if can_assign && matches!(name.kind, TokenType::Equal) {
+        if can_assign {
             self.emit(set_op);
         } else {
             self.emit(get_op);
@@ -554,49 +553,61 @@ impl<'gc> CodeGen<'gc> {
         Ok(())
     }
 
-    fn resolve_local(&self, name: &str) -> Option<(u8, isize)> {
-        for i in (0..self.local_count).rev() {
-            let local = &self.locals[i];
-            if local.name.lexeme == name {
-                return Some((i as u8, local.depth));
-            }
-        }
-        None
+    // Resolve a local variable by name, return its index and depth.
+    fn resolve_local(&mut self, name: &str) -> Option<(u8, isize)> {
+        (0..self.local_count)
+            .rev()
+            .find(|&i| self.locals[i].name.lexeme == name)
+            .map(|i| (i as u8, self.locals[i].depth))
     }
 
     fn resolve_upvalue(&mut self, name: &str) -> Result<Option<(u8, isize)>, &'static str> {
-        if let Some(enclosing) = self.enclosing.as_mut() {
-            if let Some((index, depth)) = enclosing.resolve_local(name) {
+        if let Some((index, depth)) = self
+            .enclosing
+            .as_mut()
+            .and_then(|enclosing| enclosing.resolve_local(name))
+        {
+            if let Some(enclosing) = self.enclosing.as_mut() {
+                // When resolving an identifier, if we end up creating an upvalue for
+                // a local variable, we mark it as captured.
                 enclosing.locals[index as usize].is_captured = true;
-                let upvalue_index = self.add_upvalue(index as usize, true)?;
-                return Ok(Some((upvalue_index as u8, depth)));
             }
-
-            if let Some((index, depth)) = enclosing.resolve_upvalue(name)? {
-                let upvalue_index = self.add_upvalue(index as usize, false)?;
-                return Ok(Some((upvalue_index as u8, depth)));
-            }
+            let index = self.add_upvalue(index as usize, true)?;
+            return Ok(Some((index as u8, depth)));
+        } else if let Some((index, depth)) = self
+            .enclosing
+            .as_mut()
+            .and_then(|enclosing| enclosing.resolve_upvalue(name).ok())
+            .flatten()
+        {
+            let index = self.add_upvalue(index as usize, false)?;
+            return Ok(Some((index as u8, depth)));
         }
+
         Ok(None)
     }
 
     fn add_upvalue(&mut self, index: usize, is_local: bool) -> Result<usize, &'static str> {
-        let upvalue_count = self.function.upvalues.len();
+        let upvalue_index = self.function.upvalues.len();
 
-        // Check if we already have this upvalue
-        for i in 0..upvalue_count {
-            let upvalue = &self.function.upvalues[i];
-            if upvalue.index == index && upvalue.is_local == is_local {
-                return Ok(i);
-            }
+        // before we add a new upvalue, we first check to see if the function
+        // already has an upvalue that closes over that variable.
+        if let Some(i) = self
+            .function
+            .upvalues
+            .iter()
+            .position(|u| u.index == index && u.is_local == is_local)
+        {
+            return Ok(i);
         }
 
-        if upvalue_count >= MAX_LOCALS {
+        if self.function.upvalues.len() == MAX_LOCALS {
             return Err("Too many closure variables in function.");
         }
 
         self.function.upvalues.push(Upvalue { index, is_local });
-        Ok(upvalue_count)
+        // println!("add upvalue to {upvalue_index} of {:?}", Upvalue { index, is_local });
+        Ok(upvalue_index)
     }
 
     // Scope management methods
@@ -638,20 +649,26 @@ impl<'gc> CodeGen<'gc> {
             return;
         }
 
-        // Check for variable redeclaration in current scope
         for i in (0..self.local_count).rev() {
             let local = &self.locals[i];
             if local.depth != -1 && local.depth < self.scope_depth {
+                // Stop when we reach an outer scope
                 break;
             }
             if local.name.lexeme == name.lexeme {
                 self.error("Already a variable with this name in this scope.");
-                return;
+                // return;
             }
         }
 
+        self.add_local(name);
+    }
+
+    fn add_local(&mut self, name: Token<'gc>) {
         if self.local_count == MAX_LOCALS {
-            self.error("Too many local variables in function.");
+            self.error(
+                "Too many local variables in function.", /*name.line, None*/
+            );
             return;
         }
 
