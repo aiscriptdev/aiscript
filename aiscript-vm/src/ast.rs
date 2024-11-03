@@ -1,4 +1,4 @@
-use crate::{scanner::Token, string::InternedString};
+use crate::{lexer::Token, string::InternedString};
 
 #[derive(Debug, Clone)]
 pub enum Expr<'gc> {

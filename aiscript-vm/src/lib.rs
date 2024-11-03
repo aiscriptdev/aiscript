@@ -1,16 +1,21 @@
 mod ai;
+#[cfg(not(feature = "v1"))]
 mod ast;
 mod builtins;
 mod chunk;
+#[cfg(not(feature = "v1"))]
 mod codegen;
-mod compiler;
 mod fuel;
+mod lexer;
 mod object;
+#[cfg(not(feature = "v1"))]
 mod parser;
+#[cfg(not(feature = "v1"))]
 mod pretty;
-mod scanner;
 mod string;
 mod string_utils;
+#[cfg(feature = "v1")]
+mod v1;
 mod value;
 mod vm;
 

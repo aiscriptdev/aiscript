@@ -2,8 +2,8 @@ use core::panic;
 use std::{array, mem, ops::Add};
 
 use crate::{
+    lexer::{Scanner, Token, TokenType},
     object::{Function, FunctionType, Upvalue},
-    scanner::{Scanner, Token, TokenType},
     vm::{Context, VmError},
     OpCode, Value,
 };

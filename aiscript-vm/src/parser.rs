@@ -4,8 +4,8 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     ast::{Expr, LiteralValue, Program, Stmt},
+    lexer::{Scanner, Token, TokenType},
     object::FunctionType,
-    scanner::{Scanner, Token, TokenType},
     vm::Context,
     VmError,
 };

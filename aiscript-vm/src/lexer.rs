@@ -80,6 +80,7 @@ impl<'a> Token<'a> {
         }
     }
 
+    #[cfg(feature = "v1")]
     pub fn identifier(name: &'a str) -> Self {
         Token::new(TokenType::Identifier, name, 0)
     }

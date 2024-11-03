@@ -1,8 +1,8 @@
 use crate::{
     ast::{Expr, LiteralValue, Program, Stmt},
+    lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
     parser::Parser,
-    scanner::{Token, TokenType},
     vm::{Context, VmError},
     OpCode, Value,
 };

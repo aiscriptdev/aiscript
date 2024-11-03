@@ -9,7 +9,6 @@ use gc_arena::{
 
 use crate::{
     ai, builtins,
-    compiler::compile,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
@@ -158,13 +157,14 @@ impl Vm {
         }
     }
 
+    #[cfg(feature = "v1")]
     pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
                 strings: state.strings,
             };
-            let function = compile(context, source)?;
+            let function = crate::v1::compile(context, source)?;
             #[cfg(feature = "debug")]
             function.disassemble("script");
             state.define_builtins();
@@ -175,7 +175,8 @@ impl Vm {
         Ok(())
     }
 
-    pub fn compile2(&mut self, source: &'static str) -> Result<(), VmError> {
+    #[cfg(not(feature = "v1"))]
+    pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
