@@ -173,9 +173,6 @@ impl<'gc> CodeGen<'gc> {
             }
             Stmt::Return { value, .. } => {
                 if let Some(expr) = value {
-                    if self.fn_type == FunctionType::Initializer {
-                        self.error("Can't return a value from an initializer.");
-                    }
                     self.generate_expr(expr)?;
                     self.emit(OpCode::Return);
                 } else {

@@ -158,6 +158,9 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::Identifier, &format!("Expect {type_name} name."));
         let name = self.previous;
+        if self.fn_type == FunctionType::Method && name.lexeme == "init" {
+            self.fn_type = FunctionType::Initializer;
+        }
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
 
         let mut params = Vec::new();
@@ -314,6 +317,9 @@ impl<'gc> Parser<'gc> {
 
     fn return_statement(&mut self) -> Option<Stmt<'gc>> {
         let value = if !self.check(TokenType::Semicolon) {
+            if self.fn_type == FunctionType::Initializer {
+                self.error("Can't return a value from an initializer.");
+            }
             Some(self.expression()?)
         } else {
             None
