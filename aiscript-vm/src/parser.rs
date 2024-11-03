@@ -18,6 +18,7 @@ pub struct Parser<'gc> {
     current: Token<'gc>,
     previous: Token<'gc>,
     previous_expr: Option<Expr<'gc>>,
+    fn_type: FunctionType,
     class_compiler: Option<Box<ClassCompiler>>,
     had_error: bool,
     panic_mode: bool,
@@ -37,6 +38,7 @@ impl<'gc> Parser<'gc> {
             current: Token::default(),
             previous: Token::default(),
             previous_expr: None,
+            fn_type: FunctionType::Script,
             class_compiler: None,
             had_error: false,
             panic_mode: false,
@@ -146,6 +148,9 @@ impl<'gc> Parser<'gc> {
     }
 
     fn function(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
+        // Save current function type
+        let previous_fn_type = self.fn_type;
+        self.fn_type = fn_type;
         let type_name = match fn_type {
             FunctionType::Method => "method",
             _ => "function",
@@ -173,6 +178,8 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::RightParen, "Expect ')' after parameters.");
         self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
         let body = self.block();
+        // Restore previous function type
+        self.fn_type = previous_fn_type;
         Some(Stmt::Function {
             name,
             params,
@@ -566,6 +573,9 @@ impl<'gc> Parser<'gc> {
     }
 
     fn prompt(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        if self.fn_type != FunctionType::AiFunction && self.fn_type != FunctionType::Script {
+            self.error("Can't prompt outside of ai function or root.");
+        }
         let expr = Box::new(self.expression()?);
         Some(Expr::Prompt {
             expression: expr,
