@@ -111,9 +111,9 @@ impl Directive {
     pub fn name(&self) -> Cow<'static, str> {
         match self {
             Directive::Simple { name, .. } => Cow::Owned(name.to_owned()),
-            Directive::Any(directives) => "any".into(),
-            Directive::Not(directive) => "not".into(),
-            Directive::In(values) => "in".into(),
+            Directive::Any(_) => "any".into(),
+            Directive::Not(_) => "not".into(),
+            Directive::In(_) => "in".into(),
         }
     }
 }

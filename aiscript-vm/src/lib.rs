@@ -1,9 +1,13 @@
 mod ai;
+mod ast;
 mod builtins;
 mod chunk;
+mod codegen;
 mod compiler;
 mod fuel;
 mod object;
+mod parser;
+mod pretty;
 mod scanner;
 mod string;
 mod string_utils;

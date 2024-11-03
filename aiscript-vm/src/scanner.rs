@@ -54,7 +54,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Token<'a> {
     pub lexeme: &'a str,
     pub line: u32,
@@ -72,7 +72,7 @@ impl Default for Token<'_> {
 }
 
 impl<'a> Token<'a> {
-    fn new(kind: TokenType, origin: &'a str, line: u32) -> Self {
+    pub fn new(kind: TokenType, origin: &'a str, line: u32) -> Self {
         Token {
             kind,
             lexeme: origin,

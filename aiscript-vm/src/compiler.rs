@@ -255,7 +255,7 @@ impl<'gc> Parser<'gc> {
                 self.error("Already a variable with this name in this scope.");
             }
         }
-        self.add_local(self.previous.clone());
+        self.add_local(self.previous);
     }
 
     fn mark_initialized(&mut self) {
@@ -833,11 +833,11 @@ impl<'gc> Parser<'gc> {
     }
 
     fn error_at_current(&mut self, message: &str) {
-        self.error_at(self.current.clone(), message);
+        self.error_at(self.current, message);
     }
 
     fn error(&mut self, message: &str) {
-        self.error_at(self.previous.clone(), message);
+        self.error_at(self.previous, message);
     }
 
     fn error_at(&mut self, token: Token<'gc>, message: &str) {

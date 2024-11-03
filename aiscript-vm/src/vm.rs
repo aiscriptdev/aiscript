@@ -175,6 +175,25 @@ impl Vm {
         Ok(())
     }
 
+    pub fn compile2(&mut self, source: &'static str) -> Result<(), VmError> {
+        self.arena.mutate_root(|mc, state| {
+            let context = Context {
+                mutation: mc,
+                strings: state.strings,
+            };
+            let function = crate::codegen::compile(context, source)?;
+
+            #[cfg(feature = "debug")]
+            function.disassemble("script");
+
+            state.define_builtins();
+            let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
+            state.push_stack(Value::from(closure));
+            state.call(closure, 0)
+        })?;
+        Ok(())
+    }
+
     pub fn interpret(&mut self) -> Result<ReturnValue, VmError> {
         loop {
             const FUEL_PER_GC: i32 = 1024 * 10;
