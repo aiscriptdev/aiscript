@@ -527,12 +527,12 @@ impl<'gc> CodeGen<'gc> {
     fn named_variable(&mut self, name: &Token<'gc>, can_assign: bool) -> Result<(), VmError> {
         let (get_op, set_op) = if let Some((pos, depth)) = self.resolve_local(name.lexeme) {
             if depth == UNINITIALIZED_LOCAL_DEPTH {
-                self.error("Can't read local variable in its own initializer.");
+                self.error_at(*name, "Can't read local variable in its own initializer.");
             }
             (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
         } else if let Some((pos, _)) = self
             .resolve_upvalue(name.lexeme)
-            .inspect_err(|err| self.error(err))
+            .inspect_err(|err| self.error_at(*name, err))
             .ok()
             .flatten()
         {
@@ -629,7 +629,7 @@ impl<'gc> CodeGen<'gc> {
     fn make_constant(&mut self, value: Value<'gc>) -> usize {
         let constant = self.function.add_constant(value);
         if constant > u8::MAX as usize {
-            self.error("Too many constants in one chunk.");
+            self.error_at_value(value, "Too many constants in one chunk.");
             0
         } else {
             constant
@@ -653,7 +653,7 @@ impl<'gc> CodeGen<'gc> {
                 break;
             }
             if local.name.lexeme == name.lexeme {
-                self.error("Already a variable with this name in this scope.");
+                self.error_at(name, "Already a variable with this name in this scope.");
                 // return;
             }
         }
@@ -663,7 +663,8 @@ impl<'gc> CodeGen<'gc> {
 
     fn add_local(&mut self, name: Token<'gc>) {
         if self.local_count == MAX_LOCALS {
-            self.error(
+            self.error_at(
+                name,
                 "Too many local variables in function.", /*name.line, None*/
             );
             return;
@@ -684,10 +685,39 @@ impl<'gc> CodeGen<'gc> {
         self.locals[self.local_count - 1].depth = self.scope_depth;
     }
 
-    // Error handling
     fn error(&mut self, message: &str) {
+        if self.had_error {
+            return;
+        }
         self.had_error = true;
         eprintln!("[line {}] Error: {}", self.current_line, message);
+    }
+
+    fn error_at_value(&mut self, value: Value<'gc>, message: &str) {
+        if self.had_error {
+            return;
+        }
+        self.had_error = true;
+        eprintln!(
+            "[line {}] Error at '{}': {}",
+            self.current_line, value, message
+        );
+    }
+
+    fn error_at(&mut self, token: Token<'gc>, message: &str) {
+        if self.had_error {
+            return;
+        }
+        eprint!("[line {}] Error", token.line);
+        if token.kind == TokenType::Eof {
+            eprint!(" at end");
+        } else if token.kind == TokenType::Error {
+            // Do nothing.
+        } else {
+            eprint!(" at '{}'", token.lexeme);
+        }
+        eprintln!(": {message}");
+        self.had_error = true;
     }
 }
 
