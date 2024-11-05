@@ -1,4 +1,5 @@
 use crate::{
+    agent::Agent,
     ast::{Expr, LiteralValue, Program, Stmt},
     lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
@@ -250,6 +251,16 @@ impl<'gc> CodeGen<'gc> {
                     self.end_scope();
                 }
             }
+            Stmt::Agent { name, fields, .. } => {
+                // Emit agent declaration
+                let agent_name = self.ctx.intern(name.lexeme.as_bytes());
+                let agent = Gc::new(&self.ctx, Agent::new(&self.ctx, agent_name, fields));
+                let agent_constant = self.make_constant(Value::from(agent));
+                self.emit(OpCode::Agent(agent_constant as u8));
+                let name_constant = self.identifier_constant(name.lexeme);
+                self.emit(OpCode::DefineGlobal(name_constant as u8));
+                self.emit(OpCode::Pop);
+            }
         }
         Ok(())
     }
@@ -257,6 +268,7 @@ impl<'gc> CodeGen<'gc> {
     fn generate_expr(&mut self, expr: &Expr<'gc>) -> Result<(), VmError> {
         self.current_line = expr.line();
         match expr {
+            Expr::Array { .. } => {}
             Expr::Binary {
                 left,
                 operator,
@@ -648,7 +660,7 @@ impl<'gc> CodeGen<'gc> {
 
         for i in (0..self.local_count).rev() {
             let local = &self.locals[i];
-            if local.depth != -1 && local.depth < self.scope_depth {
+            if local.depth != UNINITIALIZED_LOCAL_DEPTH && local.depth < self.scope_depth {
                 // Stop when we reach an outer scope
                 break;
             }

@@ -50,6 +50,7 @@ pub enum OpCode {
     SuperInvoke(u8, u8),
     // AI
     Prompt,
+    Agent(u8), // constant index
 }
 
 impl OpCode {
@@ -223,6 +224,9 @@ impl<'gc> Chunk<'gc> {
                     self.invoke_instruction("SUPER_INVOKE", name, arity)
                 }
                 OpCode::Prompt => simple_instruction("PROMPT"),
+                OpCode::Agent(c) => {
+                    println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);
+                }
             }
         } else {
             println!("Invalid opcode at offset: {offset}");

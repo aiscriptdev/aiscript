@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::{collections::HashMap, ops::Add};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -67,11 +67,13 @@ impl<'gc> Parser<'gc> {
             self.class_declaration()
         } else if self.match_token(TokenType::AI) {
             self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-            self.function(FunctionType::AiFunction)
+            self.func_declaration(FunctionType::AiFunction)
         } else if self.match_token(TokenType::Fn) {
-            self.function(FunctionType::Function)
+            self.func_declaration(FunctionType::Function)
         } else if self.match_token(TokenType::Let) {
             self.var_declaration()
+        } else if self.match_token(TokenType::Agent) {
+            self.agent_declaration()
         } else {
             self.statement()
         };
@@ -105,6 +107,85 @@ impl<'gc> Parser<'gc> {
         }
     }
 
+    fn agent_declaration(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect agent name.");
+        let name = self.previous;
+
+        self.consume(TokenType::OpenBrace, "Expect '{' before agent body.");
+        let mut fields = HashMap::new();
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            let (key, value) = self.field_declaration()?;
+            match key.lexeme {
+                "instructions" | "model" | "tool_choice" => {
+                    if !matches!(
+                        value,
+                        Expr::Literal {
+                            value: LiteralValue::String { .. },
+                            ..
+                        }
+                    ) {
+                        self.error(&format!(
+                            "Field '{}' in agent declaration should be a string.",
+                            key.lexeme
+                        ));
+                        continue;
+                    }
+                }
+                "tools" => {
+                    if !matches!(value, Expr::Array { .. }) {
+                        self.error("Field 'tools' in agent declaration should be an array.");
+                        continue;
+                    }
+                }
+                invalid => self.error_at(
+                    key,
+                    &format!("Invalid field '{}' in agent declaration.", invalid),
+                ),
+            }
+            let field_name = self.ctx.intern(key.lexeme.as_bytes());
+
+            if fields.contains_key(&field_name) {
+                self.error_at(
+                    key,
+                    &format!("Duplicate field '{}' in agent declaration.", key.lexeme),
+                );
+                continue;
+            }
+            fields.insert(self.ctx.intern(key.lexeme.as_bytes()), value);
+            // Consume comma after field declaration
+            if !self.check(TokenType::CloseBrace) {
+                self.consume(TokenType::Comma, "Expect ',' after field declaration.");
+            }
+        }
+
+        // Check for required fields
+        let required_fields = ["instructions"];
+        for field in required_fields.iter() {
+            if !fields.contains_key(&self.ctx.intern(field.as_bytes())) {
+                self.error(&format!(
+                    "Missing required field '{}' in agent declaration.",
+                    field
+                ));
+                return None;
+            }
+        }
+
+        self.consume(TokenType::CloseBrace, "Expect '}' after agent body.");
+        Some(Stmt::Agent {
+            name,
+            fields,
+            line: name.line,
+        })
+    }
+
+    fn field_declaration(&mut self) -> Option<(Token<'gc>, Expr<'gc>)> {
+        self.consume(TokenType::Identifier, "Expect field name.");
+        let key = self.previous;
+        self.consume(TokenType::Colon, "Expect ':' after field name.");
+        let value = self.expression()?;
+        Some((key, value))
+    }
+
     fn class_declaration(&mut self) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
@@ -132,7 +213,7 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            methods.push(self.function(FunctionType::Method)?);
+            methods.push(self.func_declaration(FunctionType::Method)?);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -147,7 +228,7 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn function(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
+    fn func_declaration(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
         // Save current function type
         let previous_fn_type = self.fn_type;
         self.fn_type = fn_type;
@@ -464,6 +545,25 @@ impl<'gc> Parser<'gc> {
         Some(arguments)
     }
 
+    fn array(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let mut elements = Vec::new();
+        let line = self.previous.line;
+
+        if !self.check(TokenType::CloseBracket) {
+            loop {
+                elements.push(self.expression()?);
+
+                if !self.match_token(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::CloseBracket, "Expect ']' after array elements.");
+
+        Some(Expr::Array { elements, line })
+    }
+
     fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let callee = Box::new(self.previous_expr.take()?);
 
@@ -747,6 +847,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenParen => {
             ParseRule::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
         }
+        TokenType::OpenBracket => ParseRule::new(Some(Parser::array), None, Precedence::Call),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)
@@ -775,5 +876,102 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         }
         TokenType::Prompt => ParseRule::new(Some(Parser::prompt), None, Precedence::None),
         _ => ParseRule::new(None, None, Precedence::None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gc_arena::arena::rootless_mutate;
+
+    use super::*;
+    use crate::{string::InternedStringSet, vm::Context};
+
+    #[test]
+    fn test_parse_agent() {
+        rootless_mutate(|mutation| {
+            let context = Context {
+                mutation,
+                strings: InternedStringSet::new(mutation),
+            };
+            let source = r#"
+                agent Test {
+                    instructions: "Test instruction.",
+                    model: "gpt-4",
+                    tools: [a, b],
+                    tool_choice: "auto",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse().unwrap();
+            let Stmt::Agent { name, fields, line } = &result.statements[0] else {
+                panic!("Expected agent statement");
+            };
+            assert_eq!(name.lexeme, "Test");
+            assert_eq!(*line, 2);
+            assert_eq!(fields.len(), 4);
+            // let pairs = fields
+            //     .iter()
+            //     .map(|(key, value)| (key.to_string(), value))
+            //     .collect::<Vec<_>>();
+            // assert_eq!(vec![("instructions", Expr::Literal(StringLiteral "Test instruction.")),], pairs);
+
+            let source = r#"
+                agent Test {
+                    model: "gpt-4",
+                    tools: [a, b],
+                    tool_choice: "auto",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse();
+            assert!(result.is_err());
+            let source = r#"
+                agent Test {
+                    instructions: "Test instruction.",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse().unwrap();
+            let Stmt::Agent { name, fields, .. } = &result.statements[0] else {
+                panic!("Expected agent statement");
+            };
+            assert_eq!(name.lexeme, "Test");
+            assert_eq!(fields.len(), 1);
+
+            let source = r#"
+                agent Test {
+                    instructions: "Test instruction.",
+                    tools: [a, b],
+                    tools: [a, b],
+                    tool_choice: "auto",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse();
+            assert!(result.is_err());
+
+            let source = r#"
+                agent Test {
+                    instructions: "Test instruction.",
+                    tools: [a, b],
+                    invalid: "invalid field",
+                    tool_choice: "auto",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse();
+            assert!(result.is_err());
+
+            let source = r#"
+                agent Test {
+                    instructions: "Test instruction.",
+                    tools: "invalid tools",
+                    tool_choice: "auto",
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse();
+            assert!(result.is_err());
+        });
     }
 }

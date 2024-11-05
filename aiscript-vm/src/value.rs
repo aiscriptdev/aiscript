@@ -3,6 +3,7 @@ use std::fmt::Display;
 use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
+    agent::Agent,
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
     string::InternedString,
     vm::VmError,
@@ -20,6 +21,7 @@ pub enum Value<'gc> {
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
+    Agent(Gc<'gc, Agent<'gc>>),
     Nil,
 }
 
@@ -72,6 +74,7 @@ impl<'gc> Display for Value<'gc> {
                 write!(f, "{}", s)
             }
             Value::BoundMethod(bm) => write!(f, "{}", bm.method.function),
+            Value::Agent(agent) => write!(f, "agent {}", agent.name),
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -130,6 +133,13 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Function(function) => Ok(function),
             _ => Err(VmError::RuntimeError("cannot convert to function.".into())),
+        }
+    }
+
+    pub fn as_agent(self) -> Result<Gc<'gc, Agent<'gc>>, VmError> {
+        match self {
+            Value::Agent(agent) => Ok(agent),
+            _ => Err(VmError::RuntimeError("cannot convert to agent.".into())),
         }
     }
 
@@ -248,6 +258,12 @@ impl<'gc> From<GcRefLock<'gc, Instance<'gc>>> for Value<'gc> {
 impl<'gc> From<Gc<'gc, BoundMethod<'gc>>> for Value<'gc> {
     fn from(value: Gc<'gc, BoundMethod<'gc>>) -> Self {
         Value::BoundMethod(value)
+    }
+}
+
+impl<'gc> From<Gc<'gc, Agent<'gc>>> for Value<'gc> {
+    fn from(value: Gc<'gc, Agent<'gc>>) -> Self {
+        Value::Agent(value)
     }
 }
 

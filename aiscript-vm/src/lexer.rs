@@ -2,17 +2,20 @@ use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    OpenParen,  // (
-    CloseParen, // )
-    OpenBrace,  // {
-    CloseBrace, // }
-    Comma,      // ,
-    Dot,        // .
-    Minus,      // -
-    Plus,       // +
-    Semicolon,  // ;
-    Slash,      // /
-    Star,       // *
+    OpenParen,    // (
+    CloseParen,   // )
+    OpenBrace,    // {
+    CloseBrace,   // }
+    OpenBracket,  // [
+    CloseBracket, // ]
+    Comma,        // ,
+    Dot,          // .
+    Minus,        // -
+    Plus,         // +
+    Semicolon,    // ;
+    Slash,        // /
+    Star,         // *
+    Colon,        // :
 
     Bang,         // !
     BangEqual,    // !=
@@ -233,6 +236,8 @@ impl<'a> Scanner<'a> {
             match c {
                 '(' => return self.make_token(TokenType::OpenParen),
                 ')' => return self.make_token(TokenType::CloseParen),
+                '[' => return self.make_token(TokenType::OpenBracket),
+                ']' => return self.make_token(TokenType::CloseBracket),
                 '{' => return self.make_token(TokenType::OpenBrace),
                 '}' => return self.make_token(TokenType::CloseBrace),
                 ';' => return self.make_token(TokenType::Semicolon),
@@ -242,6 +247,7 @@ impl<'a> Scanner<'a> {
                 '+' => return self.make_token(TokenType::Plus),
                 '/' => return self.make_token(TokenType::Slash),
                 '*' => return self.make_token(TokenType::Star),
+                ':' => return self.make_token(TokenType::Colon),
                 '!' => {
                     return if self.peek2() == "!=" {
                         self.advance();
