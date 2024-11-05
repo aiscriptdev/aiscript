@@ -7,9 +7,26 @@ async fn _prompt(message: String) -> String {
 
 #[cfg(not(feature = "ai_test"))]
 async fn _prompt(message: String) -> String {
-    use langchain_rust::{language_models::llm::LLM, llm::OpenAI};
-    let open_ai = OpenAI::default().with_model("gpt-3.5-turbo");
-    open_ai.invoke(&message).await.unwrap()
+    use std::env;
+
+    use openai_api_rs::v1::{
+        api::OpenAIClient,
+        chat_completion::{self, ChatCompletionRequest},
+        common::GPT3_5_TURBO,
+    };
+    let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
+    let req = ChatCompletionRequest::new(
+        GPT3_5_TURBO.to_string(),
+        vec![chat_completion::ChatCompletionMessage {
+            role: chat_completion::MessageRole::user,
+            content: chat_completion::Content::Text(message),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }],
+    );
+    let result = client.chat_completion(req).await.unwrap();
+    result.choices[0].message.content.clone().unwrap()
 }
 
 pub fn prompt(message: String) -> String {

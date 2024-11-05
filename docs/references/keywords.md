@@ -22,13 +22,13 @@ let a = prompt "What is AI?";
 print a;
 ```
 
-`prompt` supports customizations, the format is `<company>://<model>?<key1>=<value1>&<key2>=<value2>`. For example:
+`prompt` supports customizations, the format is `prompt "text" => "<company>://<model>?<key1>=<value1>&<key2>=<value2>"`. For example:
 
 ```rs
-let a = prompt "openai://gpt-3.5-turbo?temperature=1 What is Rust?";
+let a = prompt "What is Rust?" => "openai://gpt-3.5-turbo?temperature=1";
 print a;
 
-let b = prompt "anthropic://claude-3-5-sonnet-20241022?temperature=1 What is Rust?";
+let b = prompt "What is Rust?" => "anthropic://claude-3-5-sonnet-20241022?temperature=1";
 print b;
 ```
 
