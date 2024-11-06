@@ -142,16 +142,15 @@ impl<'gc> Parser<'gc> {
                     &format!("Invalid field '{}' in agent declaration.", invalid),
                 ),
             }
-            let field_name = self.ctx.intern(key.lexeme.as_bytes());
 
-            if fields.contains_key(&field_name) {
+            if fields.contains_key(key.lexeme) {
                 self.error_at(
                     key,
                     &format!("Duplicate field '{}' in agent declaration.", key.lexeme),
                 );
                 continue;
             }
-            fields.insert(self.ctx.intern(key.lexeme.as_bytes()), value);
+            fields.insert(key.lexeme, value);
             // Consume comma after field declaration
             if !self.check(TokenType::CloseBrace) {
                 self.consume(TokenType::Comma, "Expect ',' after field declaration.");
@@ -160,8 +159,8 @@ impl<'gc> Parser<'gc> {
 
         // Check for required fields
         let required_fields = ["instructions"];
-        for field in required_fields.iter() {
-            if !fields.contains_key(&self.ctx.intern(field.as_bytes())) {
+        for field in required_fields {
+            if !fields.contains_key(field) {
                 self.error(&format!(
                     "Missing required field '{}' in agent declaration.",
                     field

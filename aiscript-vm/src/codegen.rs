@@ -1,4 +1,8 @@
-use std::{collections::HashMap, mem, sync::atomic::AtomicUsize};
+use std::{
+    collections::HashMap,
+    mem,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::{
     agent::Agent,
@@ -25,6 +29,7 @@ struct Local<'gc> {
 pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
     chunks: HashMap<usize, Function<'gc>>,
+    named_id_map: HashMap<&'gc str, usize>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -40,6 +45,7 @@ impl<'gc> CodeGen<'gc> {
         let generator = Box::new(CodeGen {
             ctx,
             chunks: HashMap::new(),
+            named_id_map: HashMap::new(),
             function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: std::array::from_fn(|i| {
@@ -66,12 +72,6 @@ impl<'gc> CodeGen<'gc> {
         });
 
         generator
-    }
-
-    fn push_chunk(&mut self, function: Function<'gc>) -> usize {
-        let chunk_id = CHUNK_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
-        self.chunks.insert(chunk_id, function);
-        chunk_id
     }
 
     pub fn generate(
@@ -270,12 +270,16 @@ impl<'gc> CodeGen<'gc> {
             Stmt::Agent { name, fields, .. } => {
                 // Emit agent declaration
                 let agent_name = self.ctx.intern(name.lexeme.as_bytes());
-                let agent = Gc::new(&self.ctx, Agent::new(&self.ctx, agent_name, fields));
+                let agent = Agent::new(&self.ctx, agent_name)
+                    .parse_instructions(fields)
+                    .parse_model(fields)
+                    .parse_tools(fields, |name| self.next_chunk_id(name));
+                let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::DefineGlobal(name_constant as u8));
-                self.emit(OpCode::Pop);
+                // self.emit(OpCode::Pop);
             }
         }
         Ok(())
@@ -469,7 +473,7 @@ impl<'gc> CodeGen<'gc> {
 impl<'gc> CodeGen<'gc> {
     fn generate_function(
         &mut self,
-        name: &str,
+        name: &'gc str,
         params: &[Token<'gc>],
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
@@ -502,13 +506,26 @@ impl<'gc> CodeGen<'gc> {
         }
         if let Some(enclosing) = self.enclosing.take() {
             let function = mem::take(&mut self.function);
-            let chunk_id = self.push_chunk(function);
+            let chunk_id = self.next_chunk_id(name);
+            // TODO: Duplicate function name?
+            self.chunks.insert(chunk_id, function);
             let chunks = mem::take(&mut self.chunks);
             *self = *enclosing;
             self.chunks.extend(chunks);
             self.emit(OpCode::Closure(chunk_id as u8));
         }
         Ok(())
+    }
+
+    fn next_chunk_id(&mut self, name: &'gc str) -> usize {
+        match self.named_id_map.get(name).copied() {
+            Some(chunk_id) => chunk_id,
+            None => {
+                let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
+                self.named_id_map.insert(name, chunk_id);
+                chunk_id
+            }
+        }
     }
 
     // Bytecode emission methods

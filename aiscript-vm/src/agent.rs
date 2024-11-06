@@ -14,7 +14,7 @@ pub struct Agent<'gc> {
     pub name: InternedString<'gc>,
     pub instructions: InternedString<'gc>,
     pub model: InternedString<'gc>,
-    pub tools: Vec<InternedString<'gc>>,
+    pub tools: Vec<usize>,
     pub tool_choice: ToolChoice,
 }
 
@@ -33,60 +33,10 @@ pub enum ToolChoice {
 }
 
 impl<'gc> Agent<'gc> {
-    pub fn new(
-        ctx: &Context<'gc>,
-        name: InternedString<'gc>,
-        fields: &HashMap<InternedString<'gc>, Expr<'gc>>,
-    ) -> Agent<'gc> {
-        let mut instructions = InternedString::from_static(ctx, "test");
-        let mut model = InternedString::from_static(ctx, "gpt-4");
-        let mut tools = vec![];
-
-        for (key, expr) in fields {
-            match &*key.to_string() {
-                "instructions" => {
-                    instructions = match expr {
-                        Expr::Literal {
-                            value: LiteralValue::String(value),
-                            ..
-                        } => *value,
-                        _ => panic!("Expected string literal"),
-                    };
-                }
-                "model" => {
-                    model = match expr {
-                        Expr::Literal {
-                            value: LiteralValue::String(value),
-                            ..
-                        } => *value,
-                        _ => panic!("Expected string literal"),
-                    };
-                }
-                "tools" => {
-                    match expr {
-                        Expr::Array { elements, .. } => {
-                            for element in elements {
-                                match element {
-                                    Expr::Literal {
-                                        value: LiteralValue::String(value),
-                                        ..
-                                    } => {
-                                        tools.push(*value);
-                                    }
-                                    Expr::Variable { name, .. } => {
-                                        let name = ctx.intern(name.lexeme.as_bytes());
-                                        tools.push(name);
-                                    }
-                                    _ => panic!("Expected string literal"),
-                                }
-                            }
-                        }
-                        _ => panic!("Expected array"),
-                    };
-                }
-                _ => {}
-            }
-        }
+    pub fn new(ctx: &Context<'gc>, name: InternedString<'gc>) -> Agent<'gc> {
+        let instructions = InternedString::from_static(ctx, "test");
+        let model = InternedString::from_static(ctx, "gpt-4");
+        let tools = vec![];
 
         Agent {
             name,
@@ -96,19 +46,50 @@ impl<'gc> Agent<'gc> {
             tool_choice: ToolChoice::Auto,
         }
     }
+
+    pub fn parse_instructions(mut self, fields: &HashMap<&'gc str, Expr<'gc>>) -> Self {
+        if let Some(Expr::Literal {
+            value: LiteralValue::String(value),
+            ..
+        }) = fields.get("instructions")
+        {
+            self.instructions = *value;
+        }
+        self
+    }
+
+    pub fn parse_model(mut self, fields: &HashMap<&'gc str, Expr<'gc>>) -> Self {
+        if let Some(Expr::Literal {
+            value: LiteralValue::String(value),
+            ..
+        }) = fields.get("model")
+        {
+            self.model = *value;
+        }
+        self
+    }
+
+    pub fn parse_tools<F>(mut self, fields: &HashMap<&'gc str, Expr<'gc>>, mut f: F) -> Self
+    where
+        F: FnMut(&'gc str) -> usize,
+    {
+        if let Some(Expr::Array { elements, .. }) = dbg!(fields.get("tools")) {
+            for element in elements {
+                match element {
+                    Expr::Variable { name, .. } => {
+                        self.tools.push(f(name.lexeme));
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+        }
+        self
+    }
 }
 
 pub fn run_agent<'gc>(agent: Gc<'gc, Agent<'gc>>, input: InternedString<'gc>) -> String {
     format!(
-        "input: {},instructions: {}, model: {}, tools: {}",
-        input,
-        agent.instructions,
-        agent.model,
-        agent
-            .tools
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-            .join(",")
+        "input: {},instructions: {}, model: {}, tools: {:?}",
+        input, agent.instructions, agent.model, agent.tools
     )
 }

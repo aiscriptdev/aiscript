@@ -160,7 +160,7 @@ pub enum Stmt<'gc> {
     },
     Agent {
         name: Token<'gc>,
-        fields: HashMap<InternedString<'gc>, Expr<'gc>>,
+        fields: HashMap<&'gc str, Expr<'gc>>,
         line: u32,
     },
 }
