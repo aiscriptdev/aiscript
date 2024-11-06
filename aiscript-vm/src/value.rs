@@ -4,7 +4,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
     agent::Agent,
-    object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
+    object::{BoundMethod, Class, Closure, Instance, NativeFn},
     string::InternedString,
     vm::VmError,
     ReturnValue,
@@ -15,7 +15,6 @@ pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
     String(InternedString<'gc>),
-    Function(Gc<'gc, Function<'gc>>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
     Class(GcRefLock<'gc, Class<'gc>>),
@@ -36,7 +35,6 @@ unsafe impl<'gc> Collect for Value<'gc> {
     fn trace(&self, cc: &gc_arena::Collection) {
         match self {
             Value::String(s) => s.trace(cc),
-            Value::Function(func) => func.trace(cc),
             Value::Closure(closure) => closure.trace(cc),
             Value::Class(class) => class.trace(cc),
             Value::Instance(instance) => instance.trace(cc),
@@ -52,12 +50,11 @@ impl<'gc> Display for Value<'gc> {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function(func) => write!(f, "{}", func),
             Value::Closure(closure) => {
-                if closure.function.name.is_empty() {
-                    write!(f, "<script>")
+                if let Some(name) = closure.function.name {
+                    write!(f, "<fn {}>", name)
                 } else {
-                    write!(f, "<fn {}>", closure.function.name)
+                    write!(f, "<script>")
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
@@ -118,21 +115,18 @@ impl<'gc> Value<'gc> {
     pub fn as_string(self) -> Result<InternedString<'gc>, VmError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err(VmError::RuntimeError("cannot convert to string.".into())),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to string, the value is {v}"
+            ))),
         }
     }
 
     pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, VmError> {
         match self {
             Value::Closure(closure) => Ok(closure),
-            _ => Err(VmError::RuntimeError("cannot convert to closure.".into())),
-        }
-    }
-
-    pub fn as_function(self) -> Result<Gc<'gc, Function<'gc>>, VmError> {
-        match self {
-            Value::Function(function) => Ok(function),
-            _ => Err(VmError::RuntimeError("cannot convert to function.".into())),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to closure, the value is {v:?}"
+            ))),
         }
     }
 
@@ -146,14 +140,18 @@ impl<'gc> Value<'gc> {
     pub fn as_class(self) -> Result<GcRefLock<'gc, Class<'gc>>, VmError> {
         match self {
             Value::Class(class) => Ok(class),
-            _ => Err(VmError::RuntimeError("cannot convert to class.".into())),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to class, the value is {v}"
+            ))),
         }
     }
 
     pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, VmError> {
         match self {
             Value::Instance(instance) => Ok(instance),
-            _ => Err(VmError::RuntimeError("cannot convert to instance".into())),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to instance, the value is {v}"
+            ))),
         }
     }
 
@@ -176,10 +174,6 @@ impl<'gc> Value<'gc> {
 
     pub fn is_instance(&self) -> bool {
         matches!(self, Value::Instance(_))
-    }
-
-    pub fn is_function(&self) -> bool {
-        matches!(self, Value::Function(_))
     }
 
     pub fn is_closure(&self) -> bool {
@@ -228,12 +222,6 @@ impl<'gc> From<bool> for Value<'gc> {
 impl<'gc> From<InternedString<'gc>> for Value<'gc> {
     fn from(value: InternedString<'gc>) -> Self {
         Value::String(value)
-    }
-}
-
-impl<'gc> From<Gc<'gc, Function<'gc>>> for Value<'gc> {
-    fn from(value: Gc<'gc, Function<'gc>>) -> Self {
-        Value::Function(value)
     }
 }
 

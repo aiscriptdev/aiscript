@@ -10,7 +10,7 @@ use gc_arena::{
 use crate::{
     agent, ai, builtins,
     fuel::Fuel,
-    object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
+    object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     OpCode, ReturnValue, Value,
 };
@@ -53,6 +53,7 @@ impl Display for VmError {
 
 struct State<'gc> {
     mc: &'gc Mutation<'gc>,
+    chunks: HashMap<usize, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
     frame_count: usize,
     stack: [Value<'gc>; STACK_MAX_SIZE],
@@ -112,7 +113,7 @@ impl<'gc> CallFrame<'gc> {
     fn disassemble(&self) {
         self.closure
             .function
-            .disassemble(self.closure.function.name.display_lossy());
+            .disassemble(self.closure.function.name.unwrap().display_lossy());
     }
 
     #[allow(unused)]
@@ -125,6 +126,7 @@ impl<'gc> State<'gc> {
     fn new(mc: &'gc Mutation<'gc>) -> Self {
         State {
             mc,
+            chunks: HashMap::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
             frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
@@ -182,13 +184,13 @@ impl Vm {
                 mutation: mc,
                 strings: state.strings,
             };
-            let function = crate::codegen::compile(context, source)?;
-
+            state.chunks = crate::codegen::compile(context, source)?;
+            state.define_builtins();
+            let function = state.chunks.get(&0).unwrap();
             #[cfg(feature = "debug")]
             function.disassemble("script");
 
-            state.define_builtins();
-            let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
+            let closure = Gc::new(mc, Closure::new(mc, *function));
             state.push_stack(Value::from(closure));
             state.call(closure, 0)
         })?;
@@ -237,10 +239,10 @@ impl<'gc> State<'gc> {
                 "\n[line {}] in ",
                 function.chunk.line(frame.ip - 1)
             ));
-            let name = if function.name.is_empty() {
-                "script"
+            let name = if let Some(name) = function.name {
+                name.to_str().unwrap()
             } else {
-                function.name.to_str().unwrap()
+                "script"
             };
             error_message.push_str(name);
             error_message.push('\n');
@@ -393,8 +395,8 @@ impl<'gc> State<'gc> {
                     self.call_value(*self.peek(arg_count as usize), arg_count)?;
                 }
                 OpCode::Closure(byte) => {
-                    let function = frame.read_constant(byte).as_function()?;
-                    let mut closure = Closure::new(self.mc, function);
+                    let function = self.chunks.get(&(byte as usize)).unwrap();
+                    let mut closure = Closure::new(self.mc, *function);
 
                     closure
                         .function
@@ -661,7 +663,6 @@ impl<'gc> State<'gc> {
                     ));
                 }
             }
-            Value::Function(_) => {}
             Value::Closure(closure) => return self.call(closure, arg_count),
             Value::NativeFunction(function) => {
                 let result = function(self.pop_stack_n(arg_count as usize));

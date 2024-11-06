@@ -35,12 +35,12 @@ pub struct Closure<'gc> {
     pub upvalues: Box<[GcRefLock<'gc, UpvalueObj<'gc>>]>,
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Collect, Default)]
 #[collect[no_drop]]
 pub struct Function<'gc> {
     pub arity: u8,
     pub chunk: Chunk<'gc>,
-    pub name: InternedString<'gc>,
+    pub name: Option<InternedString<'gc>>,
     pub upvalues: Vec<Upvalue>,
 }
 
@@ -55,10 +55,10 @@ pub struct Upvalue {
 
 impl<'gc> Display for Function<'gc> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.name.is_empty() {
-            write!(f, "<script>")
+        if let Some(name) = self.name {
+            write!(f, "<fn {}>", name)
         } else {
-            write!(f, "<fn {}>", self.name)
+            write!(f, "<script>")
         }
     }
 }
@@ -144,7 +144,7 @@ impl<'gc> Function<'gc> {
         Self {
             arity,
             chunk: Chunk::new(),
-            name,
+            name: Some(name),
             upvalues: Vec::new(),
         }
     }

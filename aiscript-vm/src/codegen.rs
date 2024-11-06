@@ -1,3 +1,5 @@
+use std::{collections::HashMap, mem, sync::atomic::AtomicUsize};
+
 use crate::{
     agent::Agent,
     ast::{Expr, LiteralValue, Program, Stmt},
@@ -11,6 +13,7 @@ use gc_arena::Gc;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
 const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
+static CHUNK_ID: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Debug, Clone, Default)]
 struct Local<'gc> {
@@ -21,6 +24,7 @@ struct Local<'gc> {
 
 pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
+    chunks: HashMap<usize, Function<'gc>>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -35,6 +39,7 @@ impl<'gc> CodeGen<'gc> {
     pub fn new(ctx: Context<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
         let generator = Box::new(CodeGen {
             ctx,
+            chunks: HashMap::new(),
             function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: std::array::from_fn(|i| {
@@ -63,8 +68,17 @@ impl<'gc> CodeGen<'gc> {
         generator
     }
 
-    pub fn generate(program: Program<'gc>, ctx: Context<'gc>) -> Result<Function<'gc>, VmError> {
-        let mut generator = Self::new(ctx, FunctionType::Script, "");
+    fn push_chunk(&mut self, function: Function<'gc>) -> usize {
+        let chunk_id = CHUNK_ID.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.chunks.insert(chunk_id, function);
+        chunk_id
+    }
+
+    pub fn generate(
+        program: Program<'gc>,
+        ctx: Context<'gc>,
+    ) -> Result<HashMap<usize, Function<'gc>>, VmError> {
+        let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
         for stmt in program.statements {
             generator.generate_stmt(&stmt)?;
@@ -75,7 +89,9 @@ impl<'gc> CodeGen<'gc> {
         if generator.had_error {
             Err(VmError::CompileError)
         } else {
-            Ok(generator.function)
+            let function = mem::take(&mut generator.function);
+            generator.chunks.insert(0, function);
+            Ok(generator.chunks)
         }
     }
 
@@ -479,19 +495,19 @@ impl<'gc> CodeGen<'gc> {
         }
 
         self.emit_return();
-        let function = self.function.clone();
 
         // Restore the original compiler
         if self.had_error {
             return Err(VmError::CompileError);
         }
         if let Some(enclosing) = self.enclosing.take() {
+            let function = mem::take(&mut self.function);
+            let chunk_id = self.push_chunk(function);
+            let chunks = mem::take(&mut self.chunks);
             *self = *enclosing;
+            self.chunks.extend(chunks);
+            self.emit(OpCode::Closure(chunk_id as u8));
         }
-
-        let constant = self.make_constant(Value::from(Gc::new(&self.ctx, function)));
-        self.emit(OpCode::Closure(constant as u8));
-
         Ok(())
     }
 
@@ -733,11 +749,19 @@ impl<'gc> CodeGen<'gc> {
     }
 }
 
-pub fn compile<'gc>(ctx: Context<'gc>, source: &'gc str) -> Result<Function<'gc>, VmError> {
+pub fn compile<'gc>(
+    ctx: Context<'gc>,
+    source: &'gc str,
+) -> Result<HashMap<usize, Gc<'gc, Function<'gc>>>, VmError> {
     // Step 1: Parse source into AST
     let mut parser = Parser::new(ctx, source);
     let program = parser.parse()?;
     // println!("AST: {}", program);
     // Step 2: Generate bytecode from AST
-    CodeGen::generate(program, ctx)
+    CodeGen::generate(program, ctx).map(|chunks| {
+        chunks
+            .into_iter()
+            .map(|(id, function)| (id, Gc::new(&ctx, function)))
+            .collect()
+    })
 }

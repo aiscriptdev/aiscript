@@ -6,7 +6,7 @@ use std::{
 
 use gc_arena::Collect;
 
-use crate::{object::Upvalue, Value};
+use crate::Value;
 
 #[derive(Copy, Clone, Debug, Collect)]
 #[collect(no_drop)]
@@ -198,17 +198,17 @@ impl<'gc> Chunk<'gc> {
                         "OP_CLOSURE", c, self.constans[c as usize]
                     );
 
-                    let function = self.constans[c as usize].as_function().unwrap();
-                    function.upvalues.iter().for_each(|upvalue| {
-                        let Upvalue { index, is_local } = *upvalue;
-                        println!(
-                            "{:04}    | {:-22} {:4} {}",
-                            offset - 2,
-                            "",
-                            if is_local { "local" } else { "upvalue" },
-                            index,
-                        );
-                    });
+                    // let function = self.constans[c as usize].as_closure().unwrap().function;
+                    // function.upvalues.iter().for_each(|upvalue| {
+                    //     let Upvalue { index, is_local } = *upvalue;
+                    //     println!(
+                    //         "{:04}    | {:-22} {:4} {}",
+                    //         offset - 2,
+                    //         "",
+                    //         if is_local { "local" } else { "upvalue" },
+                    //         index,
+                    //     );
+                    // });
                 }
                 OpCode::GetUpvalue(c) => self.byte_instruction("GET_UPVALUE", c),
                 OpCode::SetUpvalue(c) => self.byte_instruction("SET_UPVALUE", c),
