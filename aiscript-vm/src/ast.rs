@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{lexer::Token, string::InternedString};
 
 #[derive(Debug, Clone)]
@@ -10,6 +12,10 @@ pub enum Expr<'gc> {
     },
     Grouping {
         expression: Box<Expr<'gc>>,
+        line: u32,
+    },
+    Array {
+        elements: Vec<Expr<'gc>>,
         line: u32,
     },
     Literal {
@@ -86,6 +92,7 @@ impl<'gc> Expr<'gc> {
         match self {
             Self::Binary { line, .. }
             | Self::Grouping { line, .. }
+            | Self::Array { line, .. }
             | Self::Literal { line, .. }
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }
@@ -151,6 +158,11 @@ pub enum Stmt<'gc> {
         methods: Vec<Stmt<'gc>>,
         line: u32,
     },
+    Agent {
+        name: Token<'gc>,
+        fields: HashMap<InternedString<'gc>, Expr<'gc>>,
+        line: u32,
+    },
 }
 
 impl<'gc> Stmt<'gc> {
@@ -164,7 +176,8 @@ impl<'gc> Stmt<'gc> {
             | Self::Loop { line, .. }
             | Self::Function { line, .. }
             | Self::Return { line, .. }
-            | Self::Class { line, .. } => *line,
+            | Self::Class { line, .. }
+            | Self::Agent { line, .. } => *line,
         }
     }
 }

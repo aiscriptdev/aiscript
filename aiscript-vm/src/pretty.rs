@@ -55,6 +55,13 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let indent = self.indent();
         match self.value {
+            Expr::Array { elements, line } => {
+                writeln!(f, "{indent}Array [line {line}]")?;
+                for element in elements {
+                    write!(f, "{}", PrettyPrint::new(element, self.indent + 1))?;
+                }
+                Ok(())
+            }
             Expr::Binary {
                 left,
                 operator,
@@ -323,6 +330,12 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Stmt<'gc>> {
                 for method in methods {
                     write!(f, "{}", PrettyPrint::new(method, self.indent + 2))?;
                 }
+                Ok(())
+            }
+            Stmt::Agent { name, line, .. } => {
+                writeln!(f, "{indent}Agent Statement [line {line}]")?;
+                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
+                writeln!(f, "{}Fields:", "  ".repeat(self.indent + 1))?;
                 Ok(())
             }
         }

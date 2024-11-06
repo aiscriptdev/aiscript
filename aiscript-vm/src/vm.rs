@@ -8,7 +8,7 @@ use gc_arena::{
 };
 
 use crate::{
-    ai, builtins,
+    agent, ai, builtins,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
@@ -516,6 +516,10 @@ impl<'gc> State<'gc> {
                     let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
                     self.push_stack(result);
                 }
+                OpCode::Agent(name) => {
+                    let agent = frame.read_constant(name);
+                    self.push_stack(agent);
+                }
             }
 
             const FUEL_PER_STEP: i32 = 1;
@@ -665,6 +669,10 @@ impl<'gc> State<'gc> {
                 self.stack_top -= 1;
                 self.push_stack(result);
             }
+            value @ Value::Agent(..) => {
+                // Run the agent with given input message
+                self.push_stack(value);
+            }
             _ => {
                 return Err(self.runtime_error("Can only call functions and classes.".into()));
             }
@@ -686,13 +694,23 @@ impl<'gc> State<'gc> {
     }
 
     fn invoke(&mut self, name: InternedString<'gc>, arg_count: u8) -> Result<(), VmError> {
-        let receiver = self.peek(arg_count as usize);
+        let receiver = *self.peek(arg_count as usize);
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
                 self.stack[self.stack_top - arg_count as usize - 1] = *value;
                 self.call_value(*value, arg_count)
             } else {
                 self.invoke_from_class(instance.borrow().class, name, arg_count)
+            }
+        } else if let Value::Agent(agent) = receiver {
+            if name == "run" {
+                let message = self.pop_stack();
+                let result = agent::run_agent(agent, message.as_string().unwrap());
+                let s = self.intern(result.as_bytes());
+                self.push_stack(Value::from(s));
+                Ok(())
+            } else {
+                Err(self.runtime_error(format!("Agent have no methods called '{}'.", name).into()))
             }
         } else {
             Err(self.runtime_error("Only instances have methods.".into()))
@@ -836,8 +854,8 @@ impl Vm {
 
 #[derive(Copy, Clone)]
 pub struct Context<'gc> {
-    mutation: &'gc Mutation<'gc>,
-    strings: InternedStringSet<'gc>,
+    pub mutation: &'gc Mutation<'gc>,
+    pub strings: InternedStringSet<'gc>,
 }
 
 impl<'gc> Context<'gc> {
