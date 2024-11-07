@@ -85,10 +85,6 @@ impl<'gc> Agent<'gc> {
             for element in elements {
                 match element {
                     Expr::Variable { name, .. } => {
-                        // self.tools.push(FnDef {
-                        //     name: name.lexeme.to_owned(),
-                        //     chunk_id: f(name.lexeme),
-                        // });
                         self.tools.insert(name.lexeme.to_owned(), f(name.lexeme));
                     }
                     _ => panic!("Expected string literal"),

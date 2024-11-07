@@ -20,6 +20,7 @@ pub struct Parser<'gc> {
     previous_expr: Option<Expr<'gc>>,
     fn_type: FunctionType,
     class_compiler: Option<Box<ClassCompiler>>,
+    scopes: Vec<String>,
     had_error: bool,
     panic_mode: bool,
 }
@@ -40,12 +41,14 @@ impl<'gc> Parser<'gc> {
             previous_expr: None,
             fn_type: FunctionType::Script,
             class_compiler: None,
+            scopes: Vec::new(),
             had_error: false,
             panic_mode: false,
         }
     }
 
     pub fn parse(&mut self) -> Result<Program<'gc>, VmError> {
+        self.scopes.push(String::from("script"));
         let mut program = Program::new();
         self.advance();
 
@@ -172,6 +175,7 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::CloseBrace, "Expect '}' after agent body.");
         Some(Stmt::Agent {
             name,
+            mangled_name: format!("{}${}", self.scopes.join("$"), name.lexeme),
             fields,
             line: name.line,
         })
@@ -188,6 +192,7 @@ impl<'gc> Parser<'gc> {
     fn class_declaration(&mut self) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
+        self.scopes.push(name.lexeme.to_owned());
         let superclass = if self.match_token(TokenType::Less) {
             self.consume(TokenType::Identifier, "Expect superclass name.");
             let superclass_name = self.previous;
@@ -217,6 +222,7 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
 
+        self.scopes.pop();
         // pop that compiler off the stack and restore the enclosing class compiler.
         self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
         Some(Stmt::Class {
@@ -238,6 +244,7 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::Identifier, &format!("Expect {type_name} name."));
         let name = self.previous;
+        self.scopes.push(name.lexeme.to_string());
         if self.fn_type == FunctionType::Method && name.lexeme == "init" {
             self.fn_type = FunctionType::Initializer;
         }
@@ -263,8 +270,12 @@ impl<'gc> Parser<'gc> {
         let body = self.block();
         // Restore previous function type
         self.fn_type = previous_fn_type;
+        // let mangled_name = format!("{}${}", self.scopes.join("$"), name.lexeme);
+        let mangled_name = self.scopes.join("$");
+        self.scopes.pop();
         Some(Stmt::Function {
             name,
+            mangled_name,
             params,
             body,
             is_ai: fn_type == FunctionType::AiFunction,
@@ -902,7 +913,10 @@ mod tests {
             "#;
             let mut parser = Parser::new(context, &source);
             let result = parser.parse().unwrap();
-            let Stmt::Agent { name, fields, line } = &result.statements[0] else {
+            let Stmt::Agent {
+                name, fields, line, ..
+            } = &result.statements[0]
+            else {
                 panic!("Expected agent statement");
             };
             assert_eq!(name.lexeme, "Test");

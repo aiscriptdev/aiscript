@@ -29,7 +29,8 @@ struct Local<'gc> {
 pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
     chunks: HashMap<usize, Function<'gc>>,
-    named_id_map: HashMap<&'gc str, usize>,
+    // <function mangled name, chunk_id>
+    named_id_map: HashMap<String, usize>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -80,6 +81,10 @@ impl<'gc> CodeGen<'gc> {
     ) -> Result<HashMap<usize, Function<'gc>>, VmError> {
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
+        for stmt in &program.statements {
+            generator.declare_functions(stmt)?;
+        }
+
         for stmt in program.statements {
             generator.generate_stmt(&stmt)?;
         }
@@ -93,6 +98,49 @@ impl<'gc> CodeGen<'gc> {
             generator.chunks.insert(0, function);
             Ok(generator.chunks)
         }
+    }
+
+    fn declare_functions(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
+        match stmt {
+            Stmt::Block { statements, .. } => {
+                for stmt in statements {
+                    self.declare_functions(stmt)?;
+                }
+            }
+            Stmt::If {
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.declare_functions(then_branch)?;
+                if let Some(else_branch) = else_branch {
+                    self.declare_functions(else_branch)?;
+                }
+            }
+            Stmt::Loop { body, .. } => {
+                self.declare_functions(body)?;
+            }
+            Stmt::Function {
+                mangled_name, body, ..
+            } => {
+                if !self.named_id_map.contains_key(mangled_name) {
+                    let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
+                    self.named_id_map.insert(mangled_name.to_owned(), chunk_id);
+                }
+
+                for stmt in body {
+                    self.declare_functions(stmt)?;
+                }
+            }
+            Stmt::Class { methods, .. } => {
+                for methods in methods {
+                    self.declare_functions(methods)?;
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 
     fn generate_stmt(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
@@ -165,6 +213,7 @@ impl<'gc> CodeGen<'gc> {
             }
             Stmt::Function {
                 name,
+                mangled_name,
                 params,
                 body,
                 is_ai,
@@ -181,7 +230,13 @@ impl<'gc> CodeGen<'gc> {
                     self.mark_initialized();
                 }
 
-                self.generate_function(name.lexeme, params, body, fn_type)?;
+                self.generate_function(
+                    name.lexeme,
+                    mangled_name.to_owned(),
+                    params,
+                    body,
+                    fn_type,
+                )?;
 
                 if self.scope_depth == 0 {
                     let global = self.identifier_constant(name.lexeme);
@@ -242,6 +297,7 @@ impl<'gc> CodeGen<'gc> {
                 for method in methods {
                     if let Stmt::Function {
                         name: method_name,
+                        mangled_name,
                         params,
                         body,
                         ..
@@ -252,7 +308,13 @@ impl<'gc> CodeGen<'gc> {
                         } else {
                             FunctionType::Method
                         };
-                        self.generate_function(method_name.lexeme, params, body, fn_type)?;
+                        self.generate_function(
+                            method_name.lexeme,
+                            mangled_name.to_owned(),
+                            params,
+                            body,
+                            fn_type,
+                        )?;
                         let method_constant = self.identifier_constant(method_name.lexeme);
                         self.emit(OpCode::Method(method_constant as u8));
                     }
@@ -267,13 +329,31 @@ impl<'gc> CodeGen<'gc> {
                     self.end_scope();
                 }
             }
-            Stmt::Agent { name, fields, .. } => {
+            Stmt::Agent {
+                name,
+                mangled_name,
+                fields,
+                ..
+            } => {
                 // Emit agent declaration
                 let agent_name = self.ctx.intern(name.lexeme.as_bytes());
                 let agent = Agent::new(&self.ctx, agent_name)
                     .parse_instructions(fields)
                     .parse_model(fields)
-                    .parse_tools(fields, |name| self.next_chunk_id(name));
+                    .parse_tools(fields, |name| {
+                        let mut scopes = mangled_name.split("$").collect::<Vec<_>>();
+                        let chunk_id = loop {
+                            if scopes.is_empty() {
+                                panic!("Unable to find the function called {}", name);
+                            }
+                            scopes.pop();
+                            let n = format!("{}${}", scopes.join("$"), name);
+                            if let Some(id) = self.named_id_map.get(&n).copied() {
+                                break id;
+                            }
+                        };
+                        chunk_id
+                    });
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
@@ -474,6 +554,7 @@ impl<'gc> CodeGen<'gc> {
     fn generate_function(
         &mut self,
         name: &'gc str,
+        mangle_name: String,
         params: &[Token<'gc>],
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
@@ -481,8 +562,10 @@ impl<'gc> CodeGen<'gc> {
         let compiler = Self::new(self.ctx, fn_type, name);
 
         // Create a new compiler taking ownership of current one
-        let enclosing = std::mem::replace(self, *compiler);
+        let mut enclosing = std::mem::replace(self, *compiler);
+        let named_id_map = std::mem::take(&mut enclosing.named_id_map);
         self.enclosing = Some(Box::new(enclosing));
+        self.named_id_map = named_id_map;
 
         self.begin_scope();
 
@@ -504,34 +587,18 @@ impl<'gc> CodeGen<'gc> {
         if self.had_error {
             return Err(VmError::CompileError);
         }
-        if let Some(enclosing) = self.enclosing.take() {
+        if let Some(mut enclosing) = self.enclosing.take() {
             let function = mem::take(&mut self.function);
-            let chunk_id = self.next_chunk_id(name);
+            let chunk_id = self.named_id_map.get(&mangle_name).copied().unwrap();
             // TODO: Duplicate function name?
             self.chunks.insert(chunk_id, function);
+            enclosing.named_id_map = mem::take(&mut self.named_id_map);
             let chunks = mem::take(&mut self.chunks);
-            // let named_id_map = mem::take(&mut self.named_id_map);
             *self = *enclosing;
             self.chunks.extend(chunks);
-            // self.named_id_map.extend(named_id_map);
             self.emit(OpCode::Closure(chunk_id as u8));
         }
         Ok(())
-    }
-
-    fn next_chunk_id(&mut self, name: &'gc str) -> usize {
-        match self.named_id_map.get(name).copied() {
-            Some(chunk_id) => {
-                // println!("reusing chunk_id for {name}, id: {chunk_id}");
-                chunk_id
-            }
-            None => {
-                let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
-                self.named_id_map.insert(name, chunk_id);
-                // println!("new chunk_id for {name}, id: {chunk_id}");
-                chunk_id
-            }
-        }
     }
 
     // Bytecode emission methods

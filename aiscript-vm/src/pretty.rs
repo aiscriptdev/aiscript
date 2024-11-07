@@ -292,6 +292,7 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Stmt<'gc>> {
                 body,
                 is_ai,
                 line,
+                ..
             } => {
                 writeln!(f, "{indent}Function Statement [line {line}]")?;
                 writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;

@@ -143,6 +143,7 @@ pub enum Stmt<'gc> {
     },
     Function {
         name: Token<'gc>,
+        mangled_name: String,
         params: Vec<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         is_ai: bool,
@@ -160,6 +161,7 @@ pub enum Stmt<'gc> {
     },
     Agent {
         name: Token<'gc>,
+        mangled_name: String,
         fields: HashMap<&'gc str, Expr<'gc>>,
         line: u32,
     },
