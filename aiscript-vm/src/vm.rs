@@ -8,7 +8,7 @@ use gc_arena::{
 };
 
 use crate::{
-    agent, ai, builtins,
+    ai, builtins,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
@@ -51,7 +51,7 @@ impl Display for VmError {
     }
 }
 
-struct State<'gc> {
+pub struct State<'gc> {
     mc: &'gc Mutation<'gc>,
     chunks: HashMap<usize, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
@@ -144,6 +144,20 @@ impl<'gc> State<'gc> {
     pub fn intern_static(&mut self, s: &'static str) -> InternedString<'gc> {
         self.strings.intern_static(self.mc, s.as_bytes())
     }
+
+    pub fn get_chunk(&mut self, chunk_id: usize) -> Result<Gc<'gc, Function<'gc>>, VmError> {
+        Ok(self.chunks.get(&chunk_id).copied().unwrap())
+    }
+
+    pub fn call_function(&mut self, chunk_id: usize) -> Result<(), VmError> {
+        let function = self.get_chunk(chunk_id)?;
+        #[cfg(feature = "debug")]
+        function.disassemble("script");
+
+        let closure = Gc::new(self.mc, Closure::new(self.mc, function));
+        self.push_stack(Value::from(closure));
+        self.call(closure, function.arity)
+    }
 }
 
 impl Default for Vm {
@@ -186,13 +200,7 @@ impl Vm {
             };
             state.chunks = crate::codegen::compile(context, source)?;
             state.define_builtins();
-            let function = state.chunks.get(&0).unwrap();
-            #[cfg(feature = "debug")]
-            function.disassemble("script");
-
-            let closure = Gc::new(mc, Closure::new(mc, *function));
-            state.push_stack(Value::from(closure));
-            state.call(closure, 0)
+            state.call_function(0)
         })?;
         Ok(())
     }
@@ -254,276 +262,290 @@ impl<'gc> State<'gc> {
         &mut self.frames[self.frame_count - 1]
     }
 
+    fn dispatch_next(&mut self) -> Result<Option<ReturnValue>, VmError> {
+        // Debug stack info
+        #[cfg(feature = "debug")]
+        self.print_stack();
+        let frame = self.current_frame();
+        // Disassemble instruction for debug
+        #[cfg(feature = "debug")]
+        frame.disassemble_instruction(frame.ip);
+        match frame.next_opcode() {
+            OpCode::Constant(byte) => {
+                // let byte = frame.read_byte();
+                let constant = frame.read_constant(byte);
+                self.push_stack(constant);
+            }
+            OpCode::Add => match (self.peek(0), self.peek(1)) {
+                (Value::Number(_), Value::Number(_)) => {
+                    binary_op!(self, +);
+                }
+                (Value::String(_), Value::String(_)) => {
+                    let b = self.pop_stack().as_string()?;
+                    let a = self.pop_stack().as_string()?;
+                    let s = self.intern(format!("{a}{b}").as_bytes());
+                    self.push_stack(s.into());
+                }
+                _ => {
+                    return Err(
+                        self.runtime_error("Operands must be two numbers or two strings.".into())
+                    );
+                }
+            },
+            OpCode::Subtract => {
+                binary_op!(self, -);
+            }
+            OpCode::Multiply => {
+                binary_op!(self, *);
+            }
+            OpCode::Divide => {
+                binary_op!(self, /);
+            }
+            OpCode::Negate => {
+                let v = self
+                    .pop_stack()
+                    .as_number()
+                    .map_err(|_| self.runtime_error("Operand must be a number.".into()))?;
+                self.push_stack((-v).into());
+            }
+            OpCode::Return => {
+                let frame_slot_start = frame.slot_start;
+                let return_value: Value<'_> = self.pop_stack();
+                self.close_upvalues(frame_slot_start);
+                // Must pop the frame from vec when returning
+                self.frames.pop();
+                self.frame_count -= 1;
+                if self.frame_count == 0 {
+                    self.pop_stack();
+                    return Ok(Some(return_value.into()));
+                }
+                self.stack_top = frame_slot_start;
+                self.push_stack(return_value);
+            }
+            OpCode::Nil => self.push_stack(Value::Nil),
+            OpCode::True => self.push_stack(Value::Boolean(true)),
+            OpCode::False => self.push_stack(Value::Boolean(false)),
+            OpCode::Not => {
+                let v = self.pop_stack().is_falsy();
+                self.push_stack((v).into())
+            }
+            OpCode::Equal => {
+                let b = self.pop_stack();
+                let a = self.pop_stack();
+                self.push_stack(a.equals(&b).into());
+            }
+            OpCode::Greater => {
+                binary_op!(self, >);
+            }
+            OpCode::Less => {
+                binary_op!(self, <);
+            }
+            OpCode::Print => {
+                let value = self.pop_stack();
+                println!("{value}");
+            }
+            OpCode::Pop => {
+                self.pop_stack();
+            }
+            OpCode::DefineGlobal(byte) => {
+                let varible_name = frame.read_constant(byte).as_string()?;
+                self.globals.insert(varible_name, *self.peek(0));
+                self.pop_stack();
+            }
+            OpCode::GetGlobal(byte) => {
+                let varible_name = frame.read_constant(byte).as_string()?;
+                if let Some(value) = self.globals.get(&varible_name) {
+                    self.push_stack(*value);
+                } else {
+                    return Err(self
+                        .runtime_error(format!("Undefined variable '{}'.", varible_name).into()));
+                }
+            }
+            OpCode::SetGlobal(byte) => {
+                let varible_name = frame.read_constant(byte).as_string()?;
+                #[allow(clippy::map_entry)]
+                if self.globals.contains_key(&varible_name) {
+                    self.globals.insert(varible_name, *self.peek(0));
+                } else {
+                    return Err(self
+                        .runtime_error(format!("Undefined variable '{}'.", varible_name).into()));
+                }
+            }
+            OpCode::GetLocal(slot) => {
+                let value = self.stack[frame.slot_start + slot as usize];
+                self.push_stack(value);
+            }
+            OpCode::SetLocal(slot) => {
+                let slot_start = frame.slot_start;
+                self.stack[slot_start + slot as usize] = *self.peek(0);
+            }
+            OpCode::JumpIfFalse(offset) => {
+                let is_falsy = self.peek(0).is_falsy();
+                // Alwasy jump to the next instruction, do not move this line into if block
+                if is_falsy {
+                    let frame = self.current_frame();
+                    frame.ip += offset as usize;
+                }
+            }
+            OpCode::Jump(offset) => {
+                frame.ip += offset as usize;
+            }
+            OpCode::Loop(offset) => {
+                frame.ip -= offset as usize;
+            }
+            OpCode::Call(arg_count) => {
+                self.call_value(*self.peek(arg_count as usize), arg_count)?;
+            }
+            OpCode::Closure(chunk_id) => {
+                let function = self.get_chunk(chunk_id as usize)?;
+                let mut closure = Closure::new(self.mc, function);
+
+                closure
+                    .function
+                    .upvalues
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, upvalue)| {
+                        let frame = self.current_frame();
+                        let Upvalue { is_local, index } = *upvalue;
+                        if is_local {
+                            let slot = frame.slot_start + index;
+                            let upvalue = self.capture_upvalue(slot);
+                            // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
+                            closure.upvalues[i] = upvalue;
+                        } else {
+                            // println!(
+                            //     "function {} capture upvalue: {index} {:?}",
+                            //     fn_name, &frame.closure.upvalues[index]
+                            // );
+                            closure.upvalues[i] = frame.closure.upvalues[index];
+                        }
+                    });
+
+                self.push_stack(Value::from(Gc::new(self.mc, closure)));
+            }
+            OpCode::GetUpvalue(slot) => {
+                let slot = slot as usize;
+                let upvalue = frame.closure.upvalues[slot];
+                if let Some(closed) = upvalue.borrow().closed {
+                    self.push_stack(closed);
+                } else {
+                    let location = frame.closure.upvalues[slot].borrow().location;
+                    let upvalue = self.stack[location];
+                    self.push_stack(upvalue);
+                }
+            }
+            OpCode::SetUpvalue(slot) => {
+                let slot = slot as usize;
+                let mut upvalue = frame.closure.upvalues[slot].borrow_mut(self.mc);
+                let stack_position = upvalue.location;
+                upvalue.location = slot;
+
+                let value = *self.peek(slot);
+                upvalue.closed = Some(value);
+                // Also update the stack value
+                self.stack[stack_position] = value;
+            }
+            OpCode::CloseUpvalue => {
+                self.close_upvalues(self.stack_top - 1);
+                self.pop_stack();
+            }
+            OpCode::Class(byte) => {
+                let name = frame.read_constant(byte).as_string().unwrap();
+                self.push_stack(Value::from(Gc::new(
+                    self.mc,
+                    RefLock::new(Class::new(name)),
+                )));
+            }
+            OpCode::GetProperty(byte) => {
+                if let Ok(instance) = self.peek(0).as_instance() {
+                    let frame = self.current_frame();
+                    let name = frame.read_constant(byte).as_string().unwrap();
+                    if let Some(property) = instance.borrow().fields.get(&name) {
+                        self.pop_stack(); // Instance
+                        self.push_stack(*property);
+                    } else {
+                        self.bind_method(instance.borrow().class, name)?;
+                    }
+                } else {
+                    return Err(self.runtime_error("Only instances have properties.".into()));
+                }
+            }
+            OpCode::SetProperty(byte) => {
+                if let Ok(instantce) = self.peek(1).as_instance() {
+                    let value = *self.peek(0);
+                    let frame = self.current_frame();
+                    let name = frame.read_constant(byte).as_string().unwrap();
+                    instantce.borrow_mut(self.mc).fields.insert(name, value);
+
+                    let value = self.pop_stack(); // Value
+                    self.pop_stack(); // Instance
+                    self.push_stack(value);
+                } else {
+                    return Err(self.runtime_error("Only instances have fields.".into()));
+                }
+            }
+            OpCode::Method(byte) => {
+                let name = frame.read_constant(byte).as_string().unwrap();
+                self.define_method(name);
+            }
+            OpCode::Invoke(byte, arg_count) => {
+                let method_name = frame.read_constant(byte).as_string().unwrap();
+                self.invoke(method_name, arg_count)?;
+            }
+            OpCode::Inherit => {
+                if let Value::Class(superclass) = self.peek(1) {
+                    let subclass = self.peek(0).as_class()?;
+                    subclass
+                        .borrow_mut(self.mc)
+                        .methods
+                        .extend(&superclass.borrow().methods);
+                    self.pop_stack(); // Subclass
+                } else {
+                    return Err(self.runtime_error("Superclass must be a class.".into()));
+                }
+            }
+            OpCode::GetSuper(byte) => {
+                let name = frame.read_constant(byte).as_string().unwrap();
+                let superclass = self.pop_stack().as_class()?;
+                self.bind_method(superclass, name)?
+            }
+            OpCode::SuperInvoke(byte, arg_count) => {
+                let method_name = frame.read_constant(byte).as_string().unwrap();
+                let superclass = self.pop_stack().as_class()?;
+                self.invoke_from_class(superclass, method_name, arg_count)?;
+            }
+            OpCode::Prompt => {
+                let message = self.pop_stack().as_string().unwrap().to_string();
+                let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
+                self.push_stack(result);
+            }
+            OpCode::Agent(name) => {
+                let agent = frame.read_constant(name);
+                self.push_stack(agent);
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn eval_function(&mut self, chunk_id: usize) -> Result<ReturnValue, VmError> {
+        self.call_function(chunk_id)?;
+        loop {
+            if let Some(result) = self.dispatch_next()? {
+                return Ok(result);
+            }
+        }
+    }
+
     // Runs the VM for a period of time controlled by the `fuel` parameter.
     //
     // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
     // do, and returns `Ok(true)` if no more progress can be made.
     fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
         loop {
-            // Debug stack info
-            #[cfg(feature = "debug")]
-            self.print_stack();
-            let frame = self.current_frame();
-            // Disassemble instruction for debug
-            #[cfg(feature = "debug")]
-            frame.disassemble_instruction(frame.ip);
-            match frame.next_opcode() {
-                OpCode::Constant(byte) => {
-                    // let byte = frame.read_byte();
-                    let constant = frame.read_constant(byte);
-                    self.push_stack(constant);
-                }
-                OpCode::Add => match (self.peek(0), self.peek(1)) {
-                    (Value::Number(_), Value::Number(_)) => {
-                        binary_op!(self, +);
-                    }
-                    (Value::String(_), Value::String(_)) => {
-                        let b = self.pop_stack().as_string()?;
-                        let a = self.pop_stack().as_string()?;
-                        let s = self.intern(format!("{a}{b}").as_bytes());
-                        self.push_stack(s.into());
-                    }
-                    _ => {
-                        return Err(self
-                            .runtime_error("Operands must be two numbers or two strings.".into()));
-                    }
-                },
-                OpCode::Subtract => {
-                    binary_op!(self, -);
-                }
-                OpCode::Multiply => {
-                    binary_op!(self, *);
-                }
-                OpCode::Divide => {
-                    binary_op!(self, /);
-                }
-                OpCode::Negate => {
-                    let v = self
-                        .pop_stack()
-                        .as_number()
-                        .map_err(|_| self.runtime_error("Operand must be a number.".into()))?;
-                    self.push_stack((-v).into());
-                }
-                OpCode::Return => {
-                    let frame_slot_start = frame.slot_start;
-                    let return_value = self.pop_stack();
-                    self.close_upvalues(frame_slot_start);
-                    // Must pop the frame from vec when returning
-                    self.frames.pop();
-                    self.frame_count -= 1;
-                    if self.frame_count == 0 {
-                        self.pop_stack();
-                        return Ok(Some(return_value.into()));
-                    }
-                    self.stack_top = frame_slot_start;
-                    self.push_stack(return_value);
-                }
-                OpCode::Nil => self.push_stack(Value::Nil),
-                OpCode::True => self.push_stack(Value::Boolean(true)),
-                OpCode::False => self.push_stack(Value::Boolean(false)),
-                OpCode::Not => {
-                    let v = self.pop_stack().is_falsy();
-                    self.push_stack((v).into())
-                }
-                OpCode::Equal => {
-                    let b = self.pop_stack();
-                    let a = self.pop_stack();
-                    self.push_stack(a.equals(&b).into());
-                }
-                OpCode::Greater => {
-                    binary_op!(self, >);
-                }
-                OpCode::Less => {
-                    binary_op!(self, <);
-                }
-                OpCode::Print => {
-                    let value = self.pop_stack();
-                    println!("{value}");
-                }
-                OpCode::Pop => {
-                    self.pop_stack();
-                }
-                OpCode::DefineGlobal(byte) => {
-                    let varible_name = frame.read_constant(byte).as_string()?;
-                    self.globals.insert(varible_name, *self.peek(0));
-                    self.pop_stack();
-                }
-                OpCode::GetGlobal(byte) => {
-                    let varible_name = frame.read_constant(byte).as_string()?;
-                    if let Some(value) = self.globals.get(&varible_name) {
-                        self.push_stack(*value);
-                    } else {
-                        return Err(self.runtime_error(
-                            format!("Undefined variable '{}'.", varible_name).into(),
-                        ));
-                    }
-                }
-                OpCode::SetGlobal(byte) => {
-                    let varible_name = frame.read_constant(byte).as_string()?;
-                    #[allow(clippy::map_entry)]
-                    if self.globals.contains_key(&varible_name) {
-                        self.globals.insert(varible_name, *self.peek(0));
-                    } else {
-                        return Err(self.runtime_error(
-                            format!("Undefined variable '{}'.", varible_name).into(),
-                        ));
-                    }
-                }
-                OpCode::GetLocal(slot) => {
-                    let value = self.stack[frame.slot_start + slot as usize];
-                    self.push_stack(value);
-                }
-                OpCode::SetLocal(slot) => {
-                    let slot_start = frame.slot_start;
-                    self.stack[slot_start + slot as usize] = *self.peek(0);
-                }
-                OpCode::JumpIfFalse(offset) => {
-                    let is_falsy = self.peek(0).is_falsy();
-                    // Alwasy jump to the next instruction, do not move this line into if block
-                    if is_falsy {
-                        let frame = self.current_frame();
-                        frame.ip += offset as usize;
-                    }
-                }
-                OpCode::Jump(offset) => {
-                    frame.ip += offset as usize;
-                }
-                OpCode::Loop(offset) => {
-                    frame.ip -= offset as usize;
-                }
-                OpCode::Call(arg_count) => {
-                    self.call_value(*self.peek(arg_count as usize), arg_count)?;
-                }
-                OpCode::Closure(byte) => {
-                    let function = self.chunks.get(&(byte as usize)).unwrap();
-                    let mut closure = Closure::new(self.mc, *function);
-
-                    closure
-                        .function
-                        .upvalues
-                        .iter()
-                        .enumerate()
-                        .for_each(|(i, upvalue)| {
-                            let frame = self.current_frame();
-                            let Upvalue { is_local, index } = *upvalue;
-                            if is_local {
-                                let slot = frame.slot_start + index;
-                                let upvalue = self.capture_upvalue(slot);
-                                // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
-                                closure.upvalues[i] = upvalue;
-                            } else {
-                                // println!(
-                                //     "function {} capture upvalue: {index} {:?}",
-                                //     fn_name, &frame.closure.upvalues[index]
-                                // );
-                                closure.upvalues[i] = frame.closure.upvalues[index];
-                            }
-                        });
-
-                    self.push_stack(Value::from(Gc::new(self.mc, closure)));
-                }
-                OpCode::GetUpvalue(slot) => {
-                    let slot = slot as usize;
-                    let upvalue = frame.closure.upvalues[slot];
-                    if let Some(closed) = upvalue.borrow().closed {
-                        self.push_stack(closed);
-                    } else {
-                        let location = frame.closure.upvalues[slot].borrow().location;
-                        let upvalue = self.stack[location];
-                        self.push_stack(upvalue);
-                    }
-                }
-                OpCode::SetUpvalue(slot) => {
-                    let slot = slot as usize;
-                    let mut upvalue = frame.closure.upvalues[slot].borrow_mut(self.mc);
-                    let stack_position = upvalue.location;
-                    upvalue.location = slot;
-
-                    let value = *self.peek(slot);
-                    upvalue.closed = Some(value);
-                    // Also update the stack value
-                    self.stack[stack_position] = value;
-                }
-                OpCode::CloseUpvalue => {
-                    self.close_upvalues(self.stack_top - 1);
-                    self.pop_stack();
-                }
-                OpCode::Class(byte) => {
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    self.push_stack(Value::from(Gc::new(
-                        self.mc,
-                        RefLock::new(Class::new(name)),
-                    )));
-                }
-                OpCode::GetProperty(byte) => {
-                    if let Ok(instance) = self.peek(0).as_instance() {
-                        let frame = self.current_frame();
-                        let name = frame.read_constant(byte).as_string().unwrap();
-                        if let Some(property) = instance.borrow().fields.get(&name) {
-                            self.pop_stack(); // Instance
-                            self.push_stack(*property);
-                        } else {
-                            self.bind_method(instance.borrow().class, name)?;
-                        }
-                    } else {
-                        return Err(self.runtime_error("Only instances have properties.".into()));
-                    }
-                }
-                OpCode::SetProperty(byte) => {
-                    if let Ok(instantce) = self.peek(1).as_instance() {
-                        let value = *self.peek(0);
-                        let frame = self.current_frame();
-                        let name = frame.read_constant(byte).as_string().unwrap();
-                        instantce.borrow_mut(self.mc).fields.insert(name, value);
-
-                        let value = self.pop_stack(); // Value
-                        self.pop_stack(); // Instance
-                        self.push_stack(value);
-                    } else {
-                        return Err(self.runtime_error("Only instances have fields.".into()));
-                    }
-                }
-                OpCode::Method(byte) => {
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    self.define_method(name);
-                }
-                OpCode::Invoke(byte, arg_count) => {
-                    let method_name = frame.read_constant(byte).as_string().unwrap();
-                    self.invoke(method_name, arg_count)?;
-                }
-                OpCode::Inherit => {
-                    if let Value::Class(superclass) = self.peek(1) {
-                        let subclass = self.peek(0).as_class()?;
-                        subclass
-                            .borrow_mut(self.mc)
-                            .methods
-                            .extend(&superclass.borrow().methods);
-                        self.pop_stack(); // Subclass
-                    } else {
-                        return Err(self.runtime_error("Superclass must be a class.".into()));
-                    }
-                }
-                OpCode::GetSuper(byte) => {
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    let superclass = self.pop_stack().as_class()?;
-                    self.bind_method(superclass, name)?
-                }
-                OpCode::SuperInvoke(byte, arg_count) => {
-                    let method_name = frame.read_constant(byte).as_string().unwrap();
-                    let superclass = self.pop_stack().as_class()?;
-                    self.invoke_from_class(superclass, method_name, arg_count)?;
-                }
-                OpCode::Prompt => {
-                    let message = self.pop_stack().as_string().unwrap().to_string();
-                    let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
-                    self.push_stack(result);
-                }
-                OpCode::Agent(name) => {
-                    let agent = frame.read_constant(name);
-                    self.push_stack(agent);
-                }
+            if let Some(result) = self.dispatch_next()? {
+                return Ok(Some(result));
             }
-
             const FUEL_PER_STEP: i32 = 1;
             fuel.consume(FUEL_PER_STEP);
 
@@ -706,7 +728,7 @@ impl<'gc> State<'gc> {
         } else if let Value::Agent(agent) = receiver {
             if name == "run" {
                 let message = self.pop_stack();
-                let result = agent::run_agent(agent, message.as_string().unwrap());
+                let result = ai::run_agent(self, agent, message.as_string().unwrap());
                 let s = self.intern(result.as_bytes());
                 self.push_stack(Value::from(s));
                 Ok(())

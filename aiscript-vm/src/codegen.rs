@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    agent::Agent,
+    ai::Agent,
     ast::{Expr, LiteralValue, Program, Stmt},
     lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
@@ -510,8 +510,10 @@ impl<'gc> CodeGen<'gc> {
             // TODO: Duplicate function name?
             self.chunks.insert(chunk_id, function);
             let chunks = mem::take(&mut self.chunks);
+            // let named_id_map = mem::take(&mut self.named_id_map);
             *self = *enclosing;
             self.chunks.extend(chunks);
+            // self.named_id_map.extend(named_id_map);
             self.emit(OpCode::Closure(chunk_id as u8));
         }
         Ok(())
@@ -519,10 +521,14 @@ impl<'gc> CodeGen<'gc> {
 
     fn next_chunk_id(&mut self, name: &'gc str) -> usize {
         match self.named_id_map.get(name).copied() {
-            Some(chunk_id) => chunk_id,
+            Some(chunk_id) => {
+                // println!("reusing chunk_id for {name}, id: {chunk_id}");
+                chunk_id
+            }
             None => {
                 let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
                 self.named_id_map.insert(name, chunk_id);
+                // println!("new chunk_id for {name}, id: {chunk_id}");
                 chunk_id
             }
         }

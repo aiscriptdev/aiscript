@@ -3,7 +3,7 @@ use std::fmt::Display;
 use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
-    agent::Agent,
+    ai::Agent,
     object::{BoundMethod, Class, Closure, Instance, NativeFn},
     string::InternedString,
     vm::VmError,
