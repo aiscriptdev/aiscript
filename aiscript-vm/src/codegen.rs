@@ -562,10 +562,9 @@ impl<'gc> CodeGen<'gc> {
         let compiler = Self::new(self.ctx, fn_type, name);
 
         // Create a new compiler taking ownership of current one
-        let mut enclosing = std::mem::replace(self, *compiler);
-        let named_id_map = std::mem::take(&mut enclosing.named_id_map);
+        let mut enclosing = mem::replace(self, *compiler);
+        self.named_id_map = mem::take(&mut enclosing.named_id_map);
         self.enclosing = Some(Box::new(enclosing));
-        self.named_id_map = named_id_map;
 
         self.begin_scope();
 

@@ -262,7 +262,14 @@ impl<'gc> State<'gc> {
         &mut self.frames[self.frame_count - 1]
     }
 
-    fn dispatch_next(&mut self) -> Result<Option<ReturnValue>, VmError> {
+    // Dispatch the next opcode, stop at the given frame count.
+    // When dispatch in step() function, the stop_at_frame_count is 0.
+    // When dispatch in eval_function(), the stop_at_frame_count is the frame count before to call eval_function().
+    // This is used to exit the frame call after the chunks of that function is finished.
+    fn dispatch_next(
+        &mut self,
+        stop_at_frame_count: usize,
+    ) -> Result<Option<ReturnValue>, VmError> {
         // Debug stack info
         #[cfg(feature = "debug")]
         self.print_stack();
@@ -315,7 +322,7 @@ impl<'gc> State<'gc> {
                 // Must pop the frame from vec when returning
                 self.frames.pop();
                 self.frame_count -= 1;
-                if self.frame_count == 0 {
+                if self.frame_count == stop_at_frame_count {
                     self.pop_stack();
                     return Ok(Some(return_value.into()));
                 }
@@ -529,9 +536,11 @@ impl<'gc> State<'gc> {
     }
 
     pub fn eval_function(&mut self, chunk_id: usize) -> Result<ReturnValue, VmError> {
+        // Remember the current frame count in order to exit the loop at the correct frame.
+        let frame_count = self.frame_count;
         self.call_function(chunk_id)?;
         loop {
-            if let Some(result) = self.dispatch_next()? {
+            if let Some(result) = self.dispatch_next(frame_count)? {
                 return Ok(result);
             }
         }
@@ -543,7 +552,7 @@ impl<'gc> State<'gc> {
     // do, and returns `Ok(true)` if no more progress can be made.
     fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
         loop {
-            if let Some(result) = self.dispatch_next()? {
+            if let Some(result) = self.dispatch_next(0)? {
                 return Ok(Some(result));
             }
             const FUEL_PER_STEP: i32 = 1;
@@ -741,6 +750,7 @@ impl<'gc> State<'gc> {
     }
 
     fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) -> Result<(), VmError> {
+        // #[cfg(feature = "debug")]
         // closure.function.disassemble("fn");
         if arg_count != closure.function.arity {
             return Err(self.runtime_error(
