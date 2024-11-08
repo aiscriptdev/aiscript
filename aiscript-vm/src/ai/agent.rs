@@ -10,7 +10,7 @@ use openai_api_rs::v1::{
 use tokio::runtime::Handle;
 
 use crate::{
-    ast::{Expr, LiteralValue},
+    ast::{Expr, FnDef, LiteralValue},
     string::InternedString,
     vm::{Context, State},
 };
@@ -21,7 +21,7 @@ pub struct Agent<'gc> {
     pub name: InternedString<'gc>,
     pub instructions: InternedString<'gc>,
     pub model: InternedString<'gc>,
-    pub tools: HashMap<String, usize>,
+    pub tools: HashMap<String, FnDef>,
     pub tool_choice: ToolChoice,
 }
 
@@ -77,9 +77,9 @@ impl<'gc> Agent<'gc> {
         self
     }
 
-    pub fn parse_tools<F>(mut self, fields: &HashMap<&'gc str, Expr<'gc>>, mut f: F) -> Self
+    pub fn parse_tools<F>(mut self, fields: &HashMap<&'gc str, Expr<'gc>>, f: F) -> Self
     where
-        F: FnMut(&'gc str) -> usize,
+        F: Fn(&'gc str) -> FnDef,
     {
         if let Some(Expr::Array { elements, .. }) = fields.get("tools") {
             for element in elements {
@@ -96,12 +96,12 @@ impl<'gc> Agent<'gc> {
 
     fn get_tools(&self) -> Vec<Tool> {
         let mut tool_calls = Vec::new();
-        for (name, chunk_id) in &self.tools {
+        for (name, fn_def) in &self.tools {
             let tool_call = Tool {
                 r#type: chat_completion::ToolType::Function,
                 function: types::Function {
                     name: name.clone(),
-                    description: None,
+                    description: Some(fn_def.doc.clone()),
                     parameters: FunctionParameters {
                         schema_type: JSONSchemaType::Object,
                         properties: None,
@@ -128,8 +128,8 @@ impl<'gc> Agent<'gc> {
         for tool_call in tool_calls.as_ref().unwrap() {
             // TODO: call tool function
             let name = tool_call.function.name.as_ref().unwrap();
-            if let Some(chunk_id) = self.tools.get(name) {
-                let result = state.eval_function(*chunk_id).unwrap();
+            if let Some(tool_def) = self.tools.get(name) {
+                let result = state.eval_function(tool_def.chunk_id).unwrap();
                 println!("{:?}", result);
                 response
                     .messages
@@ -165,35 +165,35 @@ pub async fn _run_agent<'gc>(
     agent: Gc<'gc, Agent<'gc>>,
     message: InternedString<'gc>,
 ) -> String {
-    // let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
-    // loop {
-    //     let req = ChatCompletionRequest::new(
-    //         GPT3_5_TURBO.to_string(),
-    //         vec![chat_completion::ChatCompletionMessage {
-    //             role: chat_completion::MessageRole::user,
-    //             content: chat_completion::Content::Text(message.to_string()),
-    //             name: None,
-    //             tool_calls: None,
-    //             tool_call_id: None,
-    //         }],
-    //     )
-    //     .tools(agent.get_tools())
-    //     .tool_choice(chat_completion::ToolChoiceType::Auto)
-    //     .parallel_tool_calls(true);
-    //     let result = client.chat_completion(req).await.unwrap();
-    //     let response = &result.choices[0].message;
+    let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
+    loop {
+        let req = ChatCompletionRequest::new(
+            GPT3_5_TURBO.to_string(),
+            vec![chat_completion::ChatCompletionMessage {
+                role: chat_completion::MessageRole::user,
+                content: chat_completion::Content::Text(message.to_string()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            }],
+        )
+        .tools(agent.get_tools())
+        .tool_choice(chat_completion::ToolChoiceType::Auto)
+        .parallel_tool_calls(true);
+        let result = client.chat_completion(req).await.unwrap();
+        let response = &result.choices[0].message;
 
-    //     if response.tool_calls.is_none() {
-    //         break;
-    //     }
+        if response.tool_calls.is_none() {
+            break;
+        }
 
-    //     let response = agent.handle_tool_call(state, &response.tool_calls);
-    // }
-    let chunk_id = dbg!(agent.tools.get("apply_discount").unwrap());
-    let result = state.eval_function(*chunk_id).unwrap();
+        let response = agent.handle_tool_call(state, &response.tool_calls);
+    }
+    // let chunk_id = dbg!(agent.tools.get("apply_discount").unwrap());
+    // let result = state.eval_function(*chunk_id).unwrap();
     format!(
-        "input: {}, instructions: {}, model: {}, tools: {:?}, result: {:?}",
-        message, agent.instructions, agent.model, agent.tools, result
+        "input: {}, instructions: {}, model: {}, tools: {:?}",
+        message, agent.instructions, agent.model, agent.tools,
     )
 }
 

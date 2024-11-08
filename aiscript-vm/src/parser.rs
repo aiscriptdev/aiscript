@@ -267,6 +267,12 @@ impl<'gc> Parser<'gc> {
         }
         self.consume(TokenType::CloseParen, "Expect ')' after parameters.");
         self.consume(TokenType::OpenBrace, "Expect '{' before function body.");
+        let doc = if self.match_token(TokenType::Doc) {
+            self.advance();
+            Some(self.previous)
+        } else {
+            None
+        };
         let body = self.block();
         // Restore previous function type
         self.fn_type = previous_fn_type;
@@ -276,6 +282,7 @@ impl<'gc> Parser<'gc> {
         Some(Stmt::Function {
             name,
             mangled_name,
+            doc,
             params,
             body,
             is_ai: fn_type == FunctionType::AiFunction,

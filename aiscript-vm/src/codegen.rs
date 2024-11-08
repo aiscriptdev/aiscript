@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     ai::Agent,
-    ast::{Expr, LiteralValue, Program, Stmt},
+    ast::{Expr, FnDef, LiteralValue, Program, Stmt},
     lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
     parser::Parser,
@@ -30,7 +30,7 @@ pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
     chunks: HashMap<usize, Function<'gc>>,
     // <function mangled name, chunk_id>
-    named_id_map: HashMap<String, usize>,
+    named_id_map: HashMap<String, FnDef>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -121,11 +121,20 @@ impl<'gc> CodeGen<'gc> {
                 self.declare_functions(body)?;
             }
             Stmt::Function {
-                mangled_name, body, ..
+                mangled_name,
+                body,
+                doc,
+                ..
             } => {
                 if !self.named_id_map.contains_key(mangled_name) {
                     let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
-                    self.named_id_map.insert(mangled_name.to_owned(), chunk_id);
+                    self.named_id_map.insert(
+                        mangled_name.to_owned(),
+                        FnDef {
+                            chunk_id,
+                            doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
+                        },
+                    );
                 }
 
                 for stmt in body {
@@ -342,17 +351,17 @@ impl<'gc> CodeGen<'gc> {
                     .parse_model(fields)
                     .parse_tools(fields, |name| {
                         let mut scopes = mangled_name.split("$").collect::<Vec<_>>();
-                        let chunk_id = loop {
+                        let fn_def = loop {
                             if scopes.is_empty() {
                                 panic!("Unable to find the function called {}", name);
                             }
                             scopes.pop();
                             let n = format!("{}${}", scopes.join("$"), name);
-                            if let Some(id) = self.named_id_map.get(&n).copied() {
-                                break id;
+                            if let Some(fn_def) = self.named_id_map.get(&n).cloned() {
+                                break fn_def;
                             }
                         };
-                        chunk_id
+                        fn_def
                     });
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
@@ -588,7 +597,11 @@ impl<'gc> CodeGen<'gc> {
         }
         if let Some(mut enclosing) = self.enclosing.take() {
             let function = mem::take(&mut self.function);
-            let chunk_id = self.named_id_map.get(&mangle_name).copied().unwrap();
+            let chunk_id = self
+                .named_id_map
+                .get(&mangle_name)
+                .map(|n| n.chunk_id)
+                .unwrap();
             // TODO: Duplicate function name?
             self.chunks.insert(chunk_id, function);
             enclosing.named_id_map = mem::take(&mut self.named_id_map);

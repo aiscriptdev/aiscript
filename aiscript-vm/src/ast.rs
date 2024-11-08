@@ -1,6 +1,15 @@
 use std::collections::HashMap;
 
+use gc_arena::Collect;
+
 use crate::{lexer::Token, string::InternedString};
+
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct FnDef {
+    pub chunk_id: usize,
+    pub doc: String,
+}
 
 #[derive(Debug, Clone)]
 pub enum Expr<'gc> {
@@ -144,6 +153,7 @@ pub enum Stmt<'gc> {
     Function {
         name: Token<'gc>,
         mangled_name: String,
+        doc: Option<Token<'gc>>,
         params: Vec<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         is_ai: bool,
