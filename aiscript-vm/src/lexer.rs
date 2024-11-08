@@ -1,7 +1,7 @@
 use std::{iter::Peekable, str::Chars};
 
 /// Represents different types of tokens in the language
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     // Delimiters
     OpenParen,    // (
@@ -30,6 +30,7 @@ pub enum TokenType {
     GreaterEqual, // >=
     Less,         // <
     LessEqual,    // <=
+    Arrow,        // ->
 
     // Literals
     Identifier, // Variable/function names
@@ -66,7 +67,7 @@ pub enum TokenType {
 }
 
 /// Represents a single token in the source code
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Hash, Copy, Clone, Eq, PartialEq)]
 pub struct Token<'a> {
     /// The actual text of the token
     pub lexeme: &'a str,
@@ -317,12 +318,18 @@ impl<'a> Scanner<'a> {
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
-            '-' => self.make_token(TokenType::Minus),
+            '-' => {
+                if self.peek() == Some(&'>') {
+                    self.advance();
+                    self.make_token(TokenType::Arrow)
+                } else {
+                    self.make_token(TokenType::Minus)
+                }
+            }
             '+' => self.make_token(TokenType::Plus),
             '/' => self.make_token(TokenType::Slash),
             '*' => self.make_token(TokenType::Star),
             ':' => self.make_token(TokenType::Colon),
-
             '!' => {
                 let kind = if self.peek2() == "!=" {
                     self.advance();
@@ -332,7 +339,6 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-
             '=' => {
                 let kind = if self.peek2() == "==" {
                     self.advance();
@@ -342,7 +348,6 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-
             '<' => {
                 let kind = if self.peek2() == "<=" {
                     self.advance();
@@ -352,7 +357,6 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-
             '>' => {
                 let kind = if self.peek2() == ">=" {
                     self.advance();
@@ -362,7 +366,6 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-
             '"' => {
                 // Check for docstring
                 if let Some("\"\"") = self.check_next(2) {
@@ -521,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_operators() {
-        let source = "+ - * / >= <= == !=";
+        let source = "+ - * / >= <= == != ->";
         let scanner = Scanner::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
@@ -542,6 +545,7 @@ mod tests {
                 TokenType::LessEqual,
                 TokenType::EqualEqual,
                 TokenType::BangEqual,
+                TokenType::Arrow,
             ]
         );
     }

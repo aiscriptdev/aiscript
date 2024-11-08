@@ -1,11 +1,13 @@
 use std::{collections::HashMap, ops::Add};
 
+use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     ast::{Expr, LiteralValue, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
     object::FunctionType,
+    ty::Type,
     vm::Context,
     VmError,
 };
@@ -63,6 +65,15 @@ impl<'gc> Parser<'gc> {
         } else {
             Ok(program)
         }
+    }
+
+    fn parse_type(&mut self) -> Type<'gc> {
+        if !self.check(TokenType::Identifier) {
+            self.error_at_current("Invalid type annotation.");
+        }
+        // Parse either builtin type or custom type (identifier)
+        self.advance();
+        Type::from_token(self.previous)
     }
 
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
@@ -248,9 +259,13 @@ impl<'gc> Parser<'gc> {
         if self.fn_type == FunctionType::Method && name.lexeme == "init" {
             self.fn_type = FunctionType::Initializer;
         }
+
         self.consume(TokenType::OpenParen, "Expect '(' after function name.");
 
-        let mut params = Vec::new();
+        // Use IndexMap for parameters and their types
+        // IndexMap is ordered by insertion order,
+        // which is matter for function call
+        let mut params = IndexMap::new();
         if !self.check(TokenType::CloseParen) {
             loop {
                 if params.len() >= 255 {
@@ -258,7 +273,16 @@ impl<'gc> Parser<'gc> {
                 }
 
                 self.consume(TokenType::Identifier, "Expect parameter name.");
-                params.push(self.previous);
+                let param_name = self.previous;
+
+                // Parse parameter type annotation
+                if self.check(TokenType::Colon) {
+                    self.consume(TokenType::Colon, "Expect ':' after parameter name.");
+                    let param_type = self.parse_type();
+                    params.insert(param_name, Some(param_type));
+                } else {
+                    params.insert(param_name, None);
+                }
 
                 if !self.match_token(TokenType::Comma) {
                     break;
@@ -266,24 +290,35 @@ impl<'gc> Parser<'gc> {
             }
         }
         self.consume(TokenType::CloseParen, "Expect ')' after parameters.");
+
+        // Parse optional return type
+        let return_type = if self.match_token(TokenType::Arrow) {
+            Some(self.parse_type())
+        } else {
+            None
+        };
         self.consume(TokenType::OpenBrace, "Expect '{' before function body.");
+
         let doc = if self.match_token(TokenType::Doc) {
             self.advance();
             Some(self.previous)
         } else {
             None
         };
+
         let body = self.block();
+
         // Restore previous function type
         self.fn_type = previous_fn_type;
-        // let mangled_name = format!("{}${}", self.scopes.join("$"), name.lexeme);
         let mangled_name = self.scopes.join("$");
         self.scopes.pop();
+
         Some(Stmt::Function {
             name,
             mangled_name,
             doc,
             params,
+            return_type,
             body,
             is_ai: fn_type == FunctionType::AiFunction,
             line: name.line,

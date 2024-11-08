@@ -10,10 +10,12 @@ use crate::{
     lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
     parser::Parser,
+    ty::{Type, TypeResolver},
     vm::{Context, VmError},
     OpCode, Value,
 };
 use gc_arena::Gc;
+use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
 const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
@@ -31,6 +33,7 @@ pub struct CodeGen<'gc> {
     chunks: HashMap<usize, Function<'gc>>,
     // <function mangled name, chunk_id>
     named_id_map: HashMap<String, FnDef>,
+    type_resolver: TypeResolver<'gc>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -47,6 +50,7 @@ impl<'gc> CodeGen<'gc> {
             ctx,
             chunks: HashMap::new(),
             named_id_map: HashMap::new(),
+            type_resolver: TypeResolver::new(),
             function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: std::array::from_fn(|i| {
@@ -82,6 +86,10 @@ impl<'gc> CodeGen<'gc> {
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
         for stmt in &program.statements {
+            generator.declare_classes(stmt)?;
+        }
+
+        for stmt in &program.statements {
             generator.declare_functions(stmt)?;
         }
 
@@ -98,6 +106,14 @@ impl<'gc> CodeGen<'gc> {
             generator.chunks.insert(0, function);
             Ok(generator.chunks)
         }
+    }
+
+    fn declare_classes(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
+        if let Stmt::Class { name, .. } = stmt {
+            self.type_resolver
+                .register_type(name.lexeme, Type::Class(*name));
+        }
+        Ok(())
     }
 
     fn declare_functions(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
@@ -224,6 +240,7 @@ impl<'gc> CodeGen<'gc> {
                 name,
                 mangled_name,
                 params,
+                return_type,
                 body,
                 is_ai,
                 ..
@@ -243,6 +260,7 @@ impl<'gc> CodeGen<'gc> {
                     name.lexeme,
                     mangled_name.to_owned(),
                     params,
+                    return_type,
                     body,
                     fn_type,
                 )?;
@@ -308,6 +326,7 @@ impl<'gc> CodeGen<'gc> {
                         name: method_name,
                         mangled_name,
                         params,
+                        return_type,
                         body,
                         ..
                     } = method
@@ -321,6 +340,7 @@ impl<'gc> CodeGen<'gc> {
                             method_name.lexeme,
                             mangled_name.to_owned(),
                             params,
+                            return_type,
                             body,
                             fn_type,
                         )?;
@@ -564,10 +584,37 @@ impl<'gc> CodeGen<'gc> {
         &mut self,
         name: &'gc str,
         mangle_name: String,
-        params: &[Token<'gc>],
+        params: &IndexMap<Token<'gc>, Option<Type<'gc>>>,
+        return_type: &Option<Type<'gc>>,
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
     ) -> Result<(), VmError> {
+        // Validate parameter types
+        for (param_token, param_type) in params {
+            if let Some(param_type) = param_type {
+                if let Err(err) = self.type_resolver.validate_type(*param_type) {
+                    self.error_at(
+                        *param_token,
+                        &format!(
+                            "Invalid parameter type '{}': {}",
+                            param_type.type_name(),
+                            err
+                        ),
+                    );
+                }
+            }
+        }
+
+        // Validate return type if present
+        if let Some(ret_type) = return_type {
+            if let Err(err) = self.type_resolver.validate_type(*ret_type) {
+                self.error(&format!(
+                    "Invalid return type '{}': {}",
+                    ret_type.type_name(),
+                    err
+                ));
+            }
+        }
         let compiler = Self::new(self.ctx, fn_type, name);
 
         // Create a new compiler taking ownership of current one
@@ -579,7 +626,7 @@ impl<'gc> CodeGen<'gc> {
 
         // Compile parameters
         self.function.arity = params.len() as u8;
-        for param in params {
+        for param in params.keys() {
             self.declare_variable(*param);
             self.mark_initialized();
         }

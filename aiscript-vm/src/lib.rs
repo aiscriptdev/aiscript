@@ -14,6 +14,7 @@ mod parser;
 mod pretty;
 mod string;
 mod string_utils;
+mod ty;
 #[cfg(feature = "v1")]
 mod v1;
 mod value;

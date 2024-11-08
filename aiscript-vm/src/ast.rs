@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use gc_arena::Collect;
+use indexmap::IndexMap;
 
-use crate::{lexer::Token, string::InternedString};
+use crate::{lexer::Token, string::InternedString, ty::Type};
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
@@ -154,7 +155,8 @@ pub enum Stmt<'gc> {
         name: Token<'gc>,
         mangled_name: String,
         doc: Option<Token<'gc>>,
-        params: Vec<Token<'gc>>,
+        params: IndexMap<Token<'gc>, Option<Type<'gc>>>, // Parameter name -> Type mapping
+        return_type: Option<Type<'gc>>,
         body: Vec<Stmt<'gc>>,
         is_ai: bool,
         line: u32,
