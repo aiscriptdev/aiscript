@@ -138,6 +138,7 @@ impl<'gc> CodeGen<'gc> {
                 self.declare_functions(body)?;
             }
             Stmt::Function {
+                name,
                 mangled_name,
                 body,
                 doc,
@@ -152,6 +153,8 @@ impl<'gc> CodeGen<'gc> {
                             doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
                         },
                     );
+                } else {
+                    self.error_at(*name, "A function with same name already exists.");
                 }
 
                 for stmt in body {
@@ -585,35 +588,32 @@ impl<'gc> CodeGen<'gc> {
         &mut self,
         name: &'gc str,
         mangle_name: String,
-        params: &IndexMap<Token<'gc>, Option<Type<'gc>>>,
-        return_type: &Option<Type<'gc>>,
+        params: &IndexMap<Token<'gc>, Option<Token<'gc>>>,
+        return_type: &Option<Token<'gc>>,
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
     ) -> Result<(), VmError> {
         // Validate parameter types
         for (param_token, param_type) in params {
-            if let Some(param_type) = param_type {
-                if let Err(err) = self.type_resolver.validate_type(*param_type) {
+            if let Some(param_type) = param_type.as_ref().copied() {
+                let ty = Type::from_token(param_type);
+                if let Err(err) = self.type_resolver.validate_type(ty) {
                     self.error_at(
                         *param_token,
-                        &format!(
-                            "Invalid parameter type '{}': {}",
-                            param_type.type_name(),
-                            err
-                        ),
+                        &format!("Invalid parameter type '{}': {}.", ty.type_name(), err),
                     );
                 }
             }
         }
 
         // Validate return type if present
-        if let Some(ret_type) = return_type {
-            if let Err(err) = self.type_resolver.validate_type(*ret_type) {
-                self.error(&format!(
-                    "Invalid return type '{}': {}",
-                    ret_type.type_name(),
-                    err
-                ));
+        if let Some(ret_type) = return_type.as_ref().copied() {
+            let ty = Type::from_token(ret_type);
+            if let Err(err) = self.type_resolver.validate_type(ty) {
+                self.error_at(
+                    ret_type,
+                    &format!("Invalid return type '{}': {}.", ty.type_name(), err),
+                );
             }
         }
         let compiler = Self::new(self.ctx, fn_type, name);

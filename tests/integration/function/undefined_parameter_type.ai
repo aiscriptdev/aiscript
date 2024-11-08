@@ -1,0 +1,5 @@
+fn test(
+    x: vv, // Error at 'x': Invalid parameter type 'vv': Undefined type 'vv'.
+    y: str,
+) -> str {
+}

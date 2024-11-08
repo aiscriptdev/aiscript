@@ -1,0 +1,2 @@
+fn a(x: 123) { // Error at '123': Invalid type annotation.
+}

@@ -41,10 +41,7 @@ impl<'gc> TypeResolver<'gc> {
         match self.resolve_type(typ) {
             Some(_) => Ok(()),
             None => match typ {
-                Type::Class(token) => Err(format!(
-                    "Undefined type '{}' at line {}",
-                    token.lexeme, token.line
-                )),
+                Type::Class(token) => Err(format!("Undefined type '{}'", token.lexeme)),
                 _ => Ok(()),
             },
         }

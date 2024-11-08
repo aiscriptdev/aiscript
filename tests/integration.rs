@@ -76,10 +76,11 @@ fn parse_comments(path: &PathBuf) -> Expected {
     expected
 }
 
+// NOTICE: this attribute procedure will cache the test file list,
+// we need rebuild this crate to update the test file list
 #[test_resources("tests/integration/*/*.ai")]
 fn run_file_test(filename: &str) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // path.push(filename);
     path.set_file_name(filename);
     let expected = parse_comments(&path);
 

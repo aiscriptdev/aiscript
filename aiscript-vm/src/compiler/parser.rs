@@ -6,7 +6,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use super::{
     ast::{Expr, Literal, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
-    ty::Type,
 };
 use crate::{object::FunctionType, vm::Context, VmError};
 
@@ -65,13 +64,13 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn parse_type(&mut self) -> Type<'gc> {
+    fn parse_type(&mut self) -> Token<'gc> {
         if !self.check(TokenType::Identifier) {
             self.error_at_current("Invalid type annotation.");
         }
         // Parse either builtin type or custom type (identifier)
         self.advance();
-        Type::from_token(self.previous)
+        self.previous
     }
 
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
@@ -997,9 +996,9 @@ mod tests {
             assert_eq!(mangled_name, "script$test2");
             assert_eq!(doc, &None);
             assert_eq!(params.len(), 2);
-            assert_eq!(params[0].unwrap(), Type::Int);
-            assert_eq!(params[1].unwrap(), Type::Int);
-            assert_eq!(return_type.unwrap(), Type::Int);
+            assert_eq!(params[0].unwrap().lexeme, "int");
+            assert_eq!(params[1].unwrap().lexeme, "int");
+            assert_eq!(return_type.unwrap().lexeme, "int");
 
             let Stmt::Function {
                 name,
@@ -1018,7 +1017,7 @@ mod tests {
             assert_eq!(params.len(), 2);
             assert_eq!(params[0], None);
             assert_eq!(params[1], None);
-            assert_eq!(return_type.unwrap(), Type::Int);
+            assert_eq!(return_type.unwrap().lexeme, "int");
         });
     }
 

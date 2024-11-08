@@ -1,0 +1,5 @@
+fn test(
+    x: str,
+    y: str,
+) -> vv { // Error at 'vv': Invalid return type 'vv': Undefined type 'vv'.
+}
