@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Add};
+use std::{collections::HashMap, mem, ops::Add};
 
 use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -264,27 +264,28 @@ impl<'gc> Parser<'gc> {
         // IndexMap is ordered by insertion order,
         // which is matter for function call
         let mut params = IndexMap::new();
-        if !self.check(TokenType::CloseParen) {
-            loop {
-                if params.len() >= 255 {
-                    self.error_at_current("Can't have more than 255 parameters.");
-                }
+        loop {
+            if self.check(TokenType::CloseParen) {
+                break;
+            }
+            if params.len() >= 255 {
+                self.error_at_current("Can't have more than 255 parameters.");
+            }
 
-                self.consume(TokenType::Identifier, "Expect parameter name.");
-                let param_name = self.previous;
+            self.consume(TokenType::Identifier, "Expect parameter name.");
+            let param_name = self.previous;
 
-                // Parse parameter type annotation
-                if self.check(TokenType::Colon) {
-                    self.consume(TokenType::Colon, "Expect ':' after parameter name.");
-                    let param_type = self.parse_type();
-                    params.insert(param_name, Some(param_type));
-                } else {
-                    params.insert(param_name, None);
-                }
+            // Parse parameter type annotation
+            if self.check(TokenType::Colon) {
+                self.consume(TokenType::Colon, "Expect ':' after parameter name.");
+                let param_type = self.parse_type();
+                params.insert(param_name, Some(param_type));
+            } else {
+                params.insert(param_name, None);
+            }
 
-                if !self.match_token(TokenType::Comma) {
-                    break;
-                }
+            if !self.match_token(TokenType::Comma) {
+                break;
             }
         }
         self.consume(TokenType::CloseParen, "Expect ')' after parameters.");
@@ -298,7 +299,6 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::OpenBrace, "Expect '{' before function body.");
 
         let doc = if self.match_token(TokenType::Doc) {
-            self.advance();
             Some(self.previous)
         } else {
             None
@@ -762,7 +762,7 @@ impl<'gc> Parser<'gc> {
 
     // Helper methods
     fn advance(&mut self) {
-        self.previous = std::mem::take(&mut self.current);
+        self.previous = mem::take(&mut self.current);
 
         while let Some(token) = self.scanner.next() {
             self.current = token;
@@ -935,6 +935,92 @@ mod tests {
 
     use super::*;
     use crate::{string::InternedStringSet, vm::Context};
+
+    #[test]
+    fn test_parse_function() {
+        rootless_mutate(|mutation| {
+            let context = Context {
+                mutation,
+                strings: InternedStringSet::new(mutation),
+            };
+            let source = r#"
+                fn test1() {
+                    """
+                    test1 doc
+                    """
+                    print("Hello, world!");
+                }
+
+                fn test2(a: int, b: int) -> int {
+                    return a + b;
+                }
+
+                fn test3(a, b,) -> int {
+                    return a + b;
+                }
+            "#;
+            let mut parser = Parser::new(context, &source);
+            let result = parser.parse().unwrap();
+            let Stmt::Function {
+                name,
+                mangled_name,
+                doc,
+                params,
+                return_type,
+                body,
+                line,
+                ..
+            } = &result.statements[0]
+            else {
+                panic!("Unexpected statement type");
+            };
+            assert_eq!(name.lexeme, "test1");
+            assert_eq!(mangled_name, "script$test1");
+            assert_eq!(doc.unwrap().lexeme, "test1 doc");
+            assert_eq!(params.len(), 0);
+            assert!(return_type.is_none());
+            assert_eq!(body.len(), 1);
+            assert_eq!(line, &2);
+
+            let Stmt::Function {
+                name,
+                mangled_name,
+                doc,
+                params,
+                return_type,
+                ..
+            } = &result.statements[1]
+            else {
+                panic!("Unexpected statement type");
+            };
+            assert_eq!(name.lexeme, "test2");
+            assert_eq!(mangled_name, "script$test2");
+            assert_eq!(doc, &None);
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].unwrap(), Type::Int);
+            assert_eq!(params[1].unwrap(), Type::Int);
+            assert_eq!(return_type.unwrap(), Type::Int);
+
+            let Stmt::Function {
+                name,
+                mangled_name,
+                doc,
+                params,
+                return_type,
+                ..
+            } = &result.statements[2]
+            else {
+                panic!("Unexpected statement type");
+            };
+            assert_eq!(name.lexeme, "test3");
+            assert_eq!(mangled_name, "script$test3");
+            assert_eq!(doc, &None);
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0], None);
+            assert_eq!(params[1], None);
+            assert_eq!(return_type.unwrap(), Type::Int);
+        });
+    }
 
     #[test]
     fn test_parse_agent() {
