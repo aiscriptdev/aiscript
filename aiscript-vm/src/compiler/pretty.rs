@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::*;
+use super::ast::*;
 
 struct PrettyPrint<'a, T> {
     value: &'a T,
@@ -88,16 +88,16 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
             Expr::Literal { value, line } => {
                 writeln!(f, "{indent}Literal [line {line}]")?;
                 match value {
-                    LiteralValue::Number(n) => {
+                    Literal::Number(n) => {
                         writeln!(f, "{}Number: {}", "  ".repeat(self.indent + 1), n)
                     }
-                    LiteralValue::String(s) => {
+                    Literal::String(s) => {
                         writeln!(f, "{}String: {:?}", "  ".repeat(self.indent + 1), s)
                     }
-                    LiteralValue::Boolean(b) => {
+                    Literal::Boolean(b) => {
                         writeln!(f, "{}Boolean: {}", "  ".repeat(self.indent + 1), b)
                     }
-                    LiteralValue::Nil => writeln!(f, "{}Nil", "  ".repeat(self.indent + 1)),
+                    Literal::Nil => writeln!(f, "{}Nil", "  ".repeat(self.indent + 1)),
                 }
             }
             Expr::Unary {

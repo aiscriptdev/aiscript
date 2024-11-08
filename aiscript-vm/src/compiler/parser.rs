@@ -3,14 +3,12 @@ use std::{collections::HashMap, ops::Add};
 use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::{
-    ast::{Expr, LiteralValue, Program, Stmt},
+use super::{
+    ast::{Expr, Literal, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
-    object::FunctionType,
     ty::Type,
-    vm::Context,
-    VmError,
 };
+use crate::{object::FunctionType, vm::Context, VmError};
 
 type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc>>;
 
@@ -134,7 +132,7 @@ impl<'gc> Parser<'gc> {
                     if !matches!(
                         value,
                         Expr::Literal {
-                            value: LiteralValue::String { .. },
+                            value: Literal::String { .. },
                             ..
                         }
                     ) {
@@ -402,7 +400,7 @@ impl<'gc> Parser<'gc> {
 
         body = Stmt::Loop {
             condition: condition.unwrap_or(Expr::Literal {
-                value: LiteralValue::Boolean(true),
+                value: Literal::Boolean(true),
                 line: self.previous.line,
             }),
             body: Box::new(body),
@@ -494,7 +492,7 @@ impl<'gc> Parser<'gc> {
     fn number(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let value = self.previous.lexeme.parse::<f64>().unwrap();
         Some(Expr::Literal {
-            value: LiteralValue::Number(value),
+            value: Literal::Number(value),
             line: self.previous.line,
         })
     }
@@ -502,7 +500,7 @@ impl<'gc> Parser<'gc> {
     fn string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let string = self.previous.lexeme.trim_matches('"');
         Some(Expr::Literal {
-            value: LiteralValue::String(self.ctx.intern(string.as_bytes())),
+            value: Literal::String(self.ctx.intern(string.as_bytes())),
             line: self.previous.line,
         })
     }
@@ -510,15 +508,15 @@ impl<'gc> Parser<'gc> {
     fn literal(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         match self.previous.kind {
             TokenType::False => Some(Expr::Literal {
-                value: LiteralValue::Boolean(false),
+                value: Literal::Boolean(false),
                 line: self.previous.line,
             }),
             TokenType::True => Some(Expr::Literal {
-                value: LiteralValue::Boolean(true),
+                value: Literal::Boolean(true),
                 line: self.previous.line,
             }),
             TokenType::Nil => Some(Expr::Literal {
-                value: LiteralValue::Nil,
+                value: Literal::Nil,
                 line: self.previous.line,
             }),
             _ => unreachable!(),

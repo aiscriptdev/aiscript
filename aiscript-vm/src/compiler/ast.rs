@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
-use crate::{lexer::Token, string::InternedString, ty::Type};
+use super::{lexer::Token, ty::Type};
+use crate::string::InternedString;
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
@@ -29,7 +30,7 @@ pub enum Expr<'gc> {
         line: u32,
     },
     Literal {
-        value: LiteralValue<'gc>,
+        value: Literal<'gc>,
         line: u32,
     },
     Unary {
@@ -197,7 +198,7 @@ impl<'gc> Stmt<'gc> {
 }
 
 #[derive(Debug, Clone)]
-pub enum LiteralValue<'gc> {
+pub enum Literal<'gc> {
     Number(f64),
     String(InternedString<'gc>),
     Boolean(bool),

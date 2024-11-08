@@ -198,7 +198,7 @@ impl Vm {
                 mutation: mc,
                 strings: state.strings,
             };
-            state.chunks = crate::codegen::compile(context, source)?;
+            state.chunks = crate::compiler::compile(context, source)?;
             state.define_builtins();
             state.call_function(0)
         })?;

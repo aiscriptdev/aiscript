@@ -4,13 +4,14 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use super::{
+    ast::{Expr, FnDef, Literal, Program, Stmt},
+    lexer::{Token, TokenType},
+    ty::{Type, TypeResolver},
+};
 use crate::{
     ai::Agent,
-    ast::{Expr, FnDef, LiteralValue, Program, Stmt},
-    lexer::{Token, TokenType},
     object::{Function, FunctionType, Upvalue},
-    parser::Parser,
-    ty::{Type, TypeResolver},
     vm::{Context, VmError},
     OpCode, Value,
 };
@@ -433,11 +434,11 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(expression)?;
             }
             Expr::Literal { value, .. } => match value {
-                LiteralValue::Number(n) => self.emit_constant(Value::from(*n)),
-                LiteralValue::String(s) => self.emit_constant(Value::from(*s)),
-                LiteralValue::Boolean(true) => self.emit(OpCode::True),
-                LiteralValue::Boolean(false) => self.emit(OpCode::False),
-                LiteralValue::Nil => self.emit(OpCode::Nil),
+                Literal::Number(n) => self.emit_constant(Value::from(*n)),
+                Literal::String(s) => self.emit_constant(Value::from(*s)),
+                Literal::Boolean(true) => self.emit(OpCode::True),
+                Literal::Boolean(false) => self.emit(OpCode::False),
+                Literal::Nil => self.emit(OpCode::Nil),
             },
             Expr::Unary {
                 operator, right, ..
@@ -896,21 +897,4 @@ impl<'gc> CodeGen<'gc> {
         eprintln!(": {message}");
         self.had_error = true;
     }
-}
-
-pub fn compile<'gc>(
-    ctx: Context<'gc>,
-    source: &'gc str,
-) -> Result<HashMap<usize, Gc<'gc, Function<'gc>>>, VmError> {
-    // Step 1: Parse source into AST
-    let mut parser = Parser::new(ctx, source);
-    let program = parser.parse()?;
-    // println!("AST: {}", program);
-    // Step 2: Generate bytecode from AST
-    CodeGen::generate(program, ctx).map(|chunks| {
-        chunks
-            .into_iter()
-            .map(|(id, function)| (id, Gc::new(&ctx, function)))
-            .collect()
-    })
 }

@@ -10,7 +10,7 @@ use openai_api_rs::v1::{
 use tokio::runtime::Handle;
 
 use crate::{
-    ast::{Expr, FnDef, LiteralValue},
+    compiler::ast::{Expr, FnDef, Literal},
     string::InternedString,
     vm::{Context, State},
 };
@@ -57,7 +57,7 @@ impl<'gc> Agent<'gc> {
 
     pub fn parse_instructions(mut self, fields: &HashMap<&'gc str, Expr<'gc>>) -> Self {
         if let Some(Expr::Literal {
-            value: LiteralValue::String(value),
+            value: Literal::String(value),
             ..
         }) = fields.get("instructions")
         {
@@ -68,7 +68,7 @@ impl<'gc> Agent<'gc> {
 
     pub fn parse_model(mut self, fields: &HashMap<&'gc str, Expr<'gc>>) -> Self {
         if let Some(Expr::Literal {
-            value: LiteralValue::String(value),
+            value: Literal::String(value),
             ..
         }) = fields.get("model")
         {

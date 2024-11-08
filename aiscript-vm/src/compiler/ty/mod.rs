@@ -2,7 +2,7 @@ mod resolver;
 
 pub use resolver::TypeResolver;
 
-use crate::lexer::Token;
+use crate::compiler::lexer::Token;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Type<'gc> {
