@@ -553,6 +553,8 @@ impl<'gc> State<'gc> {
 
         loop {
             if let Some(result) = self.dispatch_next(frame_count)? {
+                // Popup the call function pushed to the stack top
+                self.pop_stack();
                 return Ok(result);
             }
         }
@@ -712,10 +714,6 @@ impl<'gc> State<'gc> {
                 // Stack should be restored after native function called
                 self.stack_top -= 1;
                 self.push_stack(result);
-            }
-            value @ Value::Agent(..) => {
-                // Run the agent with given input message
-                self.push_stack(value);
             }
             _ => {
                 return Err(self.runtime_error("Can only call functions and classes.".into()));
