@@ -1,5 +1,6 @@
-use std::{iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::CharIndices};
 
+mod character_tests;
 mod tests;
 
 /// Represents different types of tokens in the language
@@ -111,10 +112,10 @@ pub struct Scanner<'a> {
     /// The complete source code being scanned
     pub source: &'a str,
     /// Character iterator for the source
-    iter: Peekable<Chars<'a>>,
-    /// Start position of current token
+    iter: Peekable<CharIndices<'a>>,
+    /// Start position of current token (in bytes)
     pub start: usize,
-    /// Current position in the source
+    /// Current position in the source (in bytes)
     pub current: usize,
     /// Current line number
     pub line: u32,
@@ -127,7 +128,7 @@ impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            iter: source.chars().peekable(),
+            iter: source.char_indices().peekable(),
             start: 0,
             current: 0,
             line: 1,
@@ -137,36 +138,72 @@ impl<'a> Scanner<'a> {
 
     /// Advances the scanner one character forward
     fn advance(&mut self) -> Option<char> {
-        self.current += 1;
-        // Handle UTF-8 character boundaries correctly
-        while !self.source.is_char_boundary(self.current) && self.current < self.source.len() {
-            self.current += 1;
+        match self.iter.next() {
+            Some((pos, ch)) => {
+                self.current = pos + ch.len_utf8();
+                Some(ch)
+            }
+            None => None,
         }
-        self.iter.next()
     }
 
     /// Peeks at the next character without consuming it
-    fn peek(&mut self) -> Option<&char> {
-        self.iter.peek()
+    fn peek(&mut self) -> Option<char> {
+        self.iter.peek().map(|&(_, c)| c)
     }
 
     /// Looks ahead at the next N characters without consuming them
     fn check_next(&self, n: usize) -> Option<&str> {
-        if self.current + n <= self.source.len() {
-            Some(&self.source[self.current..self.current + n])
-        } else {
-            None
+        let mut chars = self.source[self.current..].char_indices();
+        match chars.nth(n - 1) {
+            Some((end_offset, ch)) => {
+                let end = self.current + end_offset + ch.len_utf8();
+                if end <= self.source.len() {
+                    Some(&self.source[self.current..end])
+                } else {
+                    None
+                }
+            }
+            None => None,
         }
     }
 
     /// Returns the next 2 characters as a string slice
     fn next2(&mut self) -> &str {
-        &self.source[self.current..=self.current + 1]
+        let mut chars = self.source[self.current..].char_indices();
+        match chars.nth(1) {
+            Some((end_offset, ch)) => {
+                let end = self.current + end_offset + ch.len_utf8();
+                &self.source[self.current..end]
+            }
+            None => &self.source[self.current..],
+        }
     }
 
     /// Returns the previous and current character as a string slice
     fn peek2(&mut self) -> &str {
-        &self.source[self.current - 1..=self.current]
+        // Find the start of the previous character
+        let mut prev_start = self.current;
+        let mut found = false;
+        for i in (0..self.current).rev() {
+            if self.source.is_char_boundary(i) {
+                prev_start = i;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            prev_start = 0;
+        }
+
+        // Find the end of the current character
+        let next_boundary = self.source[self.current..]
+            .char_indices()
+            .next()
+            .map(|(_, ch)| self.current + ch.len_utf8())
+            .unwrap_or(self.source.len());
+
+        &self.source[prev_start..next_boundary]
     }
 
     /// Skips whitespace and comments
@@ -182,7 +219,7 @@ impl<'a> Scanner<'a> {
                 }
                 '/' => {
                     if self.next2() == "//" {
-                        while matches!(self.peek(), Some(c) if *c != '\n') {
+                        while matches!(self.peek(), Some(c) if c != '\n') {
                             self.advance();
                         }
                     } else {
@@ -214,7 +251,7 @@ impl<'a> Scanner<'a> {
 
         loop {
             match self.peek() {
-                Some(&c) => {
+                Some(c) => {
                     if c == '"' && self.next2() == "\"\"" {
                         break;
                     }
@@ -244,7 +281,7 @@ impl<'a> Scanner<'a> {
             token
         };
 
-        while let Some(&c) = self.peek() {
+        while let Some(c) = self.peek() {
             if c == '"' {
                 self.advance();
             } else {
@@ -281,7 +318,7 @@ impl<'a> Scanner<'a> {
 
     /// Scans identifiers and keywords
     fn scan_identifier(&mut self) -> Token<'a> {
-        while matches!(self.peek(), Some(c) if c.is_alphanumeric() || *c == '_') {
+        while matches!(self.peek(), Some(c) if c.is_alphanumeric() || c == '_') {
             self.advance();
         }
 
@@ -334,7 +371,7 @@ impl<'a> Scanner<'a> {
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
             '-' => {
-                if self.peek() == Some(&'>') {
+                if self.peek() == Some('>') {
                     self.advance();
                     self.make_token(TokenType::Arrow)
                 } else {
@@ -387,7 +424,7 @@ impl<'a> Scanner<'a> {
                     self.scan_docstring()
                 } else {
                     // Regular string
-                    while let Some(&ch) = self.peek() {
+                    while let Some(ch) = self.peek() {
                         match ch {
                             '"' => break,
                             '\n' => {
@@ -401,7 +438,7 @@ impl<'a> Scanner<'a> {
                     }
 
                     match self.peek() {
-                        Some(&'"') => {
+                        Some('"') => {
                             self.advance();
                             self.make_token(TokenType::String)
                         }
