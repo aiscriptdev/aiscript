@@ -275,6 +275,7 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
                 }
                 ReturnValue::Object(map)
             }
+            Value::Agent(agent) => ReturnValue::Agent(agent.name.to_string()),
             _ => ReturnValue::Nil,
         }
     }

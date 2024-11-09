@@ -137,6 +137,10 @@ impl<'gc> State<'gc> {
         }
     }
 
+    pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
+        self.globals.get(&name).copied()
+    }
+
     pub fn intern(&mut self, s: &[u8]) -> InternedString<'gc> {
         self.strings.intern(self.mc, s)
     }

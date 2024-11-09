@@ -25,6 +25,7 @@ pub enum ReturnValue {
     Boolean(bool),
     String(String),
     Object(HashMap<String, serde_json::Value>),
+    Agent(String), // agent name
     Nil,
 }
 
@@ -43,8 +44,9 @@ impl Display for ReturnValue {
             Self::String(s) => write!(f, "{s}"),
             Self::Number(n) => write!(f, "{n}"),
             Self::Boolean(b) => write!(f, "{b}"),
-            Self::Nil => write!(f, ""),
+            Self::Agent(name) => write!(f, "{name}"),
             Self::Object(obj) => write!(f, "{}", serde_json::to_string(obj).unwrap()),
+            Self::Nil => write!(f, ""),
         }
     }
 }

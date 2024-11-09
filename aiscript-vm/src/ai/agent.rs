@@ -6,8 +6,8 @@ use openai_api_rs::v1::types::JSONSchemaType;
 use openai_api_rs::v1::{
     api::OpenAIClient,
     chat_completion::{
-        ChatCompletionMessage, ChatCompletionRequest, Content, MessageRole, Tool, ToolCall,
-        ToolChoiceType, ToolType,
+        ChatCompletionMessage, ChatCompletionMessageForResponse, ChatCompletionRequest, Content,
+        MessageRole, Tool, ToolCall, ToolChoiceType, ToolType,
     },
     common::GPT3_5_TURBO,
     types::{self, FunctionParameters, JSONSchemaDefine},
@@ -21,6 +21,7 @@ use crate::{
     },
     string::InternedString,
     vm::{Context, State},
+    ReturnValue,
 };
 
 #[derive(Debug, Collect)]
@@ -48,9 +49,9 @@ pub enum ToolChoice {
 }
 
 #[cfg(not(feature = "ai_test"))]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Response<'gc> {
-    agent: Option<Agent<'gc>>,
+    agent: Option<Gc<'gc, Agent<'gc>>>,
     messages: Vec<ChatCompletionMessage>,
 }
 
@@ -107,6 +108,16 @@ impl<'gc> Agent<'gc> {
 
 #[cfg(not(feature = "ai_test"))]
 impl<'gc> Agent<'gc> {
+    fn get_instruction_message(&self) -> ChatCompletionMessage {
+        ChatCompletionMessage {
+            role: MessageRole::system,
+            content: Content::Text(self.instructions.to_string()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
+    }
+
     fn get_tools(&self) -> Vec<Tool> {
         let mut tool_calls = Vec::new();
         for (name, fn_def) in &self.tools {
@@ -145,22 +156,22 @@ impl<'gc> Agent<'gc> {
         state: &mut State<'gc>,
         tool_calls: &Option<Vec<ToolCall>>,
     ) -> Response<'gc> {
-        use crate::Value;
-
-        let mut response = Response {
-            agent: None,
-            messages: vec![],
-        };
+        let mut response = Response::default();
         for tool_call in tool_calls.as_ref().unwrap() {
-            // TODO: call tool function
             let name = tool_call.function.name.as_ref().unwrap();
             if let Some(tool_def) = self.tools.get(name) {
-                let params = vec![Value::from(state.intern_static("New York"))];
+                let params = vec![];
                 let result = state.eval_function(tool_def.chunk_id, params).unwrap();
-                println!("{:?}", result);
+                let content = if let ReturnValue::Agent(agent_name) = &result {
+                    let agent_name = state.intern(agent_name.as_bytes());
+                    response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());
+                    format!("{{\"assistant\": {}}}", agent_name)
+                } else {
+                    result.to_string()
+                };
                 response.messages.push(ChatCompletionMessage {
                     role: MessageRole::tool,
-                    content: Content::Text(result.to_string()),
+                    content: Content::Text(content),
                     name: tool_call.function.name.clone(),
                     tool_calls: None,
                     tool_call_id: Some(tool_call.id.clone()),
@@ -187,43 +198,48 @@ pub async fn _run_agent<'gc>(
 #[cfg(not(feature = "ai_test"))]
 pub async fn _run_agent<'gc>(
     state: &mut State<'gc>,
-    agent: Gc<'gc, Agent<'gc>>,
-    message: InternedString<'gc>,
+    mut agent: Gc<'gc, Agent<'gc>>,
+    input: InternedString<'gc>,
 ) -> String {
+    let mut history = Vec::new();
+    history.push(ChatCompletionMessage {
+        role: MessageRole::user,
+        content: Content::Text(input.to_string()),
+        name: None,
+        tool_calls: None,
+        tool_call_id: None,
+    });
     let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
     loop {
-        let req = ChatCompletionRequest::new(
-            GPT3_5_TURBO.to_string(),
-            vec![ChatCompletionMessage {
-                role: MessageRole::user,
-                content: Content::Text(message.to_string()),
-                name: None,
-                tool_calls: None,
-                tool_call_id: None,
-            }],
-        )
-        .tools(agent.get_tools())
-        .tool_choice(ToolChoiceType::Auto)
-        .parallel_tool_calls(true);
-        let result = client.chat_completion(req).await.unwrap();
-        let response = &result.choices[0].message;
-
-        if response.tool_calls.is_none() {
-            break;
+        let mut messages = vec![agent.get_instruction_message()];
+        messages.extend(history.clone());
+        let mut req = ChatCompletionRequest::new(GPT3_5_TURBO.to_string(), messages);
+        let tools = agent.get_tools();
+        if !tools.is_empty() {
+            req = req
+                .tools(agent.get_tools())
+                .tool_choice(ToolChoiceType::Auto)
+                .parallel_tool_calls(true);
         }
-
-        // ChatCompletionMessageForResponse { role: assistant, content: None, name: None,
-        // tool_calls: Some([ToolCall { id: "call_PpSltWt31d6vQ2VY0jpWg9wQ",
-        // type: "function", function: ToolCallFunction { name: Some("get_weather"),
-        // arguments: Some("{\"location\":\"New York\"}") } }]) }
-        println!("ai: {:?}", response);
-        let response = agent.handle_tool_call(state, &response.tool_calls);
-        println!("call: {:?}", response);
+        #[cfg(feature = "debug")]
+        println!("chat completion request: {:?}", req);
+        let result = client.chat_completion(req).await.unwrap();
+        #[cfg(feature = "debug")]
+        println!("chat completion response: {:?}", response);
+        let response = &result.choices[0].message;
+        history.push(convert_chat_response_message(response.clone()));
+        if response.tool_calls.is_none() {
+            return response.content.clone().unwrap_or_default();
+        } else {
+            let response = agent.handle_tool_call(state, &response.tool_calls);
+            if let Some(handoff_agent) = response.agent {
+                agent = handoff_agent;
+            }
+            #[cfg(feature = "debug")]
+            println!("tool function call response: {:?}", response);
+            history.extend(response.messages);
+        }
     }
-    format!(
-        "input: {}, instructions: {}, model: {}, tools: {:?}",
-        message, agent.instructions, agent.model, agent.tools,
-    )
 }
 
 pub fn run_agent<'gc>(
@@ -248,5 +264,16 @@ impl From<PrimitiveType> for JSONSchemaType {
             PrimitiveType::Bool => JSONSchemaType::Boolean,
             _ => JSONSchemaType::String,
         }
+    }
+}
+
+#[cfg(not(feature = "ai_test"))]
+fn convert_chat_response_message(m: ChatCompletionMessageForResponse) -> ChatCompletionMessage {
+    ChatCompletionMessage {
+        role: m.role,
+        content: Content::Text(m.content.unwrap_or_default()),
+        name: m.name,
+        tool_calls: m.tool_calls,
+        tool_call_id: None,
     }
 }
