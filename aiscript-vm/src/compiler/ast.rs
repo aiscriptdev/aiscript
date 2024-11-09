@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
-use super::lexer::Token;
+use super::{lexer::Token, ty::PrimitiveType};
 use crate::string::InternedString;
 
 #[derive(Debug, Clone, Collect)]
@@ -11,6 +11,8 @@ use crate::string::InternedString;
 pub struct FnDef {
     pub chunk_id: usize,
     pub doc: String,
+    #[collect(require_static)]
+    pub params: IndexMap<String, PrimitiveType>,
 }
 
 #[derive(Debug, Clone)]

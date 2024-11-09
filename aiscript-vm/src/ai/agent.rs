@@ -1,16 +1,24 @@
 use std::{collections::HashMap, env};
 
 use gc_arena::{Collect, Gc};
+use openai_api_rs::v1::types::JSONSchemaType;
+#[cfg(not(feature = "ai_test"))]
 use openai_api_rs::v1::{
     api::OpenAIClient,
-    chat_completion::{self, ChatCompletionRequest, Tool, ToolCall},
+    chat_completion::{
+        ChatCompletionMessage, ChatCompletionRequest, Content, MessageRole, Tool, ToolCall,
+        ToolChoiceType, ToolType,
+    },
     common::GPT3_5_TURBO,
-    types::{self, FunctionParameters, JSONSchemaType},
+    types::{self, FunctionParameters, JSONSchemaDefine},
 };
 use tokio::runtime::Handle;
 
 use crate::{
-    compiler::ast::{Expr, FnDef, Literal},
+    compiler::{
+        ast::{Expr, FnDef, Literal},
+        ty::PrimitiveType,
+    },
     string::InternedString,
     vm::{Context, State},
 };
@@ -39,9 +47,11 @@ pub enum ToolChoice {
     Required,
 }
 
+#[cfg(not(feature = "ai_test"))]
+#[derive(Debug)]
 struct Response<'gc> {
     agent: Option<Agent<'gc>>,
-    messages: Vec<chat_completion::ChatCompletionMessage>,
+    messages: Vec<ChatCompletionMessage>,
 }
 
 impl<'gc> Agent<'gc> {
@@ -93,19 +103,35 @@ impl<'gc> Agent<'gc> {
         }
         self
     }
+}
 
+#[cfg(not(feature = "ai_test"))]
+impl<'gc> Agent<'gc> {
     fn get_tools(&self) -> Vec<Tool> {
         let mut tool_calls = Vec::new();
         for (name, fn_def) in &self.tools {
+            let properties = fn_def
+                .params
+                .iter()
+                .map(|(name, ty)| {
+                    (
+                        name.to_owned(),
+                        Box::new(JSONSchemaDefine {
+                            schema_type: Some(JSONSchemaType::from(*ty)),
+                            ..Default::default()
+                        }),
+                    )
+                })
+                .collect();
             let tool_call = Tool {
-                r#type: chat_completion::ToolType::Function,
+                r#type: ToolType::Function,
                 function: types::Function {
                     name: name.clone(),
                     description: Some(fn_def.doc.clone()),
                     parameters: FunctionParameters {
                         schema_type: JSONSchemaType::Object,
-                        properties: None,
-                        required: None,
+                        properties: Some(properties),
+                        required: Some(fn_def.params.keys().cloned().collect()),
                     },
                 },
             };
@@ -114,32 +140,31 @@ impl<'gc> Agent<'gc> {
         tool_calls
     }
 
-    #[cfg(not(feature = "ai_test"))]
     fn handle_tool_call(
         &self,
         state: &mut State<'gc>,
         tool_calls: &Option<Vec<ToolCall>>,
     ) -> Response<'gc> {
+        use crate::Value;
+
         let mut response = Response {
             agent: None,
             messages: vec![],
         };
-        // let mut messages = vec![];
         for tool_call in tool_calls.as_ref().unwrap() {
             // TODO: call tool function
             let name = tool_call.function.name.as_ref().unwrap();
             if let Some(tool_def) = self.tools.get(name) {
-                let result = state.eval_function(tool_def.chunk_id).unwrap();
+                let params = vec![Value::from(state.intern_static("New York"))];
+                let result = state.eval_function(tool_def.chunk_id, params).unwrap();
                 println!("{:?}", result);
-                response
-                    .messages
-                    .push(chat_completion::ChatCompletionMessage {
-                        role: chat_completion::MessageRole::tool,
-                        content: chat_completion::Content::Text(String::new()),
-                        name: tool_call.function.name.clone(),
-                        tool_calls: None,
-                        tool_call_id: Some(tool_call.id.clone()),
-                    });
+                response.messages.push(ChatCompletionMessage {
+                    role: MessageRole::tool,
+                    content: Content::Text(result.to_string()),
+                    name: tool_call.function.name.clone(),
+                    tool_calls: None,
+                    tool_call_id: Some(tool_call.id.clone()),
+                });
             }
         }
 
@@ -169,16 +194,16 @@ pub async fn _run_agent<'gc>(
     loop {
         let req = ChatCompletionRequest::new(
             GPT3_5_TURBO.to_string(),
-            vec![chat_completion::ChatCompletionMessage {
-                role: chat_completion::MessageRole::user,
-                content: chat_completion::Content::Text(message.to_string()),
+            vec![ChatCompletionMessage {
+                role: MessageRole::user,
+                content: Content::Text(message.to_string()),
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
             }],
         )
         .tools(agent.get_tools())
-        .tool_choice(chat_completion::ToolChoiceType::Auto)
+        .tool_choice(ToolChoiceType::Auto)
         .parallel_tool_calls(true);
         let result = client.chat_completion(req).await.unwrap();
         let response = &result.choices[0].message;
@@ -187,10 +212,14 @@ pub async fn _run_agent<'gc>(
             break;
         }
 
+        // ChatCompletionMessageForResponse { role: assistant, content: None, name: None,
+        // tool_calls: Some([ToolCall { id: "call_PpSltWt31d6vQ2VY0jpWg9wQ",
+        // type: "function", function: ToolCallFunction { name: Some("get_weather"),
+        // arguments: Some("{\"location\":\"New York\"}") } }]) }
+        println!("ai: {:?}", response);
         let response = agent.handle_tool_call(state, &response.tool_calls);
+        println!("call: {:?}", response);
     }
-    // let chunk_id = dbg!(agent.tools.get("apply_discount").unwrap());
-    // let result = state.eval_function(*chunk_id).unwrap();
     format!(
         "input: {}, instructions: {}, model: {}, tools: {:?}",
         message, agent.instructions, agent.model, agent.tools,
@@ -209,5 +238,15 @@ pub fn run_agent<'gc>(
         // We're in a sync context, create a new runtime
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async { _run_agent(state, agent, message).await })
+    }
+}
+
+impl From<PrimitiveType> for JSONSchemaType {
+    fn from(ty: PrimitiveType) -> Self {
+        match ty {
+            PrimitiveType::Int | PrimitiveType::Float => JSONSchemaType::Number,
+            PrimitiveType::Bool => JSONSchemaType::Boolean,
+            _ => JSONSchemaType::String,
+        }
     }
 }

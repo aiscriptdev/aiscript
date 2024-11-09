@@ -12,6 +12,7 @@ mod value;
 mod vm;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 
 pub(crate) use chunk::{Chunk, OpCode};
 pub use value::Value;
@@ -30,8 +31,20 @@ pub enum ReturnValue {
 impl ReturnValue {
     pub fn as_object(&self) -> Option<HashMap<String, serde_json::Value>> {
         match self {
-            ReturnValue::Object(obj) => Some(obj.clone()),
+            Self::Object(obj) => Some(obj.clone()),
             _ => None,
+        }
+    }
+}
+
+impl Display for ReturnValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(s) => write!(f, "{s}"),
+            Self::Number(n) => write!(f, "{n}"),
+            Self::Boolean(b) => write!(f, "{b}"),
+            Self::Nil => write!(f, ""),
+            Self::Object(obj) => write!(f, "{}", serde_json::to_string(obj).unwrap()),
         }
     }
 }

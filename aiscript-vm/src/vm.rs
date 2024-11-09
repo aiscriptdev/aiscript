@@ -149,13 +149,21 @@ impl<'gc> State<'gc> {
         Ok(self.chunks.get(&chunk_id).copied().unwrap())
     }
 
-    pub fn call_function(&mut self, chunk_id: usize) -> Result<(), VmError> {
+    // Call function with params
+    pub fn call_function(
+        &mut self,
+        chunk_id: usize,
+        params: Vec<Value<'gc>>,
+    ) -> Result<(), VmError> {
         let function = self.get_chunk(chunk_id)?;
         #[cfg(feature = "debug")]
         function.disassemble("script");
 
         let closure = Gc::new(self.mc, Closure::new(self.mc, function));
         self.push_stack(Value::from(closure));
+        for param in params {
+            self.push_stack(param);
+        }
         self.call(closure, function.arity)
     }
 }
@@ -200,7 +208,7 @@ impl Vm {
             };
             state.chunks = crate::compiler::compile(context, source)?;
             state.define_builtins();
-            state.call_function(0)
+            state.call_function(0, vec![])
         })?;
         Ok(())
     }
@@ -279,7 +287,6 @@ impl<'gc> State<'gc> {
         frame.disassemble_instruction(frame.ip);
         match frame.next_opcode() {
             OpCode::Constant(byte) => {
-                // let byte = frame.read_byte();
                 let constant = frame.read_constant(byte);
                 self.push_stack(constant);
             }
@@ -535,10 +542,15 @@ impl<'gc> State<'gc> {
         Ok(None)
     }
 
-    pub fn eval_function(&mut self, chunk_id: usize) -> Result<ReturnValue, VmError> {
+    pub fn eval_function(
+        &mut self,
+        chunk_id: usize,
+        params: Vec<Value<'gc>>,
+    ) -> Result<ReturnValue, VmError> {
         // Remember the current frame count in order to exit the loop at the correct frame.
         let frame_count = self.frame_count;
-        self.call_function(chunk_id)?;
+        self.call_function(chunk_id, params)?;
+
         loop {
             if let Some(result) = self.dispatch_next(frame_count)? {
                 return Ok(result);
@@ -750,8 +762,8 @@ impl<'gc> State<'gc> {
     }
 
     fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) -> Result<(), VmError> {
-        // #[cfg(feature = "debug")]
-        // closure.function.disassemble("fn");
+        #[cfg(feature = "debug")]
+        closure.function.disassemble("fn");
         if arg_count != closure.function.arity {
             return Err(self.runtime_error(
                 format!(

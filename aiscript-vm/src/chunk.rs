@@ -36,7 +36,7 @@ pub enum OpCode {
     Jump(u16),
     Loop(u16),
     Call(u8),
-    Closure(u8),
+    Closure(u8), // chunk id
     GetUpvalue(u8),
     SetUpvalue(u8),
     CloseUpvalue,
@@ -193,10 +193,7 @@ impl<'gc> Chunk<'gc> {
                     // let mut offset = offset + 1;
                     // let constant = self.code[offset] as usize;
                     // offset += 1;
-                    println!(
-                        "{:-16} {:4} '{}'",
-                        "OP_CLOSURE", c, self.constans[c as usize]
-                    );
+                    println!("{:-16} {:4}", "OP_CLOSURE", c);
 
                     // let function = self.constans[c as usize].as_closure().unwrap().function;
                     // function.upvalues.iter().for_each(|upvalue| {

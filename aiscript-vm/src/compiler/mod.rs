@@ -11,7 +11,7 @@ mod codegen;
 mod lexer;
 mod parser;
 mod pretty;
-mod ty;
+pub(crate) mod ty;
 
 pub fn compile<'gc>(
     ctx: Context<'gc>,

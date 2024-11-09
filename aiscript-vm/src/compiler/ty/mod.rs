@@ -1,8 +1,18 @@
 mod resolver;
 
+use crate::compiler::lexer::Token;
+use gc_arena::Collect;
 pub use resolver::TypeResolver;
 
-use crate::compiler::lexer::Token;
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[collect(require_static)]
+pub enum PrimitiveType {
+    Int,
+    Str,
+    Bool,
+    Float,
+    NonPrimitive,
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Type<'gc> {
@@ -38,6 +48,18 @@ impl<'gc> Type<'gc> {
             Type::Bool => "bool".to_string(),
             Type::Float => "float".to_string(),
             Type::Class(token) => token.lexeme.to_string(),
+        }
+    }
+}
+
+impl<'gc> From<Token<'gc>> for PrimitiveType {
+    fn from(token: Token<'gc>) -> Self {
+        match token.lexeme {
+            "int" => PrimitiveType::Int,
+            "str" => PrimitiveType::Str,
+            "bool" => PrimitiveType::Bool,
+            "float" => PrimitiveType::Float,
+            _ => PrimitiveType::NonPrimitive,
         }
     }
 }

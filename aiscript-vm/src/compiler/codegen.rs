@@ -7,7 +7,7 @@ use std::{
 use super::{
     ast::{Expr, FnDef, Literal, Program, Stmt},
     lexer::{Token, TokenType},
-    ty::{Type, TypeResolver},
+    ty::{PrimitiveType, Type, TypeResolver},
 };
 use crate::{
     ai::Agent,
@@ -142,6 +142,7 @@ impl<'gc> CodeGen<'gc> {
                 mangled_name,
                 body,
                 doc,
+                params,
                 ..
             } => {
                 if !self.named_id_map.contains_key(mangled_name) {
@@ -151,6 +152,15 @@ impl<'gc> CodeGen<'gc> {
                         FnDef {
                             chunk_id,
                             doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
+                            params: params
+                                .iter()
+                                .map(|(name, ty)| {
+                                    (
+                                        name.lexeme.to_owned(),
+                                        PrimitiveType::from(ty.unwrap_or_default()),
+                                    )
+                                })
+                                .collect(),
                         },
                     );
                 } else {
@@ -841,10 +851,7 @@ impl<'gc> CodeGen<'gc> {
 
     fn add_local(&mut self, name: Token<'gc>) {
         if self.local_count == MAX_LOCALS {
-            self.error_at(
-                name,
-                "Too many local variables in function.", /*name.line, None*/
-            );
+            self.error_at(name, "Too many local variables in function.");
             return;
         }
 
