@@ -18,6 +18,7 @@ use crate::{
     compiler::{
         ast::{Expr, FnDef, Literal},
         ty::PrimitiveType,
+        Token,
     },
     string::InternedString,
     vm::{Context, State},
@@ -88,15 +89,17 @@ impl<'gc> Agent<'gc> {
         self
     }
 
-    pub fn parse_tools<F>(mut self, fields: &HashMap<&'gc str, Expr<'gc>>, f: F) -> Self
+    pub fn parse_tools<F>(mut self, fields: &HashMap<&'gc str, Expr<'gc>>, mut f: F) -> Self
     where
-        F: Fn(&'gc str) -> FnDef,
+        F: FnMut(&Token<'gc>) -> Option<FnDef>,
     {
         if let Some(Expr::Array { elements, .. }) = fields.get("tools") {
             for element in elements {
                 match element {
                     Expr::Variable { name, .. } => {
-                        self.tools.insert(name.lexeme.to_owned(), f(name.lexeme));
+                        if let Some(fn_def) = f(name) {
+                            self.tools.insert(name.lexeme.to_owned(), fn_def);
+                        }
                     }
                     _ => panic!("Expected string literal"),
                 }
@@ -160,6 +163,7 @@ impl<'gc> Agent<'gc> {
         for tool_call in tool_calls.as_ref().unwrap() {
             let name = tool_call.function.name.as_ref().unwrap();
             if let Some(tool_def) = self.tools.get(name) {
+                // FIXME: pass params as the correct order
                 let params = vec![];
                 let result = state.eval_function(tool_def.chunk_id, params).unwrap();
                 let content = if let ReturnValue::Agent(agent_name) = &result {

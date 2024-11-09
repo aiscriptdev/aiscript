@@ -6,6 +6,7 @@ use parser::Parser;
 
 use crate::{object::Function, vm::Context, VmError};
 
+pub use lexer::Token;
 pub(crate) mod ast;
 mod codegen;
 mod lexer;

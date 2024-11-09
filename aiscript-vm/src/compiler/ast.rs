@@ -15,6 +15,28 @@ pub struct FnDef {
     pub params: IndexMap<String, PrimitiveType>,
 }
 
+impl FnDef {
+    pub fn new<'gc>(
+        chunk_id: usize,
+        doc: &Option<Token<'gc>>,
+        params: &IndexMap<Token<'gc>, Option<Token<'gc>>>,
+    ) -> Self {
+        FnDef {
+            chunk_id,
+            doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
+            params: params
+                .iter()
+                .map(|(name, ty)| {
+                    (
+                        name.lexeme.to_owned(),
+                        PrimitiveType::from(ty.unwrap_or_default()),
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr<'gc> {
     Binary {
@@ -178,6 +200,7 @@ pub enum Stmt<'gc> {
         name: Token<'gc>,
         mangled_name: String,
         fields: HashMap<&'gc str, Expr<'gc>>,
+        tools: Vec<Stmt<'gc>>,
         line: u32,
     },
 }

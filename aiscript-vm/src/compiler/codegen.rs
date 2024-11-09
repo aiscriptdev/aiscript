@@ -7,7 +7,7 @@ use std::{
 use super::{
     ast::{Expr, FnDef, Literal, Program, Stmt},
     lexer::{Token, TokenType},
-    ty::{PrimitiveType, Type, TypeResolver},
+    ty::{Type, TypeResolver},
 };
 use crate::{
     ai::Agent,
@@ -147,22 +147,8 @@ impl<'gc> CodeGen<'gc> {
             } => {
                 if !self.named_id_map.contains_key(mangled_name) {
                     let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
-                    self.named_id_map.insert(
-                        mangled_name.to_owned(),
-                        FnDef {
-                            chunk_id,
-                            doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
-                            params: params
-                                .iter()
-                                .map(|(name, ty)| {
-                                    (
-                                        name.lexeme.to_owned(),
-                                        PrimitiveType::from(ty.unwrap_or_default()),
-                                    )
-                                })
-                                .collect(),
-                        },
-                    );
+                    self.named_id_map
+                        .insert(mangled_name.to_owned(), FnDef::new(chunk_id, doc, params));
                 } else {
                     self.error_at(*name, "A function with same name already exists.");
                 }
@@ -174,6 +160,11 @@ impl<'gc> CodeGen<'gc> {
             Stmt::Class { methods, .. } => {
                 for methods in methods {
                     self.declare_functions(methods)?;
+                }
+            }
+            Stmt::Agent { tools, .. } => {
+                for tool in tools {
+                    self.declare_functions(tool)?;
                 }
             }
             _ => {}
@@ -376,27 +367,61 @@ impl<'gc> CodeGen<'gc> {
                 name,
                 mangled_name,
                 fields,
+                tools,
                 ..
             } => {
                 // Emit agent declaration
                 let agent_name = self.ctx.intern(name.lexeme.as_bytes());
-                let agent = Agent::new(&self.ctx, agent_name)
+                let mut agent = Agent::new(&self.ctx, agent_name)
                     .parse_instructions(fields)
                     .parse_model(fields)
                     .parse_tools(fields, |name| {
                         let mut scopes = mangled_name.split("$").collect::<Vec<_>>();
-                        let fn_def = loop {
+                        loop {
                             if scopes.is_empty() {
-                                panic!("Unable to find the function called {}", name);
+                                self.error_at(
+                                    *name,
+                                    &format!("Unable to find the function called {}", name.lexeme),
+                                );
+                                return None;
                             }
                             scopes.pop();
-                            let n = format!("{}${}", scopes.join("$"), name);
-                            if let Some(fn_def) = self.named_id_map.get(&n).cloned() {
-                                break fn_def;
+                            let n = format!("{}${}", scopes.join("$"), name.lexeme);
+                            if let Some(fn_def) = self.named_id_map.get(&n) {
+                                return Some(fn_def.clone());
                             }
-                        };
-                        fn_def
+                        }
                     });
+
+                for tool in tools {
+                    if let Stmt::Function {
+                        name,
+                        mangled_name,
+                        doc,
+                        params,
+                        return_type,
+                        body,
+                        ..
+                    } = tool
+                    {
+                        let fn_type = FunctionType::Tool;
+                        let chunk_id = self.generate_function(
+                            name.lexeme,
+                            mangled_name.to_owned(),
+                            params,
+                            return_type,
+                            body,
+                            fn_type,
+                        )?;
+                        if agent
+                            .tools
+                            .insert(name.lexeme.to_string(), FnDef::new(chunk_id, doc, params))
+                            .is_some()
+                        {
+                            self.error_at(*name, &format!("Duplicate tool name: {}", name.lexeme));
+                        }
+                    }
+                }
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
@@ -602,7 +627,7 @@ impl<'gc> CodeGen<'gc> {
         return_type: &Option<Token<'gc>>,
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
-    ) -> Result<(), VmError> {
+    ) -> Result<usize, VmError> {
         // Validate parameter types
         for (param_token, param_type) in params {
             if let Some(param_type) = param_type.as_ref().copied() {
@@ -653,9 +678,10 @@ impl<'gc> CodeGen<'gc> {
         if self.had_error {
             return Err(VmError::CompileError);
         }
+        let mut chunk_id = 0;
         if let Some(mut enclosing) = self.enclosing.take() {
             let function = mem::take(&mut self.function);
-            let chunk_id = self
+            chunk_id = self
                 .named_id_map
                 .get(&mangle_name)
                 .map(|n| n.chunk_id)
@@ -668,7 +694,7 @@ impl<'gc> CodeGen<'gc> {
             self.chunks.extend(chunks);
             self.emit(OpCode::Closure(chunk_id as u8));
         }
-        Ok(())
+        Ok(chunk_id)
     }
 
     // Bytecode emission methods

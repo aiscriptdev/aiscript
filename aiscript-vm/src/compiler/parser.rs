@@ -121,10 +121,11 @@ impl<'gc> Parser<'gc> {
     fn agent_declaration(&mut self) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect agent name.");
         let name = self.previous;
-
+        self.scopes.push(name.lexeme.to_owned());
         self.consume(TokenType::OpenBrace, "Expect '{' before agent body.");
         let mut fields = HashMap::new();
-        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+        while !self.check(TokenType::CloseBrace) && !self.check(TokenType::Fn) && !self.is_at_end()
+        {
             let (key, value) = self.field_declaration()?;
             match key.lexeme {
                 "instructions" | "model" | "tool_choice" => {
@@ -180,11 +181,19 @@ impl<'gc> Parser<'gc> {
             }
         }
 
+        let mut tools = Vec::new();
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            self.consume(TokenType::Fn, "Expect 'fn' keyword.");
+            tools.push(self.func_declaration(FunctionType::Tool)?);
+        }
+
         self.consume(TokenType::CloseBrace, "Expect '}' after agent body.");
+        self.scopes.pop();
         Some(Stmt::Agent {
             name,
             mangled_name: format!("{}${}", self.scopes.join("$"), name.lexeme),
             fields,
+            tools,
             line: name.line,
         })
     }
@@ -247,6 +256,7 @@ impl<'gc> Parser<'gc> {
         self.fn_type = fn_type;
         let type_name = match fn_type {
             FunctionType::Method => "method",
+            FunctionType::Tool => "tool function",
             _ => "function",
         };
 
