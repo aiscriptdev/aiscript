@@ -411,7 +411,7 @@ impl<'gc> State<'gc> {
             OpCode::Loop(offset) => {
                 frame.ip -= offset as usize;
             }
-            OpCode::Call(arg_count) => {
+            OpCode::Call(arg_count, keyword_args_count) => {
                 self.call_value(*self.peek(arg_count as usize), arg_count)?;
             }
             OpCode::Closure(chunk_id) => {
@@ -507,7 +507,7 @@ impl<'gc> State<'gc> {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 self.define_method(name);
             }
-            OpCode::Invoke(byte, arg_count) => {
+            OpCode::Invoke(byte, arg_count, keyword_args_count) => {
                 let method_name = frame.read_constant(byte).as_string().unwrap();
                 self.invoke(method_name, arg_count)?;
             }
@@ -528,7 +528,7 @@ impl<'gc> State<'gc> {
                 let superclass = self.pop_stack().as_class()?;
                 self.bind_method(superclass, name)?
             }
-            OpCode::SuperInvoke(byte, arg_count) => {
+            OpCode::SuperInvoke(byte, arg_count, keyword_args_count) => {
                 let method_name = frame.read_constant(byte).as_string().unwrap();
                 let superclass = self.pop_stack().as_class()?;
                 self.invoke_from_class(superclass, method_name, arg_count)?;

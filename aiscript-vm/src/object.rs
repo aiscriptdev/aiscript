@@ -39,6 +39,10 @@ pub struct Closure<'gc> {
 #[collect[no_drop]]
 pub struct Function<'gc> {
     pub arity: u8,
+    pub max_arity: u8,
+    pub param_names: Vec<String>,
+    // <param_name, constant_index>
+    pub default_values: HashMap<String, usize>, 
     pub chunk: Chunk<'gc>,
     pub name: Option<InternedString<'gc>>,
     pub upvalues: Vec<Upvalue>,
@@ -144,6 +148,9 @@ impl<'gc> Function<'gc> {
     pub fn new(name: InternedString<'gc>, arity: u8) -> Self {
         Self {
             arity,
+            max_arity: arity,
+            param_names: Vec::new(),
+            default_values: HashMap::new(),
             chunk: Chunk::new(),
             name: Some(name),
             upvalues: Vec::new(),

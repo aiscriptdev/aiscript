@@ -4,7 +4,34 @@ use gc_arena::Collect;
 use indexmap::IndexMap;
 
 use super::{lexer::Token, ty::PrimitiveType};
-use crate::string::InternedString;
+use crate::{string::InternedString, Value};
+
+#[derive(Debug, Clone)]
+pub struct Parameter<'gc> {
+    pub name: Token<'gc>,
+    pub type_hint: Option<Token<'gc>>,
+    pub default_value: Option<Expr<'gc>>,
+}
+
+impl<'gc> Parameter<'gc> {
+    pub fn new(name: Token<'gc>) -> Self {
+        Self {
+            name,
+            type_hint: None,
+            default_value: None,
+        }
+    }
+
+    pub fn with_type(mut self, type_hint: Token<'gc>) -> Self {
+        self.type_hint = Some(type_hint);
+        self
+    }
+
+    pub fn with_default(mut self, default_value: Expr<'gc>) -> Self {
+        self.default_value = Some(default_value);
+        self
+    }
+}
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
@@ -19,17 +46,17 @@ impl FnDef {
     pub fn new<'gc>(
         chunk_id: usize,
         doc: &Option<Token<'gc>>,
-        params: &IndexMap<Token<'gc>, Option<Token<'gc>>>,
+        params: &IndexMap<Token<'gc>, Parameter<'gc>>,
     ) -> Self {
         FnDef {
             chunk_id,
             doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
             params: params
                 .iter()
-                .map(|(name, ty)| {
+                .map(|(name, param)| {
                     (
                         name.lexeme.to_owned(),
-                        PrimitiveType::from(ty.unwrap_or_default()),
+                        PrimitiveType::from(param.type_hint.unwrap_or_default()),
                     )
                 })
                 .collect(),
@@ -84,12 +111,14 @@ pub enum Expr<'gc> {
     Call {
         callee: Box<Expr<'gc>>,
         arguments: Vec<Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
         line: u32,
     },
     Invoke {
         object: Box<Expr<'gc>>,
         method: Token<'gc>,
         arguments: Vec<Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
         line: u32,
     },
     Get {
@@ -108,12 +137,12 @@ pub enum Expr<'gc> {
     },
     Super {
         method: Token<'gc>,
-        arguments: Vec<Expr<'gc>>,
         line: u32,
     },
     SuperInvoke {
         method: Token<'gc>,
         arguments: Vec<Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
         line: u32,
     },
     Prompt {
@@ -180,7 +209,7 @@ pub enum Stmt<'gc> {
         name: Token<'gc>,
         mangled_name: String,
         doc: Option<Token<'gc>>,
-        params: IndexMap<Token<'gc>, Option<Token<'gc>>>, // Parameter name -> Type mapping
+        params: IndexMap<Token<'gc>, Parameter<'gc>>,
         return_type: Option<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         is_ai: bool,
@@ -239,6 +268,17 @@ impl<'gc> Program<'gc> {
     pub fn new() -> Self {
         Self {
             statements: Vec::new(),
+        }
+    }
+}
+
+impl<'gc> From<&Literal<'gc>> for Value<'gc> {
+    fn from(value: &Literal<'gc>) -> Self {
+        match value {
+            Literal::Number(value) => Value::Number(*value),
+            Literal::String(value) => Value::String(*value),
+            Literal::Boolean(value) => Value::Boolean(*value),
+            Literal::Nil => Value::Nil,
         }
     }
 }

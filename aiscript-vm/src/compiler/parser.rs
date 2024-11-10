@@ -1,10 +1,10 @@
-use std::{collections::HashMap, mem, ops::Add};
+use std::{collections::HashMap, iter::Peekable, mem, ops::Add};
 
 use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::{
-    ast::{Expr, Literal, Program, Stmt},
+    ast::{Expr, Literal, Parameter, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{object::FunctionType, vm::Context, VmError};
@@ -13,7 +13,7 @@ type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc
 
 pub struct Parser<'gc> {
     ctx: Context<'gc>,
-    scanner: Scanner<'gc>,
+    scanner: Peekable<Scanner<'gc>>,
     current: Token<'gc>,
     previous: Token<'gc>,
     previous_expr: Option<Expr<'gc>>,
@@ -34,7 +34,7 @@ impl<'gc> Parser<'gc> {
     pub fn new(ctx: Context<'gc>, source: &'gc str) -> Self {
         Parser {
             ctx,
-            scanner: Scanner::new(source),
+            scanner: Scanner::new(source).peekable(),
             current: Token::default(),
             previous: Token::default(),
             previous_expr: None,
@@ -64,6 +64,10 @@ impl<'gc> Parser<'gc> {
         }
     }
 
+    fn peek_next(&mut self) -> Option<Token<'gc>> {
+        self.scanner.peek().copied()
+    }
+
     fn parse_type(&mut self) -> Token<'gc> {
         if !self.check(TokenType::Identifier) {
             self.error_at_current("Invalid type annotation.");
@@ -71,6 +75,51 @@ impl<'gc> Parser<'gc> {
         // Parse either builtin type or custom type (identifier)
         self.advance();
         self.previous
+    }
+
+    fn parse_literal(&mut self) -> Option<Option<Expr<'gc>>> {
+        let expr = match self.current.kind {
+            TokenType::Number => {
+                self.match_token(TokenType::Number);
+                Some(Expr::Literal {
+                    value: Literal::Number(self.previous.lexeme.parse().unwrap()),
+                    line: self.previous.line,
+                })
+            }
+            TokenType::String => {
+                self.match_token(TokenType::String);
+                Some(Expr::Literal {
+                    value: Literal::String(
+                        self.ctx
+                            .intern(self.previous.lexeme.trim_matches('"').as_bytes()),
+                    ),
+                    line: self.previous.line,
+                })
+            }
+            TokenType::True => {
+                self.match_token(TokenType::True);
+                Some(Expr::Literal {
+                    value: Literal::Boolean(true),
+                    line: self.previous.line,
+                })
+            }
+            TokenType::False => {
+                self.match_token(TokenType::False);
+                Some(Expr::Literal {
+                    value: Literal::Boolean(false),
+                    line: self.previous.line,
+                })
+            }
+            TokenType::Nil => {
+                self.match_token(TokenType::Nil);
+                Some(Expr::Literal {
+                    value: Literal::Nil,
+                    line: self.previous.line,
+                })
+            }
+            _ => None,
+        };
+        Some(expr)
     }
 
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
@@ -285,13 +334,33 @@ impl<'gc> Parser<'gc> {
             let param_name = self.previous;
 
             // Parse parameter type annotation
-            if self.check(TokenType::Colon) {
-                self.consume(TokenType::Colon, "Expect ':' after parameter name.");
-                let param_type = self.parse_type();
-                params.insert(param_name, Some(param_type));
+            let type_hint = if self.match_token(TokenType::Colon) {
+                Some(self.parse_type())
             } else {
-                params.insert(param_name, None);
-            }
+                None
+            };
+
+            // Parse default value if present - must be a literal
+            let default_value = if self.match_token(TokenType::Equal) {
+                match self.parse_literal()? {
+                    Some(expr) => Some(expr),
+                    None => {
+                        self.error("Default value must be a literal.");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            params.insert(
+                param_name,
+                Parameter {
+                    name: param_name,
+                    type_hint,
+                    default_value,
+                },
+            );
 
             if !self.match_token(TokenType::Comma) {
                 break;
@@ -585,23 +654,42 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn argument_list(&mut self) -> Option<Vec<Expr<'gc>>> {
+    fn argument_list(&mut self) -> Option<(Vec<Expr<'gc>>, HashMap<String, Expr<'gc>>)> {
         let mut arguments = Vec::new();
+        let mut keyword_args = HashMap::new();
 
         if !self.check(TokenType::CloseParen) {
             loop {
-                arguments.push(self.expression()?);
-                if arguments.len() > 255 {
+                if self.check(TokenType::Identifier)
+                    && matches!(self.peek_next(), Some(t) if t.kind == TokenType::Equal)
+                {
+                    self.advance();
+                    let name = self.previous;
+                    self.advance(); // consume '='
+                    let value = self.expression()?;
+                    if !arguments.is_empty() {
+                        self.error("Positional arguments must come before keyword arguments.");
+                    }
+                    keyword_args.insert(name.lexeme.to_string(), value);
+                } else {
+                    if !keyword_args.is_empty() {
+                        self.error("Positional arguments must come before keyword arguments.");
+                    }
+                    arguments.push(self.expression()?);
+                }
+
+                if arguments.len() + keyword_args.len() > 255 {
                     self.error("Can't have more than 255 arguments.");
                     break;
                 }
+
                 if !self.match_token(TokenType::Comma) {
                     break;
                 }
             }
         }
 
-        Some(arguments)
+        Some((arguments, keyword_args))
     }
 
     fn array(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -626,12 +714,13 @@ impl<'gc> Parser<'gc> {
     fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let callee = Box::new(self.previous_expr.take()?);
 
-        let arguments = self.argument_list()?;
+        let (arguments, keyword_args) = self.argument_list()?;
         self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
         Some(Expr::Call {
             callee,
             arguments,
+            keyword_args,
             line: self.previous.line,
         })
     }
@@ -650,13 +739,14 @@ impl<'gc> Parser<'gc> {
                 line: self.previous.line,
             })
         } else if self.match_token(TokenType::OpenParen) {
-            let arguments = self.argument_list()?;
+            let (arguments, keyword_args) = self.argument_list()?;
             self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
             Some(Expr::Invoke {
                 object,
                 method: name,
                 arguments,
+                keyword_args,
                 line: self.previous.line,
             })
         } else {
@@ -699,18 +789,18 @@ impl<'gc> Parser<'gc> {
         let method = self.previous;
 
         if self.match_token(TokenType::OpenParen) {
-            let arguments = self.argument_list()?;
+            let (arguments, keyword_args) = self.argument_list()?;
             self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
             Some(Expr::SuperInvoke {
                 method,
                 arguments,
+                keyword_args,
                 line: keyword.line,
             })
         } else {
             Some(Expr::Super {
                 method,
-                arguments: Vec::new(),
                 line: keyword.line,
             })
         }
@@ -1006,8 +1096,8 @@ mod tests {
             assert_eq!(mangled_name, "script$test2");
             assert_eq!(doc, &None);
             assert_eq!(params.len(), 2);
-            assert_eq!(params[0].unwrap().lexeme, "int");
-            assert_eq!(params[1].unwrap().lexeme, "int");
+            assert_eq!(params[0].type_hint.unwrap().lexeme, "int");
+            assert_eq!(params[1].type_hint.unwrap().lexeme, "int");
             assert_eq!(return_type.unwrap().lexeme, "int");
 
             let Stmt::Function {
@@ -1025,8 +1115,8 @@ mod tests {
             assert_eq!(mangled_name, "script$test3");
             assert_eq!(doc, &None);
             assert_eq!(params.len(), 2);
-            assert_eq!(params[0], None);
-            assert_eq!(params[1], None);
+            assert_eq!(params[0].type_hint, None);
+            assert_eq!(params[1].type_hint, None);
             assert_eq!(return_type.unwrap().lexeme, "int");
         });
     }
