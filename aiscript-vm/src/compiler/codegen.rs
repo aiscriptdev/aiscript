@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::{
-    ast::{Expr, FnDef, Literal, Program, Stmt},
+    ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
     lexer::{Token, TokenType},
     ty::{Type, TypeResolver},
 };
@@ -496,18 +496,27 @@ impl<'gc> CodeGen<'gc> {
                 self.named_variable(name, true)?;
             }
             Expr::Call {
-                callee, arguments, ..
+                callee,
+                arguments,
+                keyword_args,
+                ..
             } => {
                 self.generate_expr(callee)?;
                 for arg in arguments {
                     self.generate_expr(arg)?;
                 }
-                self.emit(OpCode::Call(arguments.len() as u8));
+                // Create and emit constants for the keyword names
+                self.generate_keyword_args(keyword_args)?;
+                self.emit(OpCode::Call(
+                    arguments.len() as u8,
+                    keyword_args.len() as u8,
+                ));
             }
             Expr::Invoke {
                 object,
                 method,
                 arguments,
+                keyword_args,
                 ..
             } => {
                 self.generate_expr(object)?;
@@ -515,7 +524,12 @@ impl<'gc> CodeGen<'gc> {
                 for arg in arguments {
                     self.generate_expr(arg)?;
                 }
-                self.emit(OpCode::Invoke(method_constant as u8, arguments.len() as u8));
+                self.generate_keyword_args(keyword_args)?;
+                self.emit(OpCode::Invoke(
+                    method_constant as u8,
+                    arguments.len() as u8,
+                    keyword_args.len() as u8,
+                ));
             }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
@@ -536,16 +550,9 @@ impl<'gc> CodeGen<'gc> {
             Expr::This { .. } => {
                 self.named_variable(&Token::new(TokenType::This, "this", 0), false)?;
             }
-            Expr::Super {
-                method, arguments, ..
-            } => {
+            Expr::Super { method, .. } => {
                 // Get the receiver ('this')
                 self.emit(OpCode::GetLocal(0));
-
-                // Generate arguments
-                for arg in arguments {
-                    self.generate_expr(arg)?;
-                }
 
                 // Look up 'super' in upvalues
                 let method_constant = self.identifier_constant(method.lexeme);
@@ -564,7 +571,10 @@ impl<'gc> CodeGen<'gc> {
                 self.emit(OpCode::GetSuper(method_constant as u8));
             }
             Expr::SuperInvoke {
-                method, arguments, ..
+                method,
+                arguments,
+                keyword_args,
+                ..
             } => {
                 // Get this instance
                 self.emit(OpCode::GetLocal(0));
@@ -573,6 +583,7 @@ impl<'gc> CodeGen<'gc> {
                 for arg in arguments {
                     self.generate_expr(arg)?;
                 }
+                self.generate_keyword_args(keyword_args)?;
 
                 // Get superclass and invoke method
                 if let Some((pos, _)) = self
@@ -588,6 +599,7 @@ impl<'gc> CodeGen<'gc> {
                 self.emit(OpCode::SuperInvoke(
                     method_constant as u8,
                     arguments.len() as u8,
+                    keyword_args.len() as u8,
                 ));
             }
             Expr::And { left, right, .. } => {
@@ -615,7 +627,17 @@ impl<'gc> CodeGen<'gc> {
         Ok(())
     }
 
-    // Helper methods for emitting bytecode and managing functions will continue in the next part...
+    fn generate_keyword_args(
+        &mut self,
+        keyword_args: &HashMap<String, Expr<'gc>>,
+    ) -> Result<(), VmError> {
+        for (name, value) in keyword_args {
+            let name_constant = self.identifier_constant(name);
+            self.emit(OpCode::Constant(name_constant as u8));
+            self.generate_expr(value)?;
+        }
+        Ok(())
+    }
 }
 
 impl<'gc> CodeGen<'gc> {
@@ -623,14 +645,14 @@ impl<'gc> CodeGen<'gc> {
         &mut self,
         name: &'gc str,
         mangle_name: String,
-        params: &IndexMap<Token<'gc>, Option<Token<'gc>>>,
+        params: &IndexMap<Token<'gc>, Parameter<'gc>>,
         return_type: &Option<Token<'gc>>,
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
     ) -> Result<usize, VmError> {
         // Validate parameter types
-        for (param_token, param_type) in params {
-            if let Some(param_type) = param_type.as_ref().copied() {
+        for (param_token, param) in params {
+            if let Some(param_type) = param.type_hint.as_ref().copied() {
                 let ty = Type::from_token(param_type);
                 if let Err(err) = self.type_resolver.validate_type(ty) {
                     self.error_at(
@@ -660,11 +682,32 @@ impl<'gc> CodeGen<'gc> {
 
         self.begin_scope();
 
-        // Compile parameters
-        self.function.arity = params.len() as u8;
-        for param in params.keys() {
-            self.declare_variable(*param);
+        // Store parameter count and default value count
+        let param_count = params.len();
+        let default_count = params
+            .values()
+            .filter(|p| p.default_value.is_some())
+            .count();
+        self.function.arity = (param_count - default_count) as u8;
+        self.function.max_arity = param_count as u8;
+
+        // Compile parameters and their default values
+        for param in params.values() {
+            self.declare_variable(param.name);
             self.mark_initialized();
+
+            // Store default value if present
+            if let Some(Expr::Literal { value, .. }) = &param.default_value {
+                let constant = self.make_constant(Value::from(value));
+                self.function
+                    .default_values
+                    .insert(param.name.lexeme.to_string(), constant);
+            }
+        }
+
+        // Store parameter names for keyword argument lookup
+        for param in params.keys() {
+            self.function.param_names.push(param.lexeme.to_string());
         }
 
         // Compile function body

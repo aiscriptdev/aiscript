@@ -35,8 +35,8 @@ pub enum OpCode {
     JumpIfFalse(u16),
     Jump(u16),
     Loop(u16),
-    Call(u8),
-    Closure(u8), // chunk id
+    Call(u8, u8), // positional_count, keyword_count
+    Closure(u8),  // chunk id
     GetUpvalue(u8),
     SetUpvalue(u8),
     CloseUpvalue,
@@ -44,10 +44,10 @@ pub enum OpCode {
     SetProperty(u8),
     GetProperty(u8),
     Method(u8),
-    Invoke(u8, u8),
+    Invoke(u8, u8, u8), // method_constant, positional_count, keyword_count
     Inherit,
     GetSuper(u8),
-    SuperInvoke(u8, u8),
+    SuperInvoke(u8, u8, u8), // method_constant, positional_count, keyword_count
     // AI
     Prompt,
     Agent(u8), // constant index
@@ -188,7 +188,7 @@ impl<'gc> Chunk<'gc> {
                 }
                 OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
                 OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
-                OpCode::Call(arity) => self.byte_instruction("CALL", arity),
+                OpCode::Call(arity, _) => self.byte_instruction("CALL", arity),
                 OpCode::Closure(c) => {
                     // let mut offset = offset + 1;
                     // let constant = self.code[offset] as usize;
@@ -214,10 +214,10 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SetProperty(c) => self.constant_instruction("SET_PROPERTY", c),
                 OpCode::GetProperty(c) => self.constant_instruction("GET_PROPERTY", c),
                 OpCode::Method(c) => self.constant_instruction("METHOD", c),
-                OpCode::Invoke(name, arity) => self.invoke_instruction("INVOKE", name, arity),
+                OpCode::Invoke(name, arity, _) => self.invoke_instruction("INVOKE", name, arity),
                 OpCode::Inherit => simple_instruction("INHERIT"),
                 OpCode::GetSuper(c) => self.constant_instruction("GET_SUPER", c),
-                OpCode::SuperInvoke(name, arity) => {
+                OpCode::SuperInvoke(name, arity, _) => {
                     self.invoke_instruction("SUPER_INVOKE", name, arity)
                 }
                 OpCode::Prompt => simple_instruction("PROMPT"),

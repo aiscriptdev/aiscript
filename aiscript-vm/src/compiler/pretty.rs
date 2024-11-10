@@ -143,6 +143,7 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
                 callee,
                 arguments,
                 line,
+                ..
             } => {
                 writeln!(f, "{indent}Call [line {line}]")?;
                 write!(f, "{}Callee: ", "  ".repeat(self.indent + 1))?;
@@ -158,6 +159,7 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
                 method,
                 arguments,
                 line,
+                ..
             } => {
                 writeln!(f, "{indent}Invoke [line {line}]")?;
                 write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;
@@ -191,23 +193,16 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
             Expr::This { line } => {
                 writeln!(f, "{indent}This [line {line}]")
             }
-            Expr::Super {
-                method,
-                arguments,
-                line,
-            } => {
+            Expr::Super { method, line } => {
                 writeln!(f, "{indent}Super [line {line}]")?;
                 writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
-                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
-                for arg in arguments {
-                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
-                }
                 Ok(())
             }
             Expr::SuperInvoke {
                 method,
                 arguments,
                 line,
+                ..
             } => {
                 writeln!(f, "{indent}SuperInvoke [line {line}]")?;
                 writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
