@@ -667,9 +667,6 @@ impl<'gc> Parser<'gc> {
                     let name = self.previous;
                     self.advance(); // consume '='
                     let value = self.expression()?;
-                    if !arguments.is_empty() {
-                        self.error("Positional arguments must come before keyword arguments.");
-                    }
                     keyword_args.insert(name.lexeme.to_string(), value);
                 } else {
                     if !keyword_args.is_empty() {

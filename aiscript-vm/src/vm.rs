@@ -168,7 +168,7 @@ impl<'gc> State<'gc> {
         for param in params {
             self.push_stack(param);
         }
-        self.call(closure, function.arity)
+        self.call(closure, function.arity, 0)
     }
 }
 
@@ -411,8 +411,13 @@ impl<'gc> State<'gc> {
             OpCode::Loop(offset) => {
                 frame.ip -= offset as usize;
             }
-            OpCode::Call(arg_count, keyword_args_count) => {
-                self.call_value(*self.peek(arg_count as usize), arg_count)?;
+            OpCode::Call(args_count, keyword_args_count) => {
+                // *2 because each keyword arg has name and value
+                // Get the actual function from the correct stack position
+                // Need to peek past all args (both positional and keyword) to get to the function
+                let total_args = args_count + keyword_args_count * 2;
+                let callee = *self.peek(total_args as usize);
+                self.call_value(callee, args_count, keyword_args_count)?;
             }
             OpCode::Closure(chunk_id) => {
                 let function = self.get_chunk(chunk_id as usize)?;
@@ -509,7 +514,7 @@ impl<'gc> State<'gc> {
             }
             OpCode::Invoke(byte, arg_count, keyword_args_count) => {
                 let method_name = frame.read_constant(byte).as_string().unwrap();
-                self.invoke(method_name, arg_count)?;
+                self.invoke(method_name, arg_count, keyword_args_count)?;
             }
             OpCode::Inherit => {
                 if let Value::Class(superclass) = self.peek(1) {
@@ -531,7 +536,7 @@ impl<'gc> State<'gc> {
             OpCode::SuperInvoke(byte, arg_count, keyword_args_count) => {
                 let method_name = frame.read_constant(byte).as_string().unwrap();
                 let superclass = self.pop_stack().as_class()?;
-                self.invoke_from_class(superclass, method_name, arg_count)?;
+                self.invoke_from_class(superclass, method_name, arg_count, keyword_args_count)?;
             }
             OpCode::Prompt => {
                 let message = self.pop_stack().as_string().unwrap().to_string();
@@ -674,7 +679,13 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) -> Result<(), VmError> {
+    fn call_value(
+        &mut self,
+        callee: Value<'gc>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<(), VmError> {
+        let total_args = args_count + keyword_args_count * 2;
         match callee {
             Value::BoundMethod(bound) => {
                 // inserts the receiver into the new CallFrame's slot zero.
@@ -696,34 +707,40 @@ impl<'gc> State<'gc> {
                        +-------------------------------+
                            topping Callframe
                 */
-                self.stack[self.stack_top - arg_count as usize - 1] = bound.receiver;
-                return self.call(bound.method, arg_count);
+                self.stack[self.stack_top - total_args as usize - 1] = bound.receiver;
+                self.call(bound.method, args_count, keyword_args_count)
             }
             Value::Class(class) => {
                 let instance = Instance::new(class);
-                self.stack[self.stack_top - arg_count as usize - 1] =
+                self.stack[self.stack_top - total_args as usize - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
                 let init = self.intern_static("init");
+
                 if let Some(initializer) = class.borrow().methods.get(&init) {
-                    return self.call(initializer.as_closure()?, arg_count);
-                } else if arg_count != 0 {
-                    return Err(self.runtime_error(
-                        format!("Expected 0 arguments but got {}.", arg_count).into(),
-                    ));
+                    self.call(initializer.as_closure()?, args_count, keyword_args_count)
+                } else if total_args != 0 {
+                    Err(self.runtime_error(
+                        format!("Expected 0 arguments but got {}.", total_args).into(),
+                    ))
+                } else {
+                    Ok(())
                 }
             }
-            Value::Closure(closure) => return self.call(closure, arg_count),
+            Value::Closure(closure) => self.call(closure, args_count, keyword_args_count),
             Value::NativeFunction(function) => {
-                let result = function(self.pop_stack_n(arg_count as usize));
-                // Stack should be restored after native function called
-                self.stack_top -= 1;
+                // Native functions don't support keyword args yet
+                if keyword_args_count > 0 {
+                    return Err(self.runtime_error(
+                        "Native functions don't support keyword arguments.".into(),
+                    ));
+                }
+                let result = function(self.pop_stack_n(args_count as usize));
+                self.stack_top -= 1; // Remove the function
                 self.push_stack(result);
+                Ok(())
             }
-            _ => {
-                return Err(self.runtime_error("Can only call functions and classes.".into()));
-            }
+            _ => Err(self.runtime_error("Can only call functions and classes.".into())),
         }
-        Ok(())
     }
 
     fn invoke_from_class(
@@ -731,22 +748,29 @@ impl<'gc> State<'gc> {
         class: GcRefLock<'gc, Class<'gc>>,
         name: InternedString<'gc>,
         arg_count: u8,
+        keyword_args_count: u8,
     ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
-            self.call(method.as_closure()?, arg_count)
+            self.call(method.as_closure()?, arg_count, keyword_args_count)
         } else {
             Err(self.runtime_error(format!("Undefined property '{}'.", name).into()))
         }
     }
 
-    fn invoke(&mut self, name: InternedString<'gc>, arg_count: u8) -> Result<(), VmError> {
+    fn invoke(
+        &mut self,
+        name: InternedString<'gc>,
+        arg_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<(), VmError> {
         let receiver = *self.peek(arg_count as usize);
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
-                self.stack[self.stack_top - arg_count as usize - 1] = *value;
-                self.call_value(*value, arg_count)
+                self.stack[self.stack_top - (arg_count + keyword_args_count * 2) as usize - 1] =
+                    *value;
+                self.call_value(*value, arg_count, keyword_args_count)
             } else {
-                self.invoke_from_class(instance.borrow().class, name, arg_count)
+                self.invoke_from_class(instance.borrow().class, name, arg_count, keyword_args_count)
             }
         } else if let Value::Agent(agent) = receiver {
             if name == "run" {
@@ -763,33 +787,134 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) -> Result<(), VmError> {
+    fn call(
+        &mut self,
+        closure: Gc<'gc, Closure<'gc>>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<(), VmError> {
         #[cfg(feature = "debug")]
         closure.function.disassemble("fn");
-        if arg_count != closure.function.arity {
+        if args_count != closure.function.arity
+            && closure.function.arity == closure.function.max_arity
+        {
+            // No keyword arguments, simply compare the positional arguments number
             return Err(self.runtime_error(
                 format!(
                     "Expected {} arguments but got {}.",
-                    closure.function.arity, arg_count
+                    closure.function.arity, args_count
                 )
                 .into(),
             ));
         }
+
         if self.frame_count == FRAME_MAX_SIZE {
             return Err(self.runtime_error("Stack overflow.".into()));
         }
 
+        let function = closure.function;
+
+        let stack_start = self.stack_top - (args_count + keyword_args_count * 2) as usize - 1;
+        let positional_args_end = stack_start + args_count as usize + 1;
+
+        // Create array to hold final argument values
+        let mut final_args = vec![Value::Nil; function.max_arity as usize];
+
+        // Fill in positional arguments
+        for (i, value) in self.stack[stack_start + 1..positional_args_end]
+            .iter()
+            .enumerate()
+        {
+            final_args[i] = *value;
+        }
+
+        // Track actual argument count (positions that will be filled)
+        let mut total_args_provided = args_count;
+        // Process keyword arguments
+        if keyword_args_count > 0 {
+            for i in 0..keyword_args_count {
+                let idx = positional_args_end + (i * 2) as usize;
+                let name = self.stack[idx].as_string().map_err(|_| {
+                    self.runtime_error("Keyword argument name must be a string.".into())
+                })?;
+                let value = self.stack[idx + 1];
+
+                // Find parameter position by name
+                if let Some(pos) = function
+                    .param_names
+                    .iter()
+                    .position(|p| p.as_bytes() == name.as_bytes())
+                {
+                    if pos < args_count as usize {
+                        return Err(self.runtime_error(
+                            format!("Keyword argument '{}' was already specified as positional argument.", name).into()
+                        ));
+                    }
+                    final_args[pos] = value;
+                    // Only increment if this position wasn't already filled
+                    if total_args_provided <= pos as u8 {
+                        total_args_provided = pos as u8 + 1;
+                    }
+                } else {
+                    return Err(
+                        self.runtime_error(format!("Unknown keyword argument '{}'.", name).into())
+                    );
+                }
+            }
+        }
+
+        if total_args_provided < function.arity {
+            return Err(self.runtime_error(
+                format!(
+                    "Expected {} arguments but got {}.",
+                    function.arity, args_count
+                )
+                .into(),
+            ));
+        }
+
+        if total_args_provided > function.max_arity {
+            return Err(self.runtime_error(
+                format!(
+                    "Expected {} arguments but got {}.",
+                    function.max_arity, args_count
+                )
+                .into(),
+            ));
+        }
+
+        // Fill in default values for unspecified parameters
+        for (i, value) in final_args.iter_mut().enumerate() {
+            if value.equals(&Value::Nil) {
+                if let Some(param_name) = function.param_names.get(i) {
+                    if let Some(&default_const) = function.default_values.get(param_name) {
+                        *value = function.read_constant(default_const as u8);
+                    } else if i < function.arity as usize {
+                        return Err(self.runtime_error(
+                            format!("Missing required argument '{}'.", param_name).into(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Restore stack and push final arguments
+        self.stack_top = stack_start + 1; // Keep the callee
+        for arg in final_args {
+            self.push_stack(arg);
+        }
+
+        // Create the call frame
         let call_frame = CallFrame {
             closure,
             ip: 0,
-            slot_start: self.stack_top - arg_count as usize - 1,
+            slot_start: self.stack_top - function.max_arity as usize - 1,
         };
-        // self.frames[self.frame_count] = call_frame;
         self.frames.push(call_frame);
         self.frame_count += 1;
+
         Ok(())
     }
-
     #[inline]
     fn stack_get(&mut self, index: usize) -> Value<'gc> {
         unsafe { *self.stack.get_unchecked(index) }

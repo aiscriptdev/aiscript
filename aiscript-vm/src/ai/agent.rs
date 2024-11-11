@@ -228,9 +228,9 @@ pub async fn _run_agent<'gc>(
         #[cfg(feature = "debug")]
         println!("chat completion request: {:?}", req);
         let result = client.chat_completion(req).await.unwrap();
+        let response = &result.choices[0].message;
         #[cfg(feature = "debug")]
         println!("chat completion response: {:?}", response);
-        let response = &result.choices[0].message;
         history.push(convert_chat_response_message(response.clone()));
         if response.tool_calls.is_none() {
             return response.content.clone().unwrap_or_default();

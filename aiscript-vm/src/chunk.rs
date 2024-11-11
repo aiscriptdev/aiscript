@@ -188,7 +188,9 @@ impl<'gc> Chunk<'gc> {
                 }
                 OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
                 OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
-                OpCode::Call(arity, _) => self.byte_instruction("CALL", arity),
+                OpCode::Call(arity, kw_args) => {
+                    println!("{:-16} {:4} {:4}", "OP_CALL", arity, kw_args);
+                }
                 OpCode::Closure(c) => {
                     // let mut offset = offset + 1;
                     // let constant = self.code[offset] as usize;
