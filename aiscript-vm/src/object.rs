@@ -42,6 +42,8 @@ pub struct Function<'gc> {
     pub max_arity: u8,
     pub param_names: Vec<String>,
     // <param_name, constant_index>
+    // TODO: change const_index to Value?
+    // Change to InternedString
     pub default_values: HashMap<String, usize>, 
     pub chunk: Chunk<'gc>,
     pub name: Option<InternedString<'gc>>,
