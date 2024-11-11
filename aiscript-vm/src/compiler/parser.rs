@@ -322,6 +322,7 @@ impl<'gc> Parser<'gc> {
         // IndexMap is ordered by insertion order,
         // which is matter for function call
         let mut params = IndexMap::new();
+        let mut keyword_args_count = 0;
         loop {
             if self.check(TokenType::CloseParen) {
                 break;
@@ -343,13 +344,19 @@ impl<'gc> Parser<'gc> {
             // Parse default value if present - must be a literal
             let default_value = if self.match_token(TokenType::Equal) {
                 match self.parse_literal()? {
-                    Some(expr) => Some(expr),
+                    Some(expr) => {
+                        keyword_args_count += 1;
+                        Some(expr)
+                    }
                     None => {
                         self.error("Default value must be a literal.");
                         None
                     }
                 }
             } else {
+                if keyword_args_count > 0 {
+                    self.error("Positional parameter must come before parameter with a default.");
+                }
                 None
             };
 

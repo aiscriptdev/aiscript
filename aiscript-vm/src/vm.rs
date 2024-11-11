@@ -863,26 +863,6 @@ impl<'gc> State<'gc> {
             }
         }
 
-        if total_args_provided < function.arity {
-            return Err(self.runtime_error(
-                format!(
-                    "Expected {} arguments but got {}.",
-                    function.arity, args_count
-                )
-                .into(),
-            ));
-        }
-
-        if total_args_provided > function.max_arity {
-            return Err(self.runtime_error(
-                format!(
-                    "Expected {} arguments but got {}.",
-                    function.max_arity, args_count
-                )
-                .into(),
-            ));
-        }
-
         // Fill in default values for unspecified parameters
         for (i, value) in final_args.iter_mut().enumerate() {
             if value.equals(&Value::Nil) {
