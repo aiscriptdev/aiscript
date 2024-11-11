@@ -1,0 +1,6 @@
+fn test(a, b = "b", c: str = "c") {
+    print a + b + c;
+}
+
+test(b="bb", "a"); // Error at ',': Positional arguments must come before keyword arguments.
+test("a", b="bb", "cc"); // Error at ',': Positional arguments must come before keyword arguments.
