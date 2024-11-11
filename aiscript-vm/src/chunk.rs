@@ -108,6 +108,11 @@ impl<'gc> Chunk<'gc> {
         }
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.code.shrink_to_fit();
+        self.constans.shrink_to_fit();
+    }
+
     pub fn line(&self, offset: usize) -> u32 {
         self.lines[offset]
     }

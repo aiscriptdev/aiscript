@@ -793,16 +793,16 @@ impl<'gc> State<'gc> {
         args_count: u8,
         keyword_args_count: u8,
     ) -> Result<(), VmError> {
+        let function = closure.function;
+
         #[cfg(feature = "debug")]
-        closure.function.disassemble("fn");
-        if args_count != closure.function.arity
-            && closure.function.arity == closure.function.max_arity
-        {
+        function.disassemble("fn");
+        if args_count != function.arity && function.arity == function.max_arity {
             // No keyword arguments, simply compare the positional arguments number
             return Err(self.runtime_error(
                 format!(
                     "Expected {} arguments but got {}.",
-                    closure.function.arity, args_count
+                    function.arity, args_count
                 )
                 .into(),
             ));
@@ -811,8 +811,6 @@ impl<'gc> State<'gc> {
         if self.frame_count == FRAME_MAX_SIZE {
             return Err(self.runtime_error("Stack overflow.".into()));
         }
-
-        let function = closure.function;
 
         let stack_start = self.stack_top - (args_count + keyword_args_count * 2) as usize - 1;
         let positional_args_end = stack_start + args_count as usize + 1;
@@ -828,8 +826,6 @@ impl<'gc> State<'gc> {
             final_args[i] = *value;
         }
 
-        // Track actual argument count (positions that will be filled)
-        let mut total_args_provided = args_count;
         // Process keyword arguments
         if keyword_args_count > 0 {
             for i in 0..keyword_args_count {
@@ -840,21 +836,13 @@ impl<'gc> State<'gc> {
                 let value = self.stack[idx + 1];
 
                 // Find parameter position by name
-                if let Some(pos) = function
-                    .param_names
-                    .iter()
-                    .position(|p| p.as_bytes() == name.as_bytes())
-                {
-                    if pos < args_count as usize {
+                if let Some((pos, _)) = function.params.get(&name).copied() {
+                    if pos < args_count {
                         return Err(self.runtime_error(
                             format!("Keyword argument '{}' was already specified as positional argument.", name).into()
                         ));
                     }
-                    final_args[pos] = value;
-                    // Only increment if this position wasn't already filled
-                    if total_args_provided <= pos as u8 {
-                        total_args_provided = pos as u8 + 1;
-                    }
+                    final_args[pos as usize] = value;
                 } else {
                     return Err(
                         self.runtime_error(format!("Unknown keyword argument '{}'.", name).into())
@@ -866,13 +854,17 @@ impl<'gc> State<'gc> {
         // Fill in default values for unspecified parameters
         for (i, value) in final_args.iter_mut().enumerate() {
             if value.equals(&Value::Nil) {
-                if let Some(param_name) = function.param_names.get(i) {
-                    if let Some(&default_const) = function.default_values.get(param_name) {
-                        *value = function.read_constant(default_const as u8);
-                    } else if i < function.arity as usize {
+                if let Some((param_name, (_, v))) = function
+                    .params
+                    .iter()
+                    .find(|(_, (index, _))| *index as usize == i)
+                {
+                    if v.is_nil() && i < function.arity as usize {
                         return Err(self.runtime_error(
-                            format!("Missing required argument '{}'.", param_name).into(),
+                            format!("Missing required argument '{}'.", *param_name).into(),
                         ));
+                    } else {
+                        *value = *v;
                     }
                 }
             }

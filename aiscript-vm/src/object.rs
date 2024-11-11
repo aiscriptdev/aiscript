@@ -40,11 +40,8 @@ pub struct Closure<'gc> {
 pub struct Function<'gc> {
     pub arity: u8,
     pub max_arity: u8,
-    pub param_names: Vec<String>,
-    // <param_name, constant_index>
-    // TODO: change const_index to Value?
-    // Change to InternedString
-    pub default_values: HashMap<String, usize>, 
+    // <name, (parameter order index, default value)>
+    pub params: HashMap<InternedString<'gc>, (u8, Value<'gc>)>,
     pub chunk: Chunk<'gc>,
     pub name: Option<InternedString<'gc>>,
     pub upvalues: Vec<Upvalue>,
@@ -151,12 +148,17 @@ impl<'gc> Function<'gc> {
         Self {
             arity,
             max_arity: arity,
-            param_names: Vec::new(),
-            default_values: HashMap::new(),
+            params: HashMap::new(),
             chunk: Chunk::new(),
             name: Some(name),
             upvalues: Vec::new(),
         }
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.params.shrink_to_fit();
+        self.chunk.shrink_to_fit();
+        self.upvalues.shrink_to_fit();
     }
 }
 

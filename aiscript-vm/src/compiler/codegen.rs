@@ -692,22 +692,19 @@ impl<'gc> CodeGen<'gc> {
         self.function.max_arity = param_count as u8;
 
         // Compile parameters and their default values
-        for param in params.values() {
+        for (index, param) in params.values().enumerate() {
             self.declare_variable(param.name);
             self.mark_initialized();
 
+            let name = self.ctx.intern(param.name.lexeme.as_bytes());
             // Store default value if present
             if let Some(Expr::Literal { value, .. }) = &param.default_value {
-                let constant = self.make_constant(Value::from(value));
                 self.function
-                    .default_values
-                    .insert(param.name.lexeme.to_string(), constant);
+                    .params
+                    .insert(name, (index as u8, Value::from(value)));
+            } else {
+                self.function.params.insert(name, (index as u8, Value::Nil));
             }
-        }
-
-        // Store parameter names for keyword argument lookup
-        for param in params.keys() {
-            self.function.param_names.push(param.lexeme.to_string());
         }
 
         // Compile function body
@@ -723,6 +720,7 @@ impl<'gc> CodeGen<'gc> {
         }
         let mut chunk_id = 0;
         if let Some(mut enclosing) = self.enclosing.take() {
+            self.function.shrink_to_fit();
             let function = mem::take(&mut self.function);
             chunk_id = self
                 .named_id_map
