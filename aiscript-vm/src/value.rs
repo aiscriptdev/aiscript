@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use gc_arena::{lock::GcRefLock, Collect, Gc};
 
@@ -262,7 +262,7 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
             Value::Boolean(value) => ReturnValue::Boolean(value),
             Value::String(value) => ReturnValue::String(value.to_string()),
             Value::Instance(instance) => {
-                let mut map = std::collections::HashMap::new();
+                let mut map = HashMap::new();
                 for (key, value) in &instance.borrow().fields {
                     let v = match value {
                         Value::Number(n) => (*n).into(),
