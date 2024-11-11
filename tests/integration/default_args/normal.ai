@@ -1,0 +1,18 @@
+fn test(a, b = "b", c: str = "c") {
+    print a + b + c;
+}
+
+test("a"); // expect: abc
+test("a", "b"); // expect: abc
+test("a", "b", "c"); // expect: abc
+test("a", "bb"); // expect: abbc
+test("a", b="bb"); // expect: abbc
+test(a="a", c="cc"); // expect: abcc
+test("a", b="bb", c="cc"); // expect: abbcc
+test("a", c="cc"); // expect: abcc
+test(a="aa", b="bb", c="cc"); // expect: aabbcc
+test(b="bb", a="aa", c="cc"); // expect: aabbcc
+test(b="bb", c="cc", a="aa"); // expect: aabbcc
+test(c="cc", b="bb", a="aa"); // expect: aabbcc
+test(c="cc", a="aa", b="bb"); // expect: aabbcc
+test(c="cc", a="aa", b="bb"); // expect: aabbcc
