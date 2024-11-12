@@ -9,7 +9,7 @@ use gc_arena::Collect;
 use crate::Value;
 
 #[derive(Copy, Clone, Debug, Collect)]
-#[collect(no_drop)]
+#[collect(require_static)]
 pub enum OpCode {
     Constant(u8),
     Return,
@@ -73,8 +73,10 @@ impl OpCode {
 #[derive(Clone, Debug, Collect)]
 #[collect[no_drop]]
 pub struct Chunk<'gc> {
+    #[collect(require_static)]
     pub code: Vec<OpCode>,
     constans: Vec<Value<'gc>>,
+    #[collect(require_static)]
     lines: Vec<u32>,
 }
 
