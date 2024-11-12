@@ -20,6 +20,8 @@ pub struct Parser<'gc> {
     fn_type: FunctionType,
     class_compiler: Option<Box<ClassCompiler>>,
     scopes: Vec<String>,
+    // track if we're inside a loop
+    loop_depth: usize,
     had_error: bool,
     panic_mode: bool,
 }
@@ -41,6 +43,7 @@ impl<'gc> Parser<'gc> {
             fn_type: FunctionType::Script,
             class_compiler: None,
             scopes: Vec::new(),
+            loop_depth: 0,
             had_error: false,
             panic_mode: false,
         }
@@ -162,9 +165,23 @@ impl<'gc> Parser<'gc> {
             self.while_statement()
         } else if self.match_token(TokenType::For) {
             self.for_statement()
+        } else if self.match_token(TokenType::Break) {
+            self.break_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn break_statement(&mut self) -> Option<Stmt<'gc>> {
+        if self.loop_depth == 0 {
+            self.error("Can't use 'break' outside of a loop.");
+            return None;
+        }
+
+        self.consume(TokenType::Semicolon, "Expect ';' after 'break'.");
+        Some(Stmt::Break {
+            line: self.previous.line,
+        })
     }
 
     fn agent_declaration(&mut self) -> Option<Stmt<'gc>> {
@@ -433,8 +450,9 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::OpenParen, "Expect '(' after 'while'.");
         let condition = self.expression()?;
         self.consume(TokenType::CloseParen, "Expect ')' after condition.");
+        self.loop_depth += 1;
         let body = Box::new(self.statement()?);
-
+        self.loop_depth -= 1;
         Some(Stmt::Loop {
             condition,
             body,
@@ -467,7 +485,9 @@ impl<'gc> Parser<'gc> {
         };
         self.consume(TokenType::CloseParen, "Expect ')' after for clauses.");
 
+        self.loop_depth += 1;
         let mut body = self.statement()?;
+        self.loop_depth -= 1;
 
         // Desugar for loop into while loop
         if let Some(increment) = increment {

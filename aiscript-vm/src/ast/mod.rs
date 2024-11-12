@@ -34,11 +34,10 @@ impl<'gc> Parameter<'gc> {
 }
 
 #[derive(Debug, Clone, Collect)]
-#[collect(no_drop)]
+#[collect(require_static)]
 pub struct FnDef {
     pub chunk_id: usize,
     pub doc: String,
-    #[collect(require_static)]
     pub params: IndexMap<String, PrimitiveType>,
 }
 
@@ -194,6 +193,9 @@ pub enum Stmt<'gc> {
         statements: Vec<Stmt<'gc>>,
         line: u32,
     },
+    Break {
+        line: u32,
+    },
     If {
         condition: Expr<'gc>,
         then_branch: Box<Stmt<'gc>>,
@@ -240,6 +242,7 @@ impl<'gc> Stmt<'gc> {
             Self::Expression { line, .. }
             | Self::Print { line, .. }
             | Self::Let { line, .. }
+            | Self::Break { line, .. }
             | Self::Block { line, .. }
             | Self::If { line, .. }
             | Self::Loop { line, .. }

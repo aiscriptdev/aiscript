@@ -5,15 +5,15 @@ use std::{
 };
 
 use crate::{
-    ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
-    lexer::{Token, TokenType},
-    ty::{Type, TypeResolver},
-};
-use crate::{
     ai::Agent,
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
+};
+use crate::{
+    ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
+    lexer::{Token, TokenType},
+    ty::{Type, TypeResolver},
 };
 use gc_arena::Gc;
 use indexmap::IndexMap;
@@ -29,6 +29,11 @@ struct Local<'gc> {
     is_captured: bool,
 }
 
+#[derive(Debug, Default)]
+struct LoopScope {
+    breaks: Vec<usize>,
+}
+
 pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
     chunks: HashMap<usize, Function<'gc>>,
@@ -40,6 +45,7 @@ pub struct CodeGen<'gc> {
     locals: [Local<'gc>; MAX_LOCALS],
     local_count: usize,
     scope_depth: isize,
+    loop_scopes: Vec<LoopScope>,
     enclosing: Option<Box<CodeGen<'gc>>>,
     current_line: u32,
     had_error: bool,
@@ -72,6 +78,7 @@ impl<'gc> CodeGen<'gc> {
             }),
             local_count: 1,
             scope_depth: 0,
+            loop_scopes: Vec::new(),
             enclosing: None,
             current_line: 0,
             had_error: false,
@@ -176,6 +183,18 @@ impl<'gc> CodeGen<'gc> {
     fn generate_stmt(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
         self.current_line = stmt.line();
         match stmt {
+            Stmt::Break { .. } => {
+                if self.loop_scopes.is_empty() {
+                    self.error("Can't use 'break' outside of a loop.");
+                    return Ok(());
+                }
+
+                let exit_jump = self.emit_jump(OpCode::Jump(0));
+                // Get the last scope's index
+                let last_idx = self.loop_scopes.len() - 1;
+                // Add the break jump to the current loop scope
+                self.loop_scopes[last_idx].breaks.push(exit_jump);
+            }
             Stmt::Expression { expression, .. } => {
                 self.generate_expr(expression)?;
                 self.emit(OpCode::Pop);
@@ -231,6 +250,7 @@ impl<'gc> CodeGen<'gc> {
                 condition, body, ..
             } => {
                 let loop_start = self.function.code_size();
+                self.loop_scopes.push(LoopScope::default());
                 self.generate_expr(condition)?;
 
                 let exit_jump = self.emit_jump(OpCode::JumpIfFalse(0));
@@ -240,6 +260,13 @@ impl<'gc> CodeGen<'gc> {
 
                 self.patch_jump(exit_jump);
                 self.emit(OpCode::Pop);
+
+                // Patch all break statements
+                if let Some(scope) = self.loop_scopes.pop() {
+                    for break_jump in scope.breaks {
+                        self.patch_jump(break_jump);
+                    }
+                }
             }
             Stmt::Function {
                 name,

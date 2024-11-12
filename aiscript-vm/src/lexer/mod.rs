@@ -43,6 +43,7 @@ pub enum TokenType {
 
     // Keywords
     And,
+    Break,
     Class,
     Else,
     False,
@@ -327,6 +328,7 @@ impl<'a> Scanner<'a> {
             "ai" => TokenType::AI,
             "agent" => TokenType::Agent,
             "and" => TokenType::And,
+            "break" => TokenType::Break,
             "class" => TokenType::Class,
             "else" => TokenType::Else,
             "false" => TokenType::False,
