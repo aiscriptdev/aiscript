@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use super::{
+use crate::{
     ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
     lexer::{Token, TokenType},
     ty::{Type, TypeResolver},

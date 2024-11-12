@@ -15,12 +15,10 @@ use openai_api_rs::v1::{
 use tokio::runtime::Handle;
 
 use crate::{
-    compiler::{
-        ast::{Expr, FnDef, Literal},
-        ty::PrimitiveType,
-        Token,
-    },
+    ast::{Expr, FnDef, Literal},
+    lexer::Token,
     string::InternedString,
+    ty::PrimitiveType,
     vm::{Context, State},
     ReturnValue,
 };

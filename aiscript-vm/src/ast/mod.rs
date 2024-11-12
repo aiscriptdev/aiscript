@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
-use super::{lexer::Token, ty::PrimitiveType};
+use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
 #[derive(Debug, Clone)]

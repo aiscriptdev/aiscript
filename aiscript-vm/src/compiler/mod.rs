@@ -2,17 +2,10 @@ use std::collections::HashMap;
 
 use codegen::CodeGen;
 use gc_arena::Gc;
-use parser::Parser;
 
-use crate::{object::Function, vm::Context, VmError};
+use crate::{object::Function, parser::Parser, vm::Context, VmError};
 
-pub use lexer::Token;
-pub(crate) mod ast;
 mod codegen;
-mod lexer;
-mod parser;
-mod pretty;
-pub(crate) mod ty;
 
 pub fn compile<'gc>(
     ctx: Context<'gc>,

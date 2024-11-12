@@ -1,6 +1,6 @@
 mod resolver;
 
-use crate::compiler::lexer::Token;
+use crate::lexer::Token;
 use gc_arena::Collect;
 pub use resolver::TypeResolver;
 

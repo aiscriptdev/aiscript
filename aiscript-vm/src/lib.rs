@@ -1,11 +1,15 @@
 mod ai;
+mod ast;
 mod builtins;
 mod chunk;
 mod compiler;
 mod fuel;
+mod lexer;
 mod object;
+mod parser;
 mod string;
 mod string_utils;
+mod ty;
 #[cfg(feature = "v1")]
 mod v1;
 mod value;

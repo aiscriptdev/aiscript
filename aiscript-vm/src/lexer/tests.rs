@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::compiler::lexer::{Scanner, Token, TokenType};
+    use crate::lexer::{Scanner, Token, TokenType};
 
     #[test]
     fn test_docstring_basic() {
