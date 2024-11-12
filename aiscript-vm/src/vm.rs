@@ -415,8 +415,8 @@ impl<'gc> State<'gc> {
                 // *2 because each keyword arg has name and value
                 // Get the actual function from the correct stack position
                 // Need to peek past all args (both positional and keyword) to get to the function
-                let total_args = args_count + keyword_args_count * 2;
-                let callee = *self.peek(total_args as usize);
+                let arg_slot_count = args_count + keyword_args_count * 2;
+                let callee = *self.peek(arg_slot_count as usize);
                 self.call_value(callee, args_count, keyword_args_count)?;
             }
             OpCode::Closure(chunk_id) => {
@@ -685,7 +685,7 @@ impl<'gc> State<'gc> {
         args_count: u8,
         keyword_args_count: u8,
     ) -> Result<(), VmError> {
-        let total_args = args_count + keyword_args_count * 2;
+        let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         match callee {
             Value::BoundMethod(bound) => {
                 // inserts the receiver into the new CallFrame's slot zero.
@@ -707,20 +707,24 @@ impl<'gc> State<'gc> {
                        +-------------------------------+
                            topping Callframe
                 */
-                self.stack[self.stack_top - total_args as usize - 1] = bound.receiver;
+                self.stack[self.stack_top - args_slot_count - 1] = bound.receiver;
                 self.call(bound.method, args_count, keyword_args_count)
             }
             Value::Class(class) => {
                 let instance = Instance::new(class);
-                self.stack[self.stack_top - total_args as usize - 1] =
+                self.stack[self.stack_top - args_slot_count - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
                 let init = self.intern_static("init");
 
                 if let Some(initializer) = class.borrow().methods.get(&init) {
                     self.call(initializer.as_closure()?, args_count, keyword_args_count)
-                } else if total_args != 0 {
+                } else if (args_count + keyword_args_count) != 0 {
                     Err(self.runtime_error(
-                        format!("Expected 0 arguments but got {}.", total_args).into(),
+                        format!(
+                            "Expected 0 arguments but got {}.",
+                            args_count + keyword_args_count
+                        )
+                        .into(),
                     ))
                 } else {
                     Ok(())
@@ -760,41 +764,44 @@ impl<'gc> State<'gc> {
     fn invoke(
         &mut self,
         name: InternedString<'gc>,
-        arg_count: u8,
+        args_count: u8,
         keyword_args_count: u8,
     ) -> Result<(), VmError> {
-        let receiver = *self.peek(arg_count as usize);
+        let args_slot_count = (args_count + keyword_args_count * 2) as usize;
+        let receiver = *self.peek(args_slot_count);
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
-                self.stack[self.stack_top - (arg_count + keyword_args_count * 2) as usize - 1] =
-                    *value;
-                self.call_value(*value, arg_count, keyword_args_count)
+                self.stack[self.stack_top - args_slot_count - 1] = *value;
+                self.call_value(*value, args_count, keyword_args_count)
             } else {
-                self.invoke_from_class(instance.borrow().class, name, arg_count, keyword_args_count)
+                self.invoke_from_class(
+                    instance.borrow().class,
+                    name,
+                    args_count,
+                    keyword_args_count,
+                )
             }
         } else if let Value::Agent(agent) = receiver {
-            if name == "run" {
-                let message = self.pop_stack();
-                let result = ai::run_agent(self, agent, message.as_string().unwrap());
+            if let Some(method) = agent.methods.get(&name) {
+                let args = self.check_args(method, args_count, keyword_args_count)?;
+                let result = ai::run_agent(self, agent, args);
                 let s = self.intern(result.as_bytes());
                 self.push_stack(Value::from(s));
                 Ok(())
             } else {
-                Err(self.runtime_error(format!("Agent have no methods called '{}'.", name).into()))
+                Err(self.runtime_error(format!("Agent have no method called '{}'.", name).into()))
             }
         } else {
             Err(self.runtime_error("Only instances have methods.".into()))
         }
     }
 
-    fn call(
+    fn check_args(
         &mut self,
-        closure: Gc<'gc, Closure<'gc>>,
+        function: &Gc<'gc, Function<'gc>>,
         args_count: u8,
         keyword_args_count: u8,
-    ) -> Result<(), VmError> {
-        let function = closure.function;
-
+    ) -> Result<Vec<Value<'gc>>, VmError> {
         #[cfg(feature = "debug")]
         function.disassemble("fn");
         if args_count != function.arity && function.arity == function.max_arity {
@@ -812,14 +819,14 @@ impl<'gc> State<'gc> {
             return Err(self.runtime_error("Stack overflow.".into()));
         }
 
-        let stack_start = self.stack_top - (args_count + keyword_args_count * 2) as usize - 1;
-        let positional_args_end = stack_start + args_count as usize + 1;
+        let arg_start = self.stack_top - (args_count + keyword_args_count * 2) as usize - 1;
+        let positional_args_end = arg_start + args_count as usize + 1;
 
         // Create array to hold final argument values
         let mut final_args = vec![Value::Nil; function.max_arity as usize];
 
         // Fill in positional arguments
-        for (i, value) in self.stack[stack_start + 1..positional_args_end]
+        for (i, value) in self.stack[arg_start + 1..positional_args_end]
             .iter()
             .enumerate()
         {
@@ -869,9 +876,21 @@ impl<'gc> State<'gc> {
                 }
             }
         }
+        Ok(final_args)
+    }
+
+    fn call(
+        &mut self,
+        closure: Gc<'gc, Closure<'gc>>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<(), VmError> {
+        let function = &closure.function;
+
+        let final_args = self.check_args(function, args_count, keyword_args_count)?;
 
         // Restore stack and push final arguments
-        self.stack_top = stack_start + 1; // Keep the callee
+        self.stack_top -= (args_count + keyword_args_count * 2) as usize;
         for arg in final_args {
             self.push_stack(arg);
         }

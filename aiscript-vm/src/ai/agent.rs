@@ -17,10 +17,11 @@ use tokio::runtime::Handle;
 use crate::{
     ast::{Expr, FnDef, Literal},
     lexer::Token,
+    object::Function,
     string::InternedString,
     ty::PrimitiveType,
     vm::{Context, State},
-    ReturnValue,
+    Chunk, ReturnValue, Value,
 };
 
 #[derive(Debug, Collect)]
@@ -31,6 +32,7 @@ pub struct Agent<'gc> {
     pub model: InternedString<'gc>,
     pub tools: HashMap<String, FnDef>,
     pub tool_choice: ToolChoice,
+    pub methods: HashMap<InternedString<'gc>, Gc<'gc, Function<'gc>>>,
 }
 
 // Controls which (if any) tool is called by the model.
@@ -54,6 +56,31 @@ struct Response<'gc> {
     messages: Vec<ChatCompletionMessage>,
 }
 
+fn agent_methods<'gc>(ctx: &Context<'gc>) -> HashMap<InternedString<'gc>, Gc<'gc, Function<'gc>>> {
+    [(
+        InternedString::from_static(ctx, "run"),
+        Gc::new(
+            ctx,
+            Function {
+                arity: 1,
+                max_arity: 2,
+                params: [("input", Value::Nil), ("debug", Value::Boolean(false))]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (name, default))| {
+                        (InternedString::from_static(ctx, name), (i as u8, default))
+                    })
+                    .collect(),
+                chunk: Chunk::new(),
+                name: None,
+                upvalues: Vec::new(),
+            },
+        ),
+    )]
+    .into_iter()
+    .collect()
+}
+
 impl<'gc> Agent<'gc> {
     pub fn new(ctx: &Context<'gc>, name: InternedString<'gc>) -> Self {
         Agent {
@@ -62,6 +89,7 @@ impl<'gc> Agent<'gc> {
             model: InternedString::from_static(ctx, "gpt-4"),
             tools: HashMap::new(),
             tool_choice: ToolChoice::Auto,
+            methods: agent_methods(ctx),
         }
     }
 
@@ -189,8 +217,11 @@ impl<'gc> Agent<'gc> {
 pub async fn _run_agent<'gc>(
     state: &mut State<'gc>,
     agent: Gc<'gc, Agent<'gc>>,
-    message: InternedString<'gc>,
+    args: Vec<Value<'gc>>,
 ) -> String {
+    let message = args[0];
+    let debug = args[1].as_boolean();
+    println!("debug: {debug}");
     format!(
         "input: {},instructions: {}, model: {}, tools: {:?}",
         message, agent.instructions, agent.model, agent.tools
@@ -201,12 +232,15 @@ pub async fn _run_agent<'gc>(
 pub async fn _run_agent<'gc>(
     state: &mut State<'gc>,
     mut agent: Gc<'gc, Agent<'gc>>,
-    input: InternedString<'gc>,
+    args: Vec<Value<'gc>>,
 ) -> String {
+    let message = args[0];
+    let debug = args[1].as_boolean();
+    println!("debug: {debug}");
     let mut history = Vec::new();
     history.push(ChatCompletionMessage {
         role: MessageRole::user,
-        content: Content::Text(input.to_string()),
+        content: Content::Text(message.to_string()),
         name: None,
         tool_calls: None,
         tool_call_id: None,
@@ -247,15 +281,15 @@ pub async fn _run_agent<'gc>(
 pub fn run_agent<'gc>(
     state: &mut State<'gc>,
     agent: Gc<'gc, Agent<'gc>>,
-    message: InternedString<'gc>,
+    args: Vec<Value<'gc>>,
 ) -> String {
     if Handle::try_current().is_ok() {
         // We're in an async context, use await
-        Handle::current().block_on(async { _run_agent(state, agent, message).await })
+        Handle::current().block_on(async { _run_agent(state, agent, args).await })
     } else {
         // We're in a sync context, create a new runtime
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime.block_on(async { _run_agent(state, agent, message).await })
+        runtime.block_on(async { _run_agent(state, agent, args).await })
     }
 }
 
