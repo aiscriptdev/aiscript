@@ -31,6 +31,10 @@ struct Local<'gc> {
 
 #[derive(Debug, Default)]
 struct LoopScope {
+    // Loop start position for continue
+    start: usize,
+    increment: usize, // Position of increment code for continue
+    // Break jump positions to patch
     breaks: Vec<usize>,
 }
 
@@ -195,6 +199,15 @@ impl<'gc> CodeGen<'gc> {
                 // Add the break jump to the current loop scope
                 self.loop_scopes[last_idx].breaks.push(exit_jump);
             }
+            Stmt::Continue { .. } => {
+                if let Some(scope) = self.loop_scopes.last() {
+                    // First jump to increment position
+                    self.emit_loop(scope.increment);
+                } else {
+                    // self.error("Can't continue outside of a loop.")
+                    // return Err(VmError::RuntimeError(.into());
+                }
+            }
             Stmt::Expression { expression, .. } => {
                 self.generate_expr(expression)?;
                 self.emit(OpCode::Pop);
@@ -247,17 +260,53 @@ impl<'gc> CodeGen<'gc> {
                 self.patch_jump(else_jump);
             }
             Stmt::Loop {
-                condition, body, ..
+                initializer,
+                condition,
+                increment,
+                body,
+                ..
             } => {
-                let loop_start = self.function.code_size();
-                self.loop_scopes.push(LoopScope::default());
-                self.generate_expr(condition)?;
+                self.begin_scope();
+                // Generate initializer before entering loop
+                if let Some(init) = initializer {
+                    self.generate_stmt(init)?;
+                }
 
+                let loop_start = self.function.code_size();
+                
+                // Check condition
+                self.generate_expr(condition)?;
                 let exit_jump = self.emit_jump(OpCode::JumpIfFalse(0));
                 self.emit(OpCode::Pop);
+
+                // Setup loop scope for break/continue
+                let increment_pos = if increment.is_some() {
+                    // Save current position - increment code will be generated later
+                    self.function.code_size()
+                } else {
+                    loop_start
+                };
+
+                let loop_scope = LoopScope {
+                    start: loop_start,
+                    increment: increment_pos,
+                    breaks: Vec::new(),
+                };
+                self.loop_scopes.push(loop_scope);
+
+                // Generate body first
                 self.generate_stmt(body)?;
+
+                // Generate increment after body
+                if let Some(incr) = increment {
+                    self.generate_expr(incr)?;
+                    self.emit(OpCode::Pop);
+                }
+
+                // Jump back to condition
                 self.emit_loop(loop_start);
 
+                // Patch breaks and cleanup
                 self.patch_jump(exit_jump);
                 self.emit(OpCode::Pop);
 
@@ -267,6 +316,7 @@ impl<'gc> CodeGen<'gc> {
                         self.patch_jump(break_jump);
                     }
                 }
+                self.end_scope();
             }
             Stmt::Function {
                 name,

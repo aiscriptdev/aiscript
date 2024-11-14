@@ -196,6 +196,9 @@ pub enum Stmt<'gc> {
     Break {
         line: u32,
     },
+    Continue {
+        line: u32,
+    },
     If {
         condition: Expr<'gc>,
         then_branch: Box<Stmt<'gc>>,
@@ -203,7 +206,9 @@ pub enum Stmt<'gc> {
         line: u32,
     },
     Loop {
+        initializer: Option<Box<Stmt<'gc>>>,
         condition: Expr<'gc>,
+        increment: Option<Expr<'gc>>,
         body: Box<Stmt<'gc>>,
         line: u32,
     },
@@ -243,6 +248,7 @@ impl<'gc> Stmt<'gc> {
             | Self::Print { line, .. }
             | Self::Let { line, .. }
             | Self::Break { line, .. }
+            | Self::Continue { line, .. }
             | Self::Block { line, .. }
             | Self::If { line, .. }
             | Self::Loop { line, .. }

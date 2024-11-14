@@ -167,6 +167,8 @@ impl<'gc> Parser<'gc> {
             self.for_statement()
         } else if self.match_token(TokenType::Break) {
             self.break_statement()
+        } else if self.match_token(TokenType::Continue) {
+            self.continue_statement()
         } else {
             self.expression_statement()
         }
@@ -180,6 +182,18 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::Semicolon, "Expect ';' after 'break'.");
         Some(Stmt::Break {
+            line: self.previous.line,
+        })
+    }
+
+    fn continue_statement(&mut self) -> Option<Stmt<'gc>> {
+        if self.loop_depth == 0 {
+            self.error("Can't use 'break' outside of a loop.");
+            return None;
+        }
+
+        self.consume(TokenType::Semicolon, "Expect ';' after 'continue'.");
+        Some(Stmt::Continue {
             line: self.previous.line,
         })
     }
@@ -454,8 +468,10 @@ impl<'gc> Parser<'gc> {
         let body = Box::new(self.statement()?);
         self.loop_depth -= 1;
         Some(Stmt::Loop {
+            initializer: None,
             condition,
             body,
+            increment: None,
             line: self.previous.line,
         })
     }
@@ -466,15 +482,18 @@ impl<'gc> Parser<'gc> {
         let initializer = if self.match_token(TokenType::Semicolon) {
             None
         } else if self.match_token(TokenType::Let) {
-            Some(self.var_declaration()?)
+            Some(Box::new(self.var_declaration()?))
         } else {
-            Some(self.expression_statement()?)
+            Some(Box::new(self.expression_statement()?))
         };
 
         let condition = if !self.check(TokenType::Semicolon) {
-            Some(self.expression()?)
+            self.expression()?
         } else {
-            None
+            Expr::Literal {
+                value: Literal::Boolean(true),
+                line: self.previous.line,
+            }
         };
         self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
@@ -486,40 +505,16 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::CloseParen, "Expect ')' after for clauses.");
 
         self.loop_depth += 1;
-        let mut body = self.statement()?;
+        let body = Box::new(self.statement()?);
         self.loop_depth -= 1;
 
-        // Desugar for loop into while loop
-        if let Some(increment) = increment {
-            body = Stmt::Block {
-                statements: vec![
-                    body,
-                    Stmt::Expression {
-                        expression: increment,
-                        line: self.previous.line,
-                    },
-                ],
-                line: self.previous.line,
-            };
-        }
-
-        body = Stmt::Loop {
-            condition: condition.unwrap_or(Expr::Literal {
-                value: Literal::Boolean(true),
-                line: self.previous.line,
-            }),
-            body: Box::new(body),
+        Some(Stmt::Loop {
+            initializer,
+            condition,
+            increment,
+            body,
             line: self.previous.line,
-        };
-
-        if let Some(initializer) = initializer {
-            body = Stmt::Block {
-                statements: vec![initializer, body],
-                line: self.previous.line,
-            };
-        }
-
-        Some(body)
+        })
     }
 
     fn if_statement(&mut self) -> Option<Stmt<'gc>> {

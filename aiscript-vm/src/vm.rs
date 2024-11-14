@@ -802,8 +802,8 @@ impl<'gc> State<'gc> {
         args_count: u8,
         keyword_args_count: u8,
     ) -> Result<Vec<Value<'gc>>, VmError> {
-        #[cfg(feature = "debug")]
-        function.disassemble("fn");
+        // #[cfg(feature = "debug")]
+        // function.disassemble("fn");
         if args_count != function.arity && function.arity == function.max_arity {
             // No keyword arguments, simply compare the positional arguments number
             return Err(self.runtime_error(
