@@ -188,7 +188,7 @@ impl<'gc> Parser<'gc> {
 
     fn continue_statement(&mut self) -> Option<Stmt<'gc>> {
         if self.loop_depth == 0 {
-            self.error("Can't use 'break' outside of a loop.");
+            self.error("Can't use 'continue' outside of a loop.");
             return None;
         }
 
