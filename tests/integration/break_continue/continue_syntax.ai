@@ -1,0 +1,26 @@
+let x = 1;
+while (x <= 12) {
+    x = x + 1;
+    if (x < 10) continue;
+    print x;
+}
+
+// expect: 10
+// expect: 11
+// expect: 12
+// expect: 13
+
+for (let i = 0; i < 10; i = i + 1) {
+    if (i == 2) continue;
+    print i; 
+}
+
+// expect: 0
+// expect: 1
+// expect: 3
+// expect: 4
+// expect: 5
+// expect: 6
+// expect: 7
+// expect: 8
+// expect: 9
