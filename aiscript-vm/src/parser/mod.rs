@@ -131,19 +131,30 @@ impl<'gc> Parser<'gc> {
     }
 
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
+        let visibility = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+
         let stmt = if self.match_token(TokenType::Use) {
-            self.use_declaration()
+            if visibility == Visibility::Public {
+                self.error("'pub' modifier cannot be used with 'use' statement");
+                None
+            } else {
+                self.use_declaration()
+            }
         } else if self.match_token(TokenType::Class) {
-            self.class_declaration()
+            self.class_declaration(visibility)
         } else if self.match_token(TokenType::AI) {
             self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-            self.func_declaration(FunctionType::AiFunction)
+            self.func_declaration(FunctionType::AiFunction, visibility)
         } else if self.match_token(TokenType::Fn) {
-            self.func_declaration(FunctionType::Function)
+            self.func_declaration(FunctionType::Function, visibility)
         } else if self.match_token(TokenType::Let) {
-            self.var_declaration()
+            self.var_declaration(visibility)
         } else if self.match_token(TokenType::Agent) {
-            self.agent_declaration()
+            self.agent_declaration(visibility)
         } else {
             self.statement()
         };
@@ -216,12 +227,7 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn agent_declaration(&mut self) -> Option<Stmt<'gc>> {
-        let visibility = if self.match_token(TokenType::Pub) {
-            Visibility::Public
-        } else {
-            Visibility::Private
-        };
+    fn agent_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect agent name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
@@ -287,7 +293,7 @@ impl<'gc> Parser<'gc> {
         let mut tools = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             self.consume(TokenType::Fn, "Expect 'fn' keyword.");
-            tools.push(self.func_declaration(FunctionType::Tool)?);
+            tools.push(self.func_declaration(FunctionType::Tool, Visibility::Private)?);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after agent body.");
@@ -310,13 +316,7 @@ impl<'gc> Parser<'gc> {
         Some((key, value))
     }
 
-    fn class_declaration(&mut self) -> Option<Stmt<'gc>> {
-        let visibility = if self.match_token(TokenType::Pub) {
-            Visibility::Public
-        } else {
-            Visibility::Private
-        };
-
+    fn class_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
@@ -344,7 +344,7 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            methods.push(self.func_declaration(FunctionType::Method)?);
+            methods.push(self.func_declaration(FunctionType::Method, Visibility::Private)?);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -361,13 +361,11 @@ impl<'gc> Parser<'gc> {
         }))
     }
 
-    fn func_declaration(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
-        let visibility = if self.match_token(TokenType::Pub) {
-            Visibility::Public
-        } else {
-            Visibility::Private
-        };
-
+    fn func_declaration(
+        &mut self,
+        fn_type: FunctionType,
+        visibility: Visibility,
+    ) -> Option<Stmt<'gc>> {
         // Save current function type
         let previous_fn_type = self.fn_type;
         self.fn_type = fn_type;
@@ -477,12 +475,7 @@ impl<'gc> Parser<'gc> {
         }))
     }
 
-    fn var_declaration(&mut self) -> Option<Stmt<'gc>> {
-        let visibility = if self.match_token(TokenType::Pub) {
-            Visibility::Public
-        } else {
-            Visibility::Private
-        };
+    fn var_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect variable name.");
         let name = self.previous;
 
@@ -526,7 +519,7 @@ impl<'gc> Parser<'gc> {
         let initializer = if self.match_token(TokenType::Semicolon) {
             None
         } else if self.match_token(TokenType::Let) {
-            Some(Box::new(self.var_declaration()?))
+            Some(Box::new(self.var_declaration(Visibility::Private)?))
         } else {
             Some(Box::new(self.expression_statement()?))
         };
