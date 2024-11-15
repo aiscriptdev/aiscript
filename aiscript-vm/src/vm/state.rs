@@ -7,13 +7,16 @@ use gc_arena::{
 };
 
 use crate::{
-    ai, builtins,
+    ai,
+    ast::Visibility,
+    builtins,
+    module::{Module, ModuleManager, ModuleSource},
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     OpCode, ReturnValue, Value,
 };
 
-use super::{fuel::Fuel, VmError};
+use super::{fuel::Fuel, Context, VmError};
 
 type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>;
 
@@ -86,6 +89,8 @@ pub struct State<'gc> {
     pub(super) strings: InternedStringSet<'gc>,
     pub(super) globals: Table<'gc>,
     open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
+    module_manager: ModuleManager<'gc>,
+    current_module: Option<InternedString<'gc>>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {
@@ -119,6 +124,58 @@ impl<'gc> State<'gc> {
             strings: InternedStringSet::new(mc),
             globals: HashMap::default(),
             open_upvalues: None,
+            module_manager: ModuleManager::new(),
+            current_module: None,
+        }
+    }
+
+    pub fn import_module(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+        // Get module source
+        let module_source = self.module_manager.get_or_load_module(name)?;
+
+        match module_source {
+            ModuleSource::Cached => Ok(()), // Module already loaded
+            ModuleSource::New { source, path } => {
+                // Create new module
+                let module = Module {
+                    name,
+                    exports: HashMap::new(),
+                    path,
+                };
+
+                // Set up module context and compile
+                let prev_module = self.current_module.replace(name);
+
+                let context = Context {
+                    mutation: self.mc,
+                    strings: self.strings,
+                };
+
+                let source: &'static str = Box::leak(source.into_boxed_str());
+                let chunks = crate::compiler::compile(context, source)?;
+
+                // Execute each chunk of module code
+                for (_id, function) in chunks {
+                    let closure = Gc::new(self.mc, Closure::new(self.mc, function));
+                    self.push_stack(Value::from(closure));
+                    self.call(closure, 0, 0)?;
+
+                    // Execute until module chunk is complete
+                    let frame_count = self.frame_count;
+                    loop {
+                        if let Some(_result) = self.dispatch_next(frame_count)? {
+                            self.pop_stack();
+                            break;
+                        }
+                    }
+                }
+
+                // Register the completed module
+                self.module_manager.register_module(name, module);
+                self.current_module = prev_module;
+
+                Ok(())
+            }
         }
     }
 
@@ -186,7 +243,7 @@ impl<'gc> State<'gc> {
     // When dispatch in step() function, the stop_at_frame_count is 0.
     // When dispatch in eval_function(), the stop_at_frame_count is the frame count before to call eval_function().
     // This is used to exit the frame call after the chunks of that function is finished.
-    fn dispatch_next(
+    pub fn dispatch_next(
         &mut self,
         stop_at_frame_count: usize,
     ) -> Result<Option<ReturnValue>, VmError> {
@@ -273,10 +330,13 @@ impl<'gc> State<'gc> {
             OpCode::Pop => {
                 self.pop_stack();
             }
-            OpCode::DefineGlobal(byte) => {
-                let varible_name = frame.read_constant(byte).as_string()?;
-                self.globals.insert(varible_name, *self.peek(0));
-                self.pop_stack();
+            OpCode::DefineGlobal(byte, visibility) => {
+                let variable_name = frame.read_constant(byte).as_string()?;
+                let value = *self.peek(0);
+
+                // Define in global scope with visibility
+                self.define_global(variable_name, value, visibility);
+                self.pop_stack(); // Pop the value after defining
             }
             OpCode::GetGlobal(byte) => {
                 let varible_name = frame.read_constant(byte).as_string()?;
@@ -455,8 +515,47 @@ impl<'gc> State<'gc> {
                 let agent = frame.read_constant(name);
                 self.push_stack(agent);
             }
+            OpCode::ImportModule(module_name_idx) => {
+                let module_name = frame.read_constant(module_name_idx).as_string()?;
+                self.import_module(module_name)?;
+            }
+            OpCode::GetModuleVar(module_idx, name_idx) => {
+                let module_name = frame.read_constant(module_idx).as_string()?;
+                let var_name = frame.read_constant(name_idx).as_string()?;
+
+                if let Some(value) = self.module_manager.get_export(module_name, var_name) {
+                    self.push_stack(value);
+                } else {
+                    return Err(self.runtime_error(
+                        format!(
+                            "Undefined variable '{}' in module '{}'",
+                            var_name, module_name
+                        )
+                        .into(),
+                    ));
+                }
+            }
         }
         Ok(None)
+    }
+
+    pub fn define_global(
+        &mut self,
+        name: InternedString<'gc>,
+        value: Value<'gc>,
+        visibility: Visibility,
+    ) {
+        // Always define in global scope
+        self.globals.insert(name, value);
+
+        // If public and in a module context, also add to module exports
+        if visibility == Visibility::Public {
+            if let Some(current_module) = self.current_module {
+                if let Some(module) = self.module_manager.modules.get_mut(&current_module) {
+                    module.exports.insert(name, value);
+                }
+            }
+        }
     }
 
     pub fn eval_function(
@@ -781,7 +880,7 @@ impl<'gc> State<'gc> {
         Ok(final_args)
     }
 
-    fn call(
+    pub fn call(
         &mut self,
         closure: Gc<'gc, Closure<'gc>>,
         args_count: u8,
@@ -811,7 +910,7 @@ impl<'gc> State<'gc> {
         Ok(())
     }
     #[inline(always)]
-    fn push_stack(&mut self, value: Value<'gc>) {
+    pub fn push_stack(&mut self, value: Value<'gc>) {
         debug_assert!(self.stack_top < STACK_MAX_SIZE, "Stack overflow");
         unsafe {
             *self.stack.get_unchecked_mut(self.stack_top) = value;
@@ -820,7 +919,7 @@ impl<'gc> State<'gc> {
     }
 
     #[inline(always)]
-    fn pop_stack(&mut self) -> Value<'gc> {
+    pub fn pop_stack(&mut self) -> Value<'gc> {
         debug_assert!(self.stack_top > 0, "Stack underflow");
         self.stack_top -= 1;
         unsafe { *self.stack.get_unchecked(self.stack_top) }

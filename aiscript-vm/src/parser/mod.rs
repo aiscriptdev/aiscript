@@ -7,7 +7,12 @@ use super::{
     ast::{Expr, Literal, Parameter, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
 };
-use crate::{object::FunctionType, vm::Context, VmError};
+use crate::{
+    ast::{AgentDecl, ClassDecl, FunctionDecl, VariableDecl, Visibility},
+    object::FunctionType,
+    vm::Context,
+    VmError,
+};
 
 type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc>>;
 
@@ -126,7 +131,9 @@ impl<'gc> Parser<'gc> {
     }
 
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
-        let stmt = if self.match_token(TokenType::Class) {
+        let stmt = if self.match_token(TokenType::Use) {
+            self.use_declaration()
+        } else if self.match_token(TokenType::Class) {
             self.class_declaration()
         } else if self.match_token(TokenType::AI) {
             self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
@@ -147,6 +154,17 @@ impl<'gc> Parser<'gc> {
         } else {
             stmt
         }
+    }
+
+    fn use_declaration(&mut self) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect module name after 'use'.");
+        let path = self.previous;
+        self.consume(TokenType::Semicolon, "Expect ';' after module path.");
+
+        Some(Stmt::Use {
+            path,
+            line: path.line,
+        })
     }
 
     fn statement(&mut self) -> Option<Stmt<'gc>> {
@@ -199,6 +217,11 @@ impl<'gc> Parser<'gc> {
     }
 
     fn agent_declaration(&mut self) -> Option<Stmt<'gc>> {
+        let visibility = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
         self.consume(TokenType::Identifier, "Expect agent name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
@@ -269,13 +292,14 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::CloseBrace, "Expect '}' after agent body.");
         self.scopes.pop();
-        Some(Stmt::Agent {
+        Some(Stmt::Agent(AgentDecl {
             name,
             mangled_name: format!("{}${}", self.scopes.join("$"), name.lexeme),
             fields,
             tools,
+            visibility,
             line: name.line,
-        })
+        }))
     }
 
     fn field_declaration(&mut self) -> Option<(Token<'gc>, Expr<'gc>)> {
@@ -287,6 +311,12 @@ impl<'gc> Parser<'gc> {
     }
 
     fn class_declaration(&mut self) -> Option<Stmt<'gc>> {
+        let visibility = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
@@ -322,15 +352,22 @@ impl<'gc> Parser<'gc> {
         self.scopes.pop();
         // pop that compiler off the stack and restore the enclosing class compiler.
         self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
-        Some(Stmt::Class {
+        Some(Stmt::Class(ClassDecl {
             name,
             superclass,
             methods,
+            visibility,
             line: name.line,
-        })
+        }))
     }
 
     fn func_declaration(&mut self, fn_type: FunctionType) -> Option<Stmt<'gc>> {
+        let visibility = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+
         // Save current function type
         let previous_fn_type = self.fn_type;
         self.fn_type = fn_type;
@@ -427,7 +464,7 @@ impl<'gc> Parser<'gc> {
         let mangled_name = self.scopes.join("$");
         self.scopes.pop();
 
-        Some(Stmt::Function {
+        Some(Stmt::Function(FunctionDecl {
             name,
             mangled_name,
             doc,
@@ -435,11 +472,17 @@ impl<'gc> Parser<'gc> {
             return_type,
             body,
             is_ai: fn_type == FunctionType::AiFunction,
+            visibility,
             line: name.line,
-        })
+        }))
     }
 
     fn var_declaration(&mut self) -> Option<Stmt<'gc>> {
+        let visibility = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
         self.consume(TokenType::Identifier, "Expect variable name.");
         let name = self.previous;
 
@@ -453,11 +496,12 @@ impl<'gc> Parser<'gc> {
             TokenType::Semicolon,
             "Expect ';' after variable declaration.",
         );
-        Some(Stmt::Let {
+        Some(Stmt::Let(VariableDecl {
             name,
             initializer,
+            visibility,
             line: name.line,
-        })
+        }))
     }
 
     fn while_statement(&mut self) -> Option<Stmt<'gc>> {
@@ -1052,7 +1096,7 @@ mod tests {
     use gc_arena::arena::rootless_mutate;
 
     use super::*;
-    use crate::{string::InternedStringSet, vm::Context};
+    use crate::{ast::AgentDecl, string::InternedStringSet, vm::Context};
 
     #[test]
     fn test_parse_function() {
@@ -1079,7 +1123,7 @@ mod tests {
             "#;
             let mut parser = Parser::new(context, &source);
             let result = parser.parse().unwrap();
-            let Stmt::Function {
+            let Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
                 doc,
@@ -1088,7 +1132,7 @@ mod tests {
                 body,
                 line,
                 ..
-            } = &result.statements[0]
+            }) = &result.statements[0]
             else {
                 panic!("Unexpected statement type");
             };
@@ -1100,14 +1144,14 @@ mod tests {
             assert_eq!(body.len(), 1);
             assert_eq!(line, &2);
 
-            let Stmt::Function {
+            let Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
                 doc,
                 params,
                 return_type,
                 ..
-            } = &result.statements[1]
+            }) = &result.statements[1]
             else {
                 panic!("Unexpected statement type");
             };
@@ -1119,14 +1163,14 @@ mod tests {
             assert_eq!(params[1].type_hint.unwrap().lexeme, "int");
             assert_eq!(return_type.unwrap().lexeme, "int");
 
-            let Stmt::Function {
+            let Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
                 doc,
                 params,
                 return_type,
                 ..
-            } = &result.statements[2]
+            }) = &result.statements[2]
             else {
                 panic!("Unexpected statement type");
             };
@@ -1157,9 +1201,9 @@ mod tests {
             "#;
             let mut parser = Parser::new(context, &source);
             let result = parser.parse().unwrap();
-            let Stmt::Agent {
+            let Stmt::Agent(AgentDecl {
                 name, fields, line, ..
-            } = &result.statements[0]
+            }) = &result.statements[0]
             else {
                 panic!("Expected agent statement");
             };
@@ -1189,7 +1233,7 @@ mod tests {
             "#;
             let mut parser = Parser::new(context, &source);
             let result = parser.parse().unwrap();
-            let Stmt::Agent { name, fields, .. } = &result.statements[0] else {
+            let Stmt::Agent(AgentDecl { name, fields, .. }) = &result.statements[0] else {
                 panic!("Expected agent statement");
             };
             assert_eq!(name.lexeme, "Test");
