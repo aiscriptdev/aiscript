@@ -74,7 +74,9 @@ impl Vm {
             };
             state.chunks = crate::compiler::compile(context, source)?;
             state.define_builtins();
-            state.call_function(0, vec![])
+            // The script function's chunk id is always the highest chunk id.
+            let script_chunk_id = state.chunks.keys().max().copied().unwrap();
+            state.call_function(script_chunk_id, vec![])
         })?;
         Ok(())
     }

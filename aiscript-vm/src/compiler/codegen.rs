@@ -20,7 +20,7 @@ use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
 const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
-static CHUNK_ID: AtomicUsize = AtomicUsize::new(1);
+pub static CHUNK_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Default)]
 struct Local<'gc> {
@@ -113,7 +113,9 @@ impl<'gc> CodeGen<'gc> {
             Err(VmError::CompileError)
         } else {
             let function = mem::take(&mut generator.function);
-            generator.chunks.insert(0, function);
+            generator
+                .chunks
+                .insert(CHUNK_ID.fetch_add(1, Ordering::AcqRel), function);
             Ok(generator.chunks)
         }
     }
