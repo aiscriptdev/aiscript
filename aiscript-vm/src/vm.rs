@@ -25,11 +25,17 @@ const STACK_MAX_SIZE: usize = 128;
 static NUMBER_OPERATOR_ERROR: &str = "Operands must be numbers.";
 
 macro_rules! binary_op {
-    ($self:expr, $op:tt) => {
-        let b = $self.pop_stack().as_number().map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
-        let a = $self.pop_stack().as_number().map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+    ($self:expr, $op:tt) => {{
+        debug_assert!($self.stack_top >= 2, "Stack underflow in binary op");
+        let b = unsafe { $self.stack.get_unchecked($self.stack_top - 1) }
+            .as_number()
+            .map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+        let a = unsafe { $self.stack.get_unchecked($self.stack_top - 2) }
+            .as_number()
+            .map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+        $self.stack_top -= 2;
         $self.push_stack((a $op b).into());
-    };
+    }};
 }
 
 pub type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>;
@@ -902,26 +908,26 @@ impl<'gc> State<'gc> {
 
         Ok(())
     }
-    #[inline]
-    fn stack_get(&mut self, index: usize) -> Value<'gc> {
-        unsafe { *self.stack.get_unchecked(index) }
-    }
-
-    #[inline]
-    fn stack_set(&mut self, index: usize, value: Value<'gc>) {
-        unsafe { *self.stack.get_unchecked_mut(index) = value }
-    }
-
-    #[inline]
+    #[inline(always)]
     fn push_stack(&mut self, value: Value<'gc>) {
-        self.stack_set(self.stack_top, value);
+        debug_assert!(self.stack_top < STACK_MAX_SIZE, "Stack overflow");
+        unsafe {
+            *self.stack.get_unchecked_mut(self.stack_top) = value;
+        }
         self.stack_top += 1;
     }
 
-    #[inline]
+    #[inline(always)]
     fn pop_stack(&mut self) -> Value<'gc> {
+        debug_assert!(self.stack_top > 0, "Stack underflow");
         self.stack_top -= 1;
-        self.stack_get(self.stack_top)
+        unsafe { *self.stack.get_unchecked(self.stack_top) }
+    }
+
+    #[inline(always)]
+    fn peek(&self, distance: usize) -> &Value<'gc> {
+        debug_assert!(self.stack_top > distance, "Stack peek out of bounds");
+        unsafe { self.stack.get_unchecked(self.stack_top - 1 - distance) }
     }
 
     fn pop_stack_n(&mut self, n: usize) -> Vec<Value<'gc>> {
@@ -943,11 +949,6 @@ impl<'gc> State<'gc> {
 
         // No need to reverse as we're copying from bottom to top
         result
-    }
-
-    #[inline]
-    fn peek(&self, distance: usize) -> &Value<'gc> {
-        &self.stack[self.stack_top - 1 - distance]
     }
 
     #[cfg(feature = "debug")]
