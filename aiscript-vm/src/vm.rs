@@ -802,8 +802,6 @@ impl<'gc> State<'gc> {
         args_count: u8,
         keyword_args_count: u8,
     ) -> Result<Vec<Value<'gc>>, VmError> {
-        // #[cfg(feature = "debug")]
-        // function.disassemble("fn");
         if args_count != function.arity && function.arity == function.max_arity {
             // No keyword arguments, simply compare the positional arguments number
             return Err(self.runtime_error(
@@ -819,37 +817,38 @@ impl<'gc> State<'gc> {
             return Err(self.runtime_error("Stack overflow.".into()));
         }
 
-        let arg_start = self.stack_top - (args_count + keyword_args_count * 2) as usize - 1;
-        let positional_args_end = arg_start + args_count as usize + 1;
+        let max_arity = function.max_arity as usize;
+        let mut final_args = vec![Value::Nil; max_arity];
 
-        // Create array to hold final argument values
-        let mut final_args = vec![Value::Nil; function.max_arity as usize];
+        // Copy positional arguments
+        let total_args = args_count as usize;
+        let keyword_slots = keyword_args_count as usize * 2;
 
-        // Fill in positional arguments
-        for (i, value) in self.stack[arg_start + 1..positional_args_end]
-            .iter()
-            .enumerate()
-        {
-            final_args[i] = *value;
+        if total_args > 0 {
+            let arg_start = self.stack_top - total_args - keyword_slots;
+            final_args[..total_args]
+                .copy_from_slice(&self.stack[arg_start..(total_args + arg_start)]);
         }
 
         // Process keyword arguments
         if keyword_args_count > 0 {
-            for i in 0..keyword_args_count {
-                let idx = positional_args_end + (i * 2) as usize;
+            let kw_start = self.stack_top - keyword_slots;
+            for i in 0..keyword_args_count as usize {
+                let idx = kw_start + i * 2;
                 let name = self.stack[idx].as_string().map_err(|_| {
                     self.runtime_error("Keyword argument name must be a string.".into())
                 })?;
                 let value = self.stack[idx + 1];
 
-                // Find parameter position by name
-                if let Some((pos, _)) = function.params.get(&name).copied() {
-                    if pos < args_count {
+                if let Some(&(pos, _)) = function.params.get(&name) {
+                    let pos = pos as usize;
+                    if pos < total_args {
                         return Err(self.runtime_error(
-                            format!("Keyword argument '{}' was already specified as positional argument.", name).into()
+                            format!("Keyword argument '{}' was already specified as positional argument.", name)
+                            .into()
                         ));
                     }
-                    final_args[pos as usize] = value;
+                    final_args[pos] = value;
                 } else {
                     return Err(
                         self.runtime_error(format!("Unknown keyword argument '{}'.", name).into())
@@ -858,24 +857,19 @@ impl<'gc> State<'gc> {
             }
         }
 
-        // Fill in default values for unspecified parameters
-        for (i, value) in final_args.iter_mut().enumerate() {
-            if value.equals(&Value::Nil) {
-                if let Some((param_name, (_, v))) = function
-                    .params
-                    .iter()
-                    .find(|(_, (index, _))| *index as usize == i)
-                {
-                    if v.is_nil() && i < function.arity as usize {
-                        return Err(self.runtime_error(
-                            format!("Missing required argument '{}'.", *param_name).into(),
-                        ));
-                    } else {
-                        *value = *v;
-                    }
+        // Fill in default values and check required parameters
+        for (name, (pos, default)) in &function.params {
+            let pos = *pos as usize;
+            if final_args[pos].equals(&Value::Nil) {
+                if pos < function.arity as usize && default.is_nil() {
+                    return Err(
+                        self.runtime_error(format!("Missing required argument '{}'.", name).into())
+                    );
                 }
+                final_args[pos] = *default;
             }
         }
+
         Ok(final_args)
     }
 
@@ -889,8 +883,9 @@ impl<'gc> State<'gc> {
 
         let final_args = self.check_args(function, args_count, keyword_args_count)?;
 
-        // Restore stack and push final arguments
-        self.stack_top -= (args_count + keyword_args_count * 2) as usize;
+        self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
+        let slot_start = self.stack_top - 1; // -1 for the function itself
+
         for arg in final_args {
             self.push_stack(arg);
         }
@@ -899,8 +894,9 @@ impl<'gc> State<'gc> {
         let call_frame = CallFrame {
             closure,
             ip: 0,
-            slot_start: self.stack_top - function.max_arity as usize - 1,
+            slot_start,
         };
+
         self.frames.push(call_frame);
         self.frame_count += 1;
 
