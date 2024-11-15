@@ -3,7 +3,6 @@ mod ast;
 mod builtins;
 mod chunk;
 mod compiler;
-mod fuel;
 mod lexer;
 mod object;
 mod parser;
