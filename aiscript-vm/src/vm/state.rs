@@ -136,13 +136,6 @@ impl<'gc> State<'gc> {
         match module_source {
             ModuleSource::Cached => Ok(()), // Module already loaded
             ModuleSource::New { source, path } => {
-                // Create new module
-                let module = Module {
-                    name,
-                    exports: HashMap::new(),
-                    path,
-                };
-
                 // Set up module context and compile
                 let prev_module = self.current_module.replace(name);
 
@@ -153,6 +146,19 @@ impl<'gc> State<'gc> {
 
                 let source: &'static str = Box::leak(source.into_boxed_str());
                 let chunks = crate::compiler::compile(context, source)?;
+
+                // Create and register the module BEFORE executing code
+                let module = Module {
+                    name,
+                    exports: HashMap::new(),
+                    path,
+                };
+
+                // Register the module before executing its code
+                // This allows the module to find itself when it needs to export its values
+                self.module_manager.register_module(name, module);
+                // Store the chunks in State.chunks before executing
+                self.chunks.extend(chunks.clone());
 
                 // Execute each chunk of module code
                 for (_id, function) in chunks {
@@ -170,8 +176,7 @@ impl<'gc> State<'gc> {
                     }
                 }
 
-                // Register the completed module
-                self.module_manager.register_module(name, module);
+                // Restore previous module context
                 self.current_module = prev_module;
 
                 Ok(())
@@ -180,6 +185,9 @@ impl<'gc> State<'gc> {
     }
 
     pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
+        if let Some(_module) = self.module_manager.modules.get(&name) {
+            return Some(Value::Module(name));
+        }
         self.globals.get(&name).copied()
     }
 
@@ -192,7 +200,9 @@ impl<'gc> State<'gc> {
     }
 
     pub fn get_chunk(&mut self, chunk_id: usize) -> Result<Gc<'gc, Function<'gc>>, VmError> {
-        Ok(self.chunks.get(&chunk_id).copied().unwrap())
+        self.chunks.get(&chunk_id).copied().ok_or_else(|| {
+            VmError::RuntimeError(format!("Failed to find chunk with id {}", chunk_id))
+        })
     }
 
     // Call function with params
@@ -339,12 +349,12 @@ impl<'gc> State<'gc> {
                 self.pop_stack(); // Pop the value after defining
             }
             OpCode::GetGlobal(byte) => {
-                let varible_name = frame.read_constant(byte).as_string()?;
-                if let Some(value) = self.globals.get(&varible_name) {
-                    self.push_stack(*value);
+                let variable_name = frame.read_constant(byte).as_string()?;
+                if let Some(value) = self.get_global(variable_name) {
+                    self.push_stack(value);
                 } else {
                     return Err(self
-                        .runtime_error(format!("Undefined variable '{}'.", varible_name).into()));
+                        .runtime_error(format!("Undefined variable '{}'.", variable_name).into()));
                 }
             }
             OpCode::SetGlobal(byte) => {
@@ -552,6 +562,8 @@ impl<'gc> State<'gc> {
         if visibility == Visibility::Public {
             if let Some(current_module) = self.current_module {
                 if let Some(module) = self.module_manager.modules.get_mut(&current_module) {
+                    #[cfg(feature = "debug")]
+                    println!("Exporting {} from module {}", name, module.name);
                     module.exports.insert(name, value);
                 }
             }
@@ -776,30 +788,46 @@ impl<'gc> State<'gc> {
     ) -> Result<(), VmError> {
         let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         let receiver = *self.peek(args_slot_count);
-        if let Value::Instance(instance) = receiver {
-            if let Some(value) = instance.borrow().fields.get(&name) {
-                self.stack[self.stack_top - args_slot_count - 1] = *value;
-                self.call_value(*value, args_count, keyword_args_count)
-            } else {
-                self.invoke_from_class(
-                    instance.borrow().class,
-                    name,
-                    args_count,
-                    keyword_args_count,
-                )
+        match receiver {
+            Value::Instance(instance) => {
+                if let Some(value) = instance.borrow().fields.get(&name) {
+                    self.stack[self.stack_top - args_slot_count - 1] = *value;
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    self.invoke_from_class(
+                        instance.borrow().class,
+                        name,
+                        args_count,
+                        keyword_args_count,
+                    )
+                }
             }
-        } else if let Value::Agent(agent) = receiver {
-            if let Some(method) = agent.methods.get(&name) {
-                let args = self.check_args(method, args_count, keyword_args_count)?;
-                let result = ai::run_agent(self, agent, args);
-                let s = self.intern(result.as_bytes());
-                self.push_stack(Value::from(s));
-                Ok(())
-            } else {
-                Err(self.runtime_error(format!("Agent have no method called '{}'.", name).into()))
+            Value::Module(module_name) => {
+                // Handle module function invocation
+                if let Some(value) = self.module_manager.get_export(module_name, name) {
+                    // Replace the module value with the function value
+                    self.stack[self.stack_top - args_slot_count - 1] = value;
+                    // Now call the function
+                    self.call_value(value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!("Undefined function '{}' in module '{}'", name, module_name).into(),
+                    ))
+                }
             }
-        } else {
-            Err(self.runtime_error("Only instances have methods.".into()))
+            Value::Agent(agent) => {
+                if let Some(method) = agent.methods.get(&name) {
+                    let args = self.check_args(method, args_count, keyword_args_count)?;
+                    let result = ai::run_agent(self, agent, args);
+                    let s = self.intern(result.as_bytes());
+                    self.push_stack(Value::from(s));
+                    Ok(())
+                } else {
+                    Err(self
+                        .runtime_error(format!("Agent have no method called '{}'.", name).into()))
+                }
+            }
+            _ => Err(self.runtime_error("Only instances or modules have methods.".into())),
         }
     }
 
