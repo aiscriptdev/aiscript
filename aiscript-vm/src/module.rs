@@ -83,7 +83,7 @@ impl<'gc> ModuleManager<'gc> {
         }
 
         Err(VmError::RuntimeError(format!(
-            "Could not find module '{}'",
+            "Could not find module '{}'.",
             module_name
         )))
     }

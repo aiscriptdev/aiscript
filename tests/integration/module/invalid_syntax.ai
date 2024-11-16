@@ -1,13 +1,5 @@
-pub; // Error at ';': Expect expression.
+use abc; // Could not find module 'abc'.
 
 pub use abc; // Error at 'use': 'pub' modifier cannot be used with 'use' statement.
 
-pub fn f1() {}
-
-pub ai fn f2() {}
-
-pub class A {}
-
-pub agent B {
-    instructions: "123"
-}
+pub; // Error at ';': Expect expression.

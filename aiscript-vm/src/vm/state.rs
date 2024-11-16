@@ -164,14 +164,17 @@ impl<'gc> State<'gc> {
                 // Register the module before executing its code
                 // This allows the module to find itself when it needs to export its values
                 self.module_manager.register_module(name, module);
-                println!(
-                    "self chunks id: {:?}",
-                    self.chunks.keys().collect::<Vec<_>>()
-                );
-                println!(
-                    "imported chunks id: {:?}",
-                    chunks.keys().collect::<Vec<_>>()
-                );
+                #[cfg(feature = "debug")]
+                {
+                    println!(
+                        "self chunks id: {:?}",
+                        self.chunks.keys().collect::<Vec<_>>()
+                    );
+                    println!(
+                        "imported chunks id: {:?}",
+                        chunks.keys().collect::<Vec<_>>()
+                    );
+                }
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 // Store the chunks in State.chunks before executing
                 self.chunks.extend(chunks);
@@ -483,17 +486,34 @@ impl<'gc> State<'gc> {
                 )));
             }
             OpCode::GetProperty(byte) => {
-                if let Ok(instance) = self.peek(0).as_instance() {
-                    let frame = self.current_frame();
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    if let Some(property) = instance.borrow().fields.get(&name) {
-                        self.pop_stack(); // Instance
-                        self.push_stack(*property);
-                    } else {
-                        self.bind_method(instance.borrow().class, name)?;
+                let name = frame.read_constant(byte).as_string().unwrap();
+                match *self.peek(0) {
+                    Value::Instance(instance) => {
+                        if let Some(property) = instance.borrow().fields.get(&name) {
+                            self.pop_stack(); // Instance
+                            self.push_stack(*property);
+                        } else {
+                            self.bind_method(instance.borrow().class, name)?;
+                        }
                     }
-                } else {
-                    return Err(self.runtime_error("Only instances have properties.".into()));
+                    Value::Module(module_name) => {
+                        if let Some(value) = self.module_manager.get_export(module_name, name) {
+                            self.pop_stack(); // Pop module
+                            self.push_stack(value);
+                        } else {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Undefined property '{}' in module '{}'",
+                                    name, module_name
+                                )
+                                .into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        // Only instances and modules have properties.
+                        return Err(self.runtime_error("Only instances have properties.".into()));
+                    }
                 }
             }
             OpCode::SetProperty(byte) => {
