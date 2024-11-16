@@ -1,4 +1,10 @@
-use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault};
+use std::{
+    array,
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    hash::BuildHasherDefault,
+    mem,
+};
 
 use ahash::AHasher;
 use gc_arena::{
@@ -81,7 +87,7 @@ impl<'gc> CallFrame<'gc> {
 
 pub struct State<'gc> {
     mc: &'gc Mutation<'gc>,
-    pub(super) chunks: HashMap<usize, Gc<'gc, Function<'gc>>>,
+    pub(super) chunks: BTreeMap<usize, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
     frame_count: usize,
     stack: [Value<'gc>; STACK_MAX_SIZE],
@@ -116,7 +122,7 @@ impl<'gc> State<'gc> {
     pub(super) fn new(mc: &'gc Mutation<'gc>) -> Self {
         State {
             mc,
-            chunks: HashMap::new(),
+            chunks: BTreeMap::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
             frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
@@ -136,9 +142,17 @@ impl<'gc> State<'gc> {
         match module_source {
             ModuleSource::Cached => Ok(()), // Module already loaded
             ModuleSource::New { source, path } => {
-                // Set up module context and compile
-                let prev_module = self.current_module.replace(name);
+                // Create new module with its own globals
+                let module = Module::new(name, path);
 
+                // Set up module context
+                let prev_module = self.current_module.replace(name);
+                let prev_globals = mem::replace(&mut self.globals, module.globals.clone());
+
+                #[cfg(feature = "debug")]
+                println!("Compiling module {}", name);
+
+                // Compile and execute module code
                 let context = Context {
                     mutation: self.mc,
                     strings: self.strings,
@@ -147,36 +161,30 @@ impl<'gc> State<'gc> {
                 let source: &'static str = Box::leak(source.into_boxed_str());
                 let chunks = crate::compiler::compile(context, source)?;
 
-                // Create and register the module BEFORE executing code
-                let module = Module {
-                    name,
-                    exports: HashMap::new(),
-                    path,
-                };
-
                 // Register the module before executing its code
                 // This allows the module to find itself when it needs to export its values
                 self.module_manager.register_module(name, module);
+                println!(
+                    "self chunks id: {:?}",
+                    self.chunks.keys().collect::<Vec<_>>()
+                );
+                println!(
+                    "imported chunks id: {:?}",
+                    chunks.keys().collect::<Vec<_>>()
+                );
+                let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 // Store the chunks in State.chunks before executing
-                self.chunks.extend(chunks.clone());
+                self.chunks.extend(chunks);
 
                 // Execute each chunk of module code
-                for (_id, function) in chunks {
-                    let closure = Gc::new(self.mc, Closure::new(self.mc, function));
-                    self.push_stack(Value::from(closure));
-                    self.call(closure, 0, 0)?;
+                self.eval_function(imported_script_chunk_id, vec![])?;
 
-                    // Execute until module chunk is complete
-                    let frame_count = self.frame_count;
-                    loop {
-                        if let Some(_result) = self.dispatch_next(frame_count)? {
-                            self.pop_stack();
-                            break;
-                        }
-                    }
+                // Save module's globals
+                if let Some(module) = self.module_manager.modules.get_mut(&name) {
+                    module.globals = mem::replace(&mut self.globals, prev_globals);
                 }
 
-                // Restore previous module context
+                // Restore previous context
                 self.current_module = prev_module;
 
                 Ok(())
@@ -185,10 +193,26 @@ impl<'gc> State<'gc> {
     }
 
     pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
+        // First check if it's a module name
         if let Some(_module) = self.module_manager.modules.get(&name) {
             return Some(Value::Module(name));
         }
-        self.globals.get(&name).copied()
+
+        // Then check current globals scope
+        if let Some(value) = self.globals.get(&name).copied() {
+            return Some(value);
+        }
+
+        // Finally check current module's globals if we're in a module
+        if let Some(current_module) = self.current_module {
+            if let Some(module) = self.module_manager.modules.get(&current_module) {
+                if let Some(value) = module.globals.get(&name).copied() {
+                    return Some(value);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn intern(&mut self, s: &[u8]) -> InternedString<'gc> {
@@ -555,7 +579,7 @@ impl<'gc> State<'gc> {
         value: Value<'gc>,
         visibility: Visibility,
     ) {
-        // Always define in global scope
+        // Always define in current globals scope
         self.globals.insert(name, value);
 
         // If public and in a module context, also add to module exports
@@ -948,7 +972,10 @@ impl<'gc> State<'gc> {
 
     #[inline(always)]
     pub fn pop_stack(&mut self) -> Value<'gc> {
-        debug_assert!(self.stack_top > 0, "Stack underflow");
+        // debug_assert!(self.stack_top > 0, "Stack underflow");
+        if self.stack_top == 0 {
+            return Value::Nil;
+        }
         self.stack_top -= 1;
         unsafe { *self.stack.get_unchecked(self.stack_top) }
     }

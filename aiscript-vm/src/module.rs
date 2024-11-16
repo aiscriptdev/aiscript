@@ -1,13 +1,15 @@
+use ahash::AHasher;
 use gc_arena::Collect;
 
 use crate::{string::InternedString, vm::VmError, Value};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, hash::BuildHasherDefault, path::PathBuf};
 
 #[derive(Debug, Collect)]
 #[collect(no_drop)]
 pub struct Module<'gc> {
     pub name: InternedString<'gc>,
-    pub exports: HashMap<InternedString<'gc>, Value<'gc>>,
+    pub exports: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    pub globals: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
     pub path: PathBuf,
 }
 
@@ -22,6 +24,15 @@ pub struct ModuleManager<'gc> {
 }
 
 impl<'gc> Module<'gc> {
+    pub fn new(name: InternedString<'gc>, path: PathBuf) -> Self {
+        Module {
+            name,
+            exports: HashMap::default(),
+            globals: HashMap::default(),
+            path,
+        }
+    }
+
     #[cfg(feature = "debug")]
     pub fn debug_info(&self) -> String {
         format!("Module '{}' from {:?}", self.name, self.path)

@@ -139,7 +139,7 @@ impl<'gc> Parser<'gc> {
 
         let stmt = if self.match_token(TokenType::Use) {
             if visibility == Visibility::Public {
-                self.error("'pub' modifier cannot be used with 'use' statement");
+                self.error("'pub' modifier cannot be used with 'use' statement.");
                 None
             } else {
                 self.use_declaration()
