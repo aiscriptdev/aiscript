@@ -1,0 +1,3 @@
+class Foo {}
+
+class Bar(Foo {} // Error at '{': Expect ')' after superclass name

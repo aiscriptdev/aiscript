@@ -322,12 +322,13 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
-        let superclass = if self.match_token(TokenType::Less) {
+        let superclass = if self.match_token(TokenType::OpenParen) {
             self.consume(TokenType::Identifier, "Expect superclass name.");
             let superclass_name = self.previous;
             if name.lexeme == superclass_name.lexeme {
                 self.error("A class can't inherit from itself.");
             }
+            self.consume(TokenType::CloseParen, "Expect ')' after superclass name");
             Some(Expr::Variable {
                 name: superclass_name,
                 line: superclass_name.line,

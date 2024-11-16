@@ -8,7 +8,7 @@ class A {
   }
 }
 
-class B < A {}
+class B(A) {}
 
 let b = B("value");
 b.test(); // expect: value

@@ -10,7 +10,7 @@ class Foo {
   }
 }
 
-class Bar < Foo {
+class Bar(Foo) {
   bar(a, b) {
     this.field1 = a;
     this.field2 = b;

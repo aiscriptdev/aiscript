@@ -1,7 +1,7 @@
 class A {}
 
 fn f() {
-  class B < A {}
+  class B(A) {}
   return B;
 }
 

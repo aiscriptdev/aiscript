@@ -2,7 +2,7 @@ class Base {
   toString() { return "Base"; }
 }
 
-class Derived < Base {
+class Derived(Base) {
   getClosure() {
     fn closure() {
       return super.toString();

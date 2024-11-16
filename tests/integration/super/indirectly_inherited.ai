@@ -4,9 +4,9 @@ class A {
   }
 }
 
-class B < A {}
+class B(A) {}
 
-class C < B {
+class C(B) {
   foo() {
     print "C.foo()";
     super.foo();

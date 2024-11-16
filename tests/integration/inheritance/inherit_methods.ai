@@ -3,7 +3,7 @@ class Foo {
   override() { print "foo"; }
 }
 
-class Bar < Foo {
+class Bar(Foo) {
   methodOnBar() { print "bar"; }
   override() { print "bar"; }
 }
