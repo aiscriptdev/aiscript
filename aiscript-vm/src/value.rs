@@ -20,6 +20,7 @@ pub enum Value<'gc> {
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
+    Module(InternedString<'gc>),
     Agent(Gc<'gc, Agent<'gc>>),
     Nil,
 }
@@ -72,6 +73,7 @@ impl<'gc> Display for Value<'gc> {
             }
             Value::BoundMethod(bm) => write!(f, "{}", bm.method.function),
             Value::Agent(agent) => write!(f, "agent {}", agent.name),
+            Value::Module(module) => write!(f, "module {}", module),
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -161,6 +163,13 @@ impl<'gc> Value<'gc> {
             _ => Err(VmError::RuntimeError(
                 "cannot convert to bound method".into(),
             )),
+        }
+    }
+
+    pub fn as_module(&self) -> Option<InternedString<'gc>> {
+        match self {
+            Value::Module(name) => Some(*name),
+            _ => None,
         }
     }
 

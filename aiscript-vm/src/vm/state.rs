@@ -1,4 +1,10 @@
-use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault};
+use std::{
+    array,
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    hash::BuildHasherDefault,
+    mem,
+};
 
 use ahash::AHasher;
 use gc_arena::{
@@ -7,13 +13,16 @@ use gc_arena::{
 };
 
 use crate::{
-    ai, builtins,
+    ai,
+    ast::Visibility,
+    builtins,
+    module::{Module, ModuleManager, ModuleSource},
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     OpCode, ReturnValue, Value,
 };
 
-use super::{fuel::Fuel, VmError};
+use super::{fuel::Fuel, Context, VmError};
 
 type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>;
 
@@ -78,7 +87,7 @@ impl<'gc> CallFrame<'gc> {
 
 pub struct State<'gc> {
     mc: &'gc Mutation<'gc>,
-    pub(super) chunks: HashMap<usize, Gc<'gc, Function<'gc>>>,
+    pub(super) chunks: BTreeMap<usize, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
     frame_count: usize,
     stack: [Value<'gc>; STACK_MAX_SIZE],
@@ -86,6 +95,8 @@ pub struct State<'gc> {
     pub(super) strings: InternedStringSet<'gc>,
     pub(super) globals: Table<'gc>,
     open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
+    module_manager: ModuleManager<'gc>,
+    current_module: Option<InternedString<'gc>>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {
@@ -111,7 +122,7 @@ impl<'gc> State<'gc> {
     pub(super) fn new(mc: &'gc Mutation<'gc>) -> Self {
         State {
             mc,
-            chunks: HashMap::new(),
+            chunks: BTreeMap::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
             frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
@@ -119,11 +130,92 @@ impl<'gc> State<'gc> {
             strings: InternedStringSet::new(mc),
             globals: HashMap::default(),
             open_upvalues: None,
+            module_manager: ModuleManager::new(),
+            current_module: None,
+        }
+    }
+
+    pub fn import_module(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+        // Get module source
+        let module_source = self.module_manager.get_or_load_module(name)?;
+
+        match module_source {
+            ModuleSource::Cached => Ok(()), // Module already loaded
+            ModuleSource::New { source, path } => {
+                // Create new module with its own globals
+                let module = Module::new(name, path);
+
+                // Set up module context
+                let prev_module = self.current_module.replace(name);
+                let prev_globals = mem::replace(&mut self.globals, module.globals.clone());
+
+                #[cfg(feature = "debug")]
+                println!("Compiling module {}", name);
+
+                // Compile and execute module code
+                let context = Context {
+                    mutation: self.mc,
+                    strings: self.strings,
+                };
+
+                let source: &'static str = Box::leak(source.into_boxed_str());
+                let chunks = crate::compiler::compile(context, source)?;
+
+                // Register the module before executing its code
+                // This allows the module to find itself when it needs to export its values
+                self.module_manager.register_module(name, module);
+                #[cfg(feature = "debug")]
+                {
+                    println!(
+                        "self chunks id: {:?}",
+                        self.chunks.keys().collect::<Vec<_>>()
+                    );
+                    println!(
+                        "imported chunks id: {:?}",
+                        chunks.keys().collect::<Vec<_>>()
+                    );
+                }
+                let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
+                // Store the chunks in State.chunks before executing
+                self.chunks.extend(chunks);
+
+                // Execute each chunk of module code
+                self.eval_function(imported_script_chunk_id, vec![])?;
+
+                // Save module's globals
+                if let Some(module) = self.module_manager.modules.get_mut(&name) {
+                    module.globals = mem::replace(&mut self.globals, prev_globals);
+                }
+
+                // Restore previous context
+                self.current_module = prev_module;
+
+                Ok(())
+            }
         }
     }
 
     pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
-        self.globals.get(&name).copied()
+        // First check if it's a module name
+        if let Some(_module) = self.module_manager.modules.get(&name) {
+            return Some(Value::Module(name));
+        }
+
+        // Then check current globals scope
+        if let Some(value) = self.globals.get(&name).copied() {
+            return Some(value);
+        }
+
+        // Finally check current module's globals if we're in a module
+        if let Some(current_module) = self.current_module {
+            if let Some(module) = self.module_manager.modules.get(&current_module) {
+                if let Some(value) = module.globals.get(&name).copied() {
+                    return Some(value);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn intern(&mut self, s: &[u8]) -> InternedString<'gc> {
@@ -135,7 +227,9 @@ impl<'gc> State<'gc> {
     }
 
     pub fn get_chunk(&mut self, chunk_id: usize) -> Result<Gc<'gc, Function<'gc>>, VmError> {
-        Ok(self.chunks.get(&chunk_id).copied().unwrap())
+        self.chunks.get(&chunk_id).copied().ok_or_else(|| {
+            VmError::RuntimeError(format!("Failed to find chunk with id {}", chunk_id))
+        })
     }
 
     // Call function with params
@@ -186,7 +280,7 @@ impl<'gc> State<'gc> {
     // When dispatch in step() function, the stop_at_frame_count is 0.
     // When dispatch in eval_function(), the stop_at_frame_count is the frame count before to call eval_function().
     // This is used to exit the frame call after the chunks of that function is finished.
-    fn dispatch_next(
+    pub fn dispatch_next(
         &mut self,
         stop_at_frame_count: usize,
     ) -> Result<Option<ReturnValue>, VmError> {
@@ -273,18 +367,21 @@ impl<'gc> State<'gc> {
             OpCode::Pop => {
                 self.pop_stack();
             }
-            OpCode::DefineGlobal(byte) => {
-                let varible_name = frame.read_constant(byte).as_string()?;
-                self.globals.insert(varible_name, *self.peek(0));
-                self.pop_stack();
+            OpCode::DefineGlobal(byte, visibility) => {
+                let variable_name = frame.read_constant(byte).as_string()?;
+                let value = *self.peek(0);
+
+                // Define in global scope with visibility
+                self.define_global(variable_name, value, visibility);
+                self.pop_stack(); // Pop the value after defining
             }
             OpCode::GetGlobal(byte) => {
-                let varible_name = frame.read_constant(byte).as_string()?;
-                if let Some(value) = self.globals.get(&varible_name) {
-                    self.push_stack(*value);
+                let variable_name = frame.read_constant(byte).as_string()?;
+                if let Some(value) = self.get_global(variable_name) {
+                    self.push_stack(value);
                 } else {
                     return Err(self
-                        .runtime_error(format!("Undefined variable '{}'.", varible_name).into()));
+                        .runtime_error(format!("Undefined variable '{}'.", variable_name).into()));
                 }
             }
             OpCode::SetGlobal(byte) => {
@@ -389,17 +486,34 @@ impl<'gc> State<'gc> {
                 )));
             }
             OpCode::GetProperty(byte) => {
-                if let Ok(instance) = self.peek(0).as_instance() {
-                    let frame = self.current_frame();
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    if let Some(property) = instance.borrow().fields.get(&name) {
-                        self.pop_stack(); // Instance
-                        self.push_stack(*property);
-                    } else {
-                        self.bind_method(instance.borrow().class, name)?;
+                let name = frame.read_constant(byte).as_string().unwrap();
+                match *self.peek(0) {
+                    Value::Instance(instance) => {
+                        if let Some(property) = instance.borrow().fields.get(&name) {
+                            self.pop_stack(); // Instance
+                            self.push_stack(*property);
+                        } else {
+                            self.bind_method(instance.borrow().class, name)?;
+                        }
                     }
-                } else {
-                    return Err(self.runtime_error("Only instances have properties.".into()));
+                    Value::Module(module_name) => {
+                        if let Some(value) = self.module_manager.get_export(module_name, name) {
+                            self.pop_stack(); // Pop module
+                            self.push_stack(value);
+                        } else {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Undefined property '{}' in module '{}'",
+                                    name, module_name
+                                )
+                                .into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        // Only instances and modules have properties.
+                        return Err(self.runtime_error("Only instances have properties.".into()));
+                    }
                 }
             }
             OpCode::SetProperty(byte) => {
@@ -455,8 +569,49 @@ impl<'gc> State<'gc> {
                 let agent = frame.read_constant(name);
                 self.push_stack(agent);
             }
+            OpCode::ImportModule(module_name_idx) => {
+                let module_name = frame.read_constant(module_name_idx).as_string()?;
+                self.import_module(module_name)?;
+            }
+            OpCode::GetModuleVar(module_idx, name_idx) => {
+                let module_name = frame.read_constant(module_idx).as_string()?;
+                let var_name = frame.read_constant(name_idx).as_string()?;
+
+                if let Some(value) = self.module_manager.get_export(module_name, var_name) {
+                    self.push_stack(value);
+                } else {
+                    return Err(self.runtime_error(
+                        format!(
+                            "Undefined variable '{}' in module '{}'",
+                            var_name, module_name
+                        )
+                        .into(),
+                    ));
+                }
+            }
         }
         Ok(None)
+    }
+
+    pub fn define_global(
+        &mut self,
+        name: InternedString<'gc>,
+        value: Value<'gc>,
+        visibility: Visibility,
+    ) {
+        // Always define in current globals scope
+        self.globals.insert(name, value);
+
+        // If public and in a module context, also add to module exports
+        if visibility == Visibility::Public {
+            if let Some(current_module) = self.current_module {
+                if let Some(module) = self.module_manager.modules.get_mut(&current_module) {
+                    #[cfg(feature = "debug")]
+                    println!("Exporting {} from module {}", name, module.name);
+                    module.exports.insert(name, value);
+                }
+            }
+        }
     }
 
     pub fn eval_function(
@@ -677,30 +832,46 @@ impl<'gc> State<'gc> {
     ) -> Result<(), VmError> {
         let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         let receiver = *self.peek(args_slot_count);
-        if let Value::Instance(instance) = receiver {
-            if let Some(value) = instance.borrow().fields.get(&name) {
-                self.stack[self.stack_top - args_slot_count - 1] = *value;
-                self.call_value(*value, args_count, keyword_args_count)
-            } else {
-                self.invoke_from_class(
-                    instance.borrow().class,
-                    name,
-                    args_count,
-                    keyword_args_count,
-                )
+        match receiver {
+            Value::Instance(instance) => {
+                if let Some(value) = instance.borrow().fields.get(&name) {
+                    self.stack[self.stack_top - args_slot_count - 1] = *value;
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    self.invoke_from_class(
+                        instance.borrow().class,
+                        name,
+                        args_count,
+                        keyword_args_count,
+                    )
+                }
             }
-        } else if let Value::Agent(agent) = receiver {
-            if let Some(method) = agent.methods.get(&name) {
-                let args = self.check_args(method, args_count, keyword_args_count)?;
-                let result = ai::run_agent(self, agent, args);
-                let s = self.intern(result.as_bytes());
-                self.push_stack(Value::from(s));
-                Ok(())
-            } else {
-                Err(self.runtime_error(format!("Agent have no method called '{}'.", name).into()))
+            Value::Module(module_name) => {
+                // Handle module function invocation
+                if let Some(value) = self.module_manager.get_export(module_name, name) {
+                    // Replace the module value with the function value
+                    self.stack[self.stack_top - args_slot_count - 1] = value;
+                    // Now call the function
+                    self.call_value(value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!("Undefined function '{}' in module '{}'", name, module_name).into(),
+                    ))
+                }
             }
-        } else {
-            Err(self.runtime_error("Only instances have methods.".into()))
+            Value::Agent(agent) => {
+                if let Some(method) = agent.methods.get(&name) {
+                    let args = self.check_args(method, args_count, keyword_args_count)?;
+                    let result = ai::run_agent(self, agent, args);
+                    let s = self.intern(result.as_bytes());
+                    self.push_stack(Value::from(s));
+                    Ok(())
+                } else {
+                    Err(self
+                        .runtime_error(format!("Agent have no method called '{}'.", name).into()))
+                }
+            }
+            _ => Err(self.runtime_error("Only instances or modules have methods.".into())),
         }
     }
 
@@ -781,7 +952,7 @@ impl<'gc> State<'gc> {
         Ok(final_args)
     }
 
-    fn call(
+    pub fn call(
         &mut self,
         closure: Gc<'gc, Closure<'gc>>,
         args_count: u8,
@@ -811,7 +982,7 @@ impl<'gc> State<'gc> {
         Ok(())
     }
     #[inline(always)]
-    fn push_stack(&mut self, value: Value<'gc>) {
+    pub fn push_stack(&mut self, value: Value<'gc>) {
         debug_assert!(self.stack_top < STACK_MAX_SIZE, "Stack overflow");
         unsafe {
             *self.stack.get_unchecked_mut(self.stack_top) = value;
@@ -820,8 +991,11 @@ impl<'gc> State<'gc> {
     }
 
     #[inline(always)]
-    fn pop_stack(&mut self) -> Value<'gc> {
-        debug_assert!(self.stack_top > 0, "Stack underflow");
+    pub fn pop_stack(&mut self) -> Value<'gc> {
+        // debug_assert!(self.stack_top > 0, "Stack underflow");
+        if self.stack_top == 0 {
+            return Value::Nil;
+        }
         self.stack_top -= 1;
         unsafe { *self.stack.get_unchecked(self.stack_top) }
     }

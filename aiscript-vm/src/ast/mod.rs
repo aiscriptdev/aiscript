@@ -6,6 +6,56 @@ use indexmap::IndexMap;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum Visibility {
+    #[default]
+    Private, // Default visibility
+    Public, // Accessible from other modules
+            // Could add more in future like:
+            // Protected,  // Only accessible to child classes
+            // Package,    // Only accessible within the same package/directory
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionDecl<'gc> {
+    pub name: Token<'gc>,
+    pub mangled_name: String,
+    pub doc: Option<Token<'gc>>,
+    pub params: IndexMap<Token<'gc>, Parameter<'gc>>,
+    pub return_type: Option<Token<'gc>>,
+    pub body: Vec<Stmt<'gc>>,
+    pub is_ai: bool,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct VariableDecl<'gc> {
+    pub name: Token<'gc>,
+    pub initializer: Option<Expr<'gc>>,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassDecl<'gc> {
+    pub name: Token<'gc>,
+    pub superclass: Option<Expr<'gc>>,
+    pub methods: Vec<Stmt<'gc>>,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AgentDecl<'gc> {
+    pub name: Token<'gc>,
+    pub mangled_name: String,
+    pub fields: HashMap<&'gc str, Expr<'gc>>,
+    pub tools: Vec<Stmt<'gc>>,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct Parameter<'gc> {
     pub name: Token<'gc>,
@@ -176,6 +226,10 @@ impl<'gc> Expr<'gc> {
 
 #[derive(Debug, Clone)]
 pub enum Stmt<'gc> {
+    Use {
+        path: Token<'gc>,
+        line: u32,
+    },
     Expression {
         expression: Expr<'gc>,
         line: u32,
@@ -184,11 +238,7 @@ pub enum Stmt<'gc> {
         expression: Expr<'gc>,
         line: u32,
     },
-    Let {
-        name: Token<'gc>,
-        initializer: Option<Expr<'gc>>,
-        line: u32,
-    },
+    Let(VariableDecl<'gc>),
     Block {
         statements: Vec<Stmt<'gc>>,
         line: u32,
@@ -212,50 +262,31 @@ pub enum Stmt<'gc> {
         body: Box<Stmt<'gc>>,
         line: u32,
     },
-    Function {
-        name: Token<'gc>,
-        mangled_name: String,
-        doc: Option<Token<'gc>>,
-        params: IndexMap<Token<'gc>, Parameter<'gc>>,
-        return_type: Option<Token<'gc>>,
-        body: Vec<Stmt<'gc>>,
-        is_ai: bool,
-        line: u32,
-    },
+    Function(FunctionDecl<'gc>),
     Return {
         value: Option<Expr<'gc>>,
         line: u32,
     },
-    Class {
-        name: Token<'gc>,
-        superclass: Option<Expr<'gc>>,
-        methods: Vec<Stmt<'gc>>,
-        line: u32,
-    },
-    Agent {
-        name: Token<'gc>,
-        mangled_name: String,
-        fields: HashMap<&'gc str, Expr<'gc>>,
-        tools: Vec<Stmt<'gc>>,
-        line: u32,
-    },
+    Class(ClassDecl<'gc>),
+    Agent(AgentDecl<'gc>),
 }
 
 impl<'gc> Stmt<'gc> {
     pub fn line(&self) -> u32 {
         match self {
-            Self::Expression { line, .. }
+            Self::Use { line, .. }
+            | Self::Expression { line, .. }
             | Self::Print { line, .. }
-            | Self::Let { line, .. }
+            | Self::Let(VariableDecl { line, .. })
             | Self::Break { line, .. }
             | Self::Continue { line, .. }
             | Self::Block { line, .. }
             | Self::If { line, .. }
             | Self::Loop { line, .. }
-            | Self::Function { line, .. }
+            | Self::Function(FunctionDecl { line, .. })
             | Self::Return { line, .. }
-            | Self::Class { line, .. }
-            | Self::Agent { line, .. } => *line,
+            | Self::Class(ClassDecl { line, .. })
+            | Self::Agent(AgentDecl { line, .. }) => *line,
         }
     }
 }

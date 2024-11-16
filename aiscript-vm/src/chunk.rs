@@ -6,7 +6,7 @@ use std::{
 
 use gc_arena::Collect;
 
-use crate::Value;
+use crate::{ast::Visibility, Value};
 
 #[derive(Copy, Clone, Debug, Collect)]
 #[collect(require_static)]
@@ -27,7 +27,7 @@ pub enum OpCode {
     Less,
     Print,
     Pop,
-    DefineGlobal(u8),
+    DefineGlobal(u8, Visibility),
     GetGlobal(u8),
     SetGlobal(u8),
     GetLocal(u8),
@@ -48,6 +48,8 @@ pub enum OpCode {
     Inherit,
     GetSuper(u8),
     SuperInvoke(u8, u8, u8), // method_constant, positional_count, keyword_count
+    ImportModule(u8),        // Import a module, constant index contains module name
+    GetModuleVar(u8, u8),    // Get variable from module (module name index, var name index)
     // AI
     Prompt,
     Agent(u8), // constant index
@@ -185,7 +187,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Less => simple_instruction("LESS"),
                 OpCode::Print => simple_instruction("PRINT"),
                 OpCode::Pop => simple_instruction("POP"),
-                OpCode::DefineGlobal(c) => self.constant_instruction("DEFINE_GLOBAL", c),
+                OpCode::DefineGlobal(c, _v) => self.constant_instruction("DEFINE_GLOBAL", c),
                 OpCode::GetGlobal(c) => self.constant_instruction("GET_GLOBAL", c),
                 OpCode::SetGlobal(c) => self.constant_instruction("SET_GLOBAL", c),
                 OpCode::GetLocal(byte) => self.byte_instruction("GET_LOCAL", byte),
@@ -229,6 +231,8 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SuperInvoke(name, arity, _) => {
                     self.invoke_instruction("SUPER_INVOKE", name, arity)
                 }
+                OpCode::ImportModule(c) => self.constant_instruction("IMPORT_MODULE", c),
+                OpCode::GetModuleVar(a, b) => self.invoke_instruction("GET_MODULE_VAR", a, b),
                 OpCode::Prompt => simple_instruction("PROMPT"),
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);

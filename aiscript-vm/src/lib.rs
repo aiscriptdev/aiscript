@@ -4,6 +4,7 @@ mod builtins;
 mod chunk;
 mod compiler;
 mod lexer;
+mod module;
 mod object;
 mod parser;
 mod string;

@@ -54,11 +54,13 @@ pub enum TokenType {
     Nil,
     Or,
     Print,
+    Pub,
     Return,
     Super,
     This,
     True,
     Let,
+    Use,
     While,
 
     // AI-specific keywords
@@ -341,11 +343,13 @@ impl<'a> Scanner<'a> {
             "or" => TokenType::Or,
             "print" => TokenType::Print,
             "prompt" => TokenType::Prompt,
+            "pub" => TokenType::Pub,
             "return" => TokenType::Return,
             "super" => TokenType::Super,
             "this" => TokenType::This,
             "true" => TokenType::True,
             "let" => TokenType::Let,
+            "use" => TokenType::Use,
             "while" => TokenType::While,
             _ => TokenType::Identifier,
         };

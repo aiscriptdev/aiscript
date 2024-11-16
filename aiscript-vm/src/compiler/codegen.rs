@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     ai::Agent,
+    ast::{AgentDecl, ClassDecl, FunctionDecl, VariableDecl},
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -121,7 +122,7 @@ impl<'gc> CodeGen<'gc> {
     }
 
     fn declare_classes(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
-        if let Stmt::Class { name, .. } = stmt {
+        if let Stmt::Class(ClassDecl { name, .. }) = stmt {
             self.type_resolver
                 .register_type(name.lexeme, Type::Class(*name));
         }
@@ -148,14 +149,14 @@ impl<'gc> CodeGen<'gc> {
             Stmt::Loop { body, .. } => {
                 self.declare_functions(body)?;
             }
-            Stmt::Function {
+            Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
                 body,
                 doc,
                 params,
                 ..
-            } => {
+            }) => {
                 if !self.named_id_map.contains_key(mangled_name) {
                     let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
                     self.named_id_map
@@ -168,12 +169,12 @@ impl<'gc> CodeGen<'gc> {
                     self.declare_functions(stmt)?;
                 }
             }
-            Stmt::Class { methods, .. } => {
+            Stmt::Class(ClassDecl { methods, .. }) => {
                 for methods in methods {
                     self.declare_functions(methods)?;
                 }
             }
-            Stmt::Agent { tools, .. } => {
+            Stmt::Agent(AgentDecl { tools, .. }) => {
                 for tool in tools {
                     self.declare_functions(tool)?;
                 }
@@ -187,6 +188,11 @@ impl<'gc> CodeGen<'gc> {
     fn generate_stmt(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
         self.current_line = stmt.line();
         match stmt {
+            Stmt::Use { path, .. } => {
+                // Load the module name as a constant
+                let module_name = self.identifier_constant(path.lexeme);
+                self.emit(OpCode::ImportModule(module_name as u8));
+            }
             Stmt::Break { .. } => {
                 let exit_jump = self.emit_jump(OpCode::Jump(0));
                 // Get the last scope's index
@@ -214,9 +220,12 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(expression)?;
                 self.emit(OpCode::Print);
             }
-            Stmt::Let {
-                name, initializer, ..
-            } => {
+            Stmt::Let(VariableDecl {
+                name,
+                initializer,
+                visibility,
+                ..
+            }) => {
                 self.declare_variable(*name);
                 if let Some(init) = initializer {
                     self.generate_expr(init)?;
@@ -227,7 +236,7 @@ impl<'gc> CodeGen<'gc> {
                     self.mark_initialized();
                 } else {
                     let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8));
+                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
                 }
             }
             Stmt::Block { statements, .. } => {
@@ -319,15 +328,16 @@ impl<'gc> CodeGen<'gc> {
 
                 self.end_scope();
             }
-            Stmt::Function {
+            Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
                 params,
                 return_type,
                 body,
                 is_ai,
+                visibility,
                 ..
-            } => {
+            }) => {
                 let fn_type = if *is_ai {
                     FunctionType::AiFunction
                 } else {
@@ -350,7 +360,7 @@ impl<'gc> CodeGen<'gc> {
 
                 if self.scope_depth == 0 {
                     let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8));
+                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
                 }
             }
             Stmt::Return { value, .. } => {
@@ -366,16 +376,17 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::Return);
                 }
             }
-            Stmt::Class {
+            Stmt::Class(ClassDecl {
                 name,
                 superclass,
                 methods,
+                visibility,
                 ..
-            } => {
+            }) => {
                 // Emit class declaration
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::Class(name_constant as u8));
-                self.emit(OpCode::DefineGlobal(name_constant as u8));
+                self.emit(OpCode::DefineGlobal(name_constant as u8, *visibility));
 
                 // Handle inheritance
                 if let Some(superclass) = superclass {
@@ -405,14 +416,14 @@ impl<'gc> CodeGen<'gc> {
 
                 // Generate methods
                 for method in methods {
-                    if let Stmt::Function {
+                    if let Stmt::Function(FunctionDecl {
                         name: method_name,
                         mangled_name,
                         params,
                         return_type,
                         body,
                         ..
-                    } = method
+                    }) = method
                     {
                         let fn_type = if method_name.lexeme == "init" {
                             FunctionType::Initializer
@@ -441,13 +452,14 @@ impl<'gc> CodeGen<'gc> {
                     self.end_scope();
                 }
             }
-            Stmt::Agent {
+            Stmt::Agent(AgentDecl {
                 name,
                 mangled_name,
                 fields,
                 tools,
+                visibility,
                 ..
-            } => {
+            }) => {
                 // Emit agent declaration
                 let agent_name = self.ctx.intern(name.lexeme.as_bytes());
                 let mut agent = Agent::new(&self.ctx, agent_name)
@@ -472,7 +484,7 @@ impl<'gc> CodeGen<'gc> {
                     });
 
                 for tool in tools {
-                    if let Stmt::Function {
+                    if let Stmt::Function(FunctionDecl {
                         name,
                         mangled_name,
                         doc,
@@ -480,7 +492,7 @@ impl<'gc> CodeGen<'gc> {
                         return_type,
                         body,
                         ..
-                    } = tool
+                    }) = tool
                     {
                         let fn_type = FunctionType::Tool;
                         let chunk_id = self.generate_function(
@@ -504,7 +516,7 @@ impl<'gc> CodeGen<'gc> {
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
                 let name_constant = self.identifier_constant(name.lexeme);
-                self.emit(OpCode::DefineGlobal(name_constant as u8));
+                self.emit(OpCode::DefineGlobal(name_constant as u8, *visibility));
                 // self.emit(OpCode::Pop);
             }
         }
