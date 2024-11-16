@@ -1,0 +1,12 @@
+fn f1() {
+    const PI = 3.14;
+
+    fn f2 () {
+        PI = 3.2; // Error at 'PI': Cannot assign to constant variable.
+        print PI;
+    }
+
+    return f2;
+}
+let f = f1();
+f();

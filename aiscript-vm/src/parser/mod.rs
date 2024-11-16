@@ -153,6 +153,8 @@ impl<'gc> Parser<'gc> {
             self.func_declaration(FunctionType::Function, visibility)
         } else if self.match_token(TokenType::Let) {
             self.var_declaration(visibility)
+        } else if self.match_token(TokenType::Const) {
+            self.const_declaration(visibility)
         } else if self.match_token(TokenType::Agent) {
             self.agent_declaration(visibility)
         } else {
@@ -473,6 +475,28 @@ impl<'gc> Parser<'gc> {
             visibility,
             line: name.line,
         }))
+    }
+
+    fn const_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect constant name.");
+        let name = self.previous;
+
+        self.consume(
+            TokenType::Equal,
+            "Const declarations must have an initializer.",
+        );
+        let initializer = self.expression()?;
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after constant declaration.",
+        );
+        Some(Stmt::Const {
+            name,
+            initializer,
+            visibility,
+            line: name.line,
+        })
     }
 
     fn var_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {

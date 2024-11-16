@@ -6,6 +6,14 @@ use indexmap::IndexMap;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
+#[derive(Debug, Clone, Copy, Default, Collect, Eq, PartialEq)]
+#[collect(require_static)]
+pub enum Mutability {
+    #[default]
+    Mutable,
+    Immutable,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Visibility {
     #[default]
@@ -239,6 +247,12 @@ pub enum Stmt<'gc> {
         line: u32,
     },
     Let(VariableDecl<'gc>),
+    Const {
+        name: Token<'gc>,
+        initializer: Expr<'gc>,
+        visibility: Visibility,
+        line: u32,
+    },
     Block {
         statements: Vec<Stmt<'gc>>,
         line: u32,
@@ -278,6 +292,7 @@ impl<'gc> Stmt<'gc> {
             | Self::Expression { line, .. }
             | Self::Print { line, .. }
             | Self::Let(VariableDecl { line, .. })
+            | Self::Const { line, .. }
             | Self::Break { line, .. }
             | Self::Continue { line, .. }
             | Self::Block { line, .. }

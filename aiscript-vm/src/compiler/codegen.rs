@@ -1,12 +1,12 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     mem,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
     ai::Agent,
-    ast::{AgentDecl, ClassDecl, FunctionDecl, VariableDecl},
+    ast::{AgentDecl, ClassDecl, FunctionDecl, Mutability, VariableDecl},
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -28,11 +28,13 @@ struct Local<'gc> {
     name: Token<'gc>,
     depth: isize,
     is_captured: bool,
+    mutability: Mutability,
 }
 
 #[derive(Debug, Default)]
 struct LoopScope {
-    increment: usize, // Position of increment code for continue
+    // Position of increment code for continue
+    increment: usize,
     // Break jump positions to patch
     breaks: Vec<usize>,
 }
@@ -49,6 +51,8 @@ pub struct CodeGen<'gc> {
     local_count: usize,
     scope_depth: isize,
     loop_scopes: Vec<LoopScope>,
+    // Track constant globals
+    const_globals: HashSet<&'gc str>,
     enclosing: Option<Box<CodeGen<'gc>>>,
     current_line: u32,
     had_error: bool,
@@ -72,8 +76,7 @@ impl<'gc> CodeGen<'gc> {
                     };
                     Local {
                         name,
-                        depth: 0,
-                        is_captured: false,
+                        ..Local::default()
                     }
                 } else {
                     Local::default()
@@ -82,6 +85,7 @@ impl<'gc> CodeGen<'gc> {
             local_count: 1,
             scope_depth: 0,
             loop_scopes: Vec::new(),
+            const_globals: HashSet::new(),
             enclosing: None,
             current_line: 0,
             had_error: false,
@@ -226,7 +230,7 @@ impl<'gc> CodeGen<'gc> {
                 visibility,
                 ..
             }) => {
-                self.declare_variable(*name);
+                self.declare_variable(*name, Mutability::Mutable);
                 if let Some(init) = initializer {
                     self.generate_expr(init)?;
                 } else {
@@ -235,6 +239,22 @@ impl<'gc> CodeGen<'gc> {
                 if self.scope_depth > 0 {
                     self.mark_initialized();
                 } else {
+                    let global = self.identifier_constant(name.lexeme);
+                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
+                }
+            }
+            Stmt::Const {
+                name,
+                initializer,
+                visibility,
+                ..
+            } => {
+                self.declare_variable(*name, Mutability::Immutable);
+                self.generate_expr(initializer)?;
+                if self.scope_depth > 0 {
+                    self.mark_initialized();
+                } else {
+                    self.const_globals.insert(name.lexeme);
                     let global = self.identifier_constant(name.lexeme);
                     self.emit(OpCode::DefineGlobal(global as u8, *visibility));
                 }
@@ -344,7 +364,7 @@ impl<'gc> CodeGen<'gc> {
                     FunctionType::Function
                 };
 
-                self.declare_variable(*name);
+                self.declare_variable(*name, Mutability::default());
                 if self.scope_depth > 0 {
                     self.mark_initialized();
                 }
@@ -398,7 +418,7 @@ impl<'gc> CodeGen<'gc> {
 
                     // Create local variable 'super'
                     let super_token = Token::new(TokenType::Super, "super", name.line);
-                    self.declare_variable(super_token);
+                    self.declare_variable(super_token, Mutability::Immutable);
                     self.mark_initialized();
 
                     // Then get the class we just defined
@@ -646,7 +666,7 @@ impl<'gc> CodeGen<'gc> {
 
                 // Look up 'super' in upvalues
                 let method_constant = self.identifier_constant(method.lexeme);
-                if let Some((pos, _)) = self
+                if let Some((pos, _, _)) = self
                     .resolve_upvalue("super")
                     .inspect_err(|err| self.error(err))
                     .ok()
@@ -676,7 +696,7 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_keyword_args(keyword_args)?;
 
                 // Get superclass and invoke method
-                if let Some((pos, _)) = self
+                if let Some((pos, _, _)) = self
                     .resolve_upvalue("super")
                     .map_err(|e| VmError::RuntimeError(e.into()))?
                 {
@@ -783,7 +803,7 @@ impl<'gc> CodeGen<'gc> {
 
         // Compile parameters and their default values
         for (index, param) in params.values().enumerate() {
-            self.declare_variable(param.name);
+            self.declare_variable(param.name, Mutability::Mutable);
             self.mark_initialized();
 
             let name = self.ctx.intern(param.name.lexeme.as_bytes());
@@ -870,22 +890,33 @@ impl<'gc> CodeGen<'gc> {
 
     // Variable handling methods
     fn named_variable(&mut self, name: &Token<'gc>, can_assign: bool) -> Result<(), VmError> {
-        let (get_op, set_op) = if let Some((pos, depth)) = self.resolve_local(name.lexeme) {
-            if depth == UNINITIALIZED_LOCAL_DEPTH {
-                self.error_at(*name, "Can't read local variable in its own initializer.");
-            }
-            (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
-        } else if let Some((pos, _)) = self
-            .resolve_upvalue(name.lexeme)
-            .inspect_err(|err| self.error_at(*name, err))
-            .ok()
-            .flatten()
-        {
-            (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
-        } else {
-            let pos = self.identifier_constant(name.lexeme) as u8;
-            (OpCode::GetGlobal(pos), OpCode::SetGlobal(pos))
-        };
+        let (get_op, set_op) =
+            if let Some((pos, depth, mutability)) = self.resolve_local(name.lexeme) {
+                if depth == UNINITIALIZED_LOCAL_DEPTH {
+                    self.error_at(*name, "Can't read local variable in its own initializer.");
+                }
+
+                if can_assign && mutability == Mutability::Immutable {
+                    self.error_at(*name, "Cannot assign to constant variable.");
+                }
+                (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
+            } else if let Some((pos, _, mutability)) = self
+                .resolve_upvalue(name.lexeme)
+                .inspect_err(|err| self.error_at(*name, err))
+                .ok()
+                .flatten()
+            {
+                if can_assign && mutability == Mutability::Immutable {
+                    self.error_at(*name, "Cannot assign to constant variable.");
+                }
+                (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
+            } else {
+                if can_assign && self.const_globals.contains(name.lexeme) {
+                    self.error_at(*name, "Cannot assign to constant variable.");
+                }
+                let pos = self.identifier_constant(name.lexeme) as u8;
+                (OpCode::GetGlobal(pos), OpCode::SetGlobal(pos))
+            };
 
         if can_assign {
             self.emit(set_op);
@@ -896,15 +927,18 @@ impl<'gc> CodeGen<'gc> {
     }
 
     // Resolve a local variable by name, return its index and depth.
-    fn resolve_local(&mut self, name: &str) -> Option<(u8, isize)> {
+    fn resolve_local(&mut self, name: &str) -> Option<(u8, isize, Mutability)> {
         (0..self.local_count)
             .rev()
             .find(|&i| self.locals[i].name.lexeme == name)
-            .map(|i| (i as u8, self.locals[i].depth))
+            .map(|i| (i as u8, self.locals[i].depth, self.locals[i].mutability))
     }
 
-    fn resolve_upvalue(&mut self, name: &str) -> Result<Option<(u8, isize)>, &'static str> {
-        if let Some((index, depth)) = self
+    fn resolve_upvalue(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<(u8, isize, Mutability)>, &'static str> {
+        if let Some((index, depth, mutability)) = self
             .enclosing
             .as_mut()
             .and_then(|enclosing| enclosing.resolve_local(name))
@@ -915,15 +949,15 @@ impl<'gc> CodeGen<'gc> {
                 enclosing.locals[index as usize].is_captured = true;
             }
             let index = self.add_upvalue(index as usize, true)?;
-            return Ok(Some((index as u8, depth)));
-        } else if let Some((index, depth)) = self
+            return Ok(Some((index as u8, depth, mutability)));
+        } else if let Some((index, depth, mutability)) = self
             .enclosing
             .as_mut()
             .and_then(|enclosing| enclosing.resolve_upvalue(name).ok())
             .flatten()
         {
             let index = self.add_upvalue(index as usize, false)?;
-            return Ok(Some((index as u8, depth)));
+            return Ok(Some((index as u8, depth, mutability)));
         }
 
         Ok(None)
@@ -986,7 +1020,7 @@ impl<'gc> CodeGen<'gc> {
         self.make_constant(Value::from(s))
     }
 
-    fn declare_variable(&mut self, name: Token<'gc>) {
+    fn declare_variable(&mut self, name: Token<'gc>, mutability: Mutability) {
         if self.scope_depth == 0 {
             return;
         }
@@ -1003,10 +1037,10 @@ impl<'gc> CodeGen<'gc> {
             }
         }
 
-        self.add_local(name);
+        self.add_local(name, mutability);
     }
 
-    fn add_local(&mut self, name: Token<'gc>) {
+    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) {
         if self.local_count == MAX_LOCALS {
             self.error_at(name, "Too many local variables in function.");
             return;
@@ -1016,6 +1050,7 @@ impl<'gc> CodeGen<'gc> {
             name,
             depth: UNINITIALIZED_LOCAL_DEPTH, // Mark as uninitialized
             is_captured: false,
+            mutability,
         };
         self.local_count += 1;
     }

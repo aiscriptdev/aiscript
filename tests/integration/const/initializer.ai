@@ -1,0 +1,1 @@
+const PI; // Error at ';': Const declarations must have an initializer.

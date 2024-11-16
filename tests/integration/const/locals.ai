@@ -1,0 +1,5 @@
+fn f1() {
+    const PI = 3.14;
+    PI = 3.1; // Error at 'PI': Cannot assign to constant variable.
+}
+f1();
