@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
+use crate::object::FunctionType;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
-#[derive(Debug, Clone, Copy, Default, Collect, Eq, PartialEq)]
-#[collect(require_static)]
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub enum Mutability {
     #[default]
     Mutable,
@@ -32,7 +32,7 @@ pub struct FunctionDecl<'gc> {
     pub params: IndexMap<Token<'gc>, Parameter<'gc>>,
     pub return_type: Option<Token<'gc>>,
     pub body: Vec<Stmt<'gc>>,
-    pub is_ai: bool,
+    pub fn_type: FunctionType,
     pub visibility: Visibility,
     pub line: u32,
 }

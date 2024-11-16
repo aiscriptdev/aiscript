@@ -472,7 +472,7 @@ impl<'gc> Parser<'gc> {
             params,
             return_type,
             body,
-            is_ai: fn_type == FunctionType::AiFunction,
+            fn_type,
             visibility,
             line: name.line,
         }))

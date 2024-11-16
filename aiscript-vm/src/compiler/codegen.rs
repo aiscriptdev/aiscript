@@ -354,16 +354,10 @@ impl<'gc> CodeGen<'gc> {
                 params,
                 return_type,
                 body,
-                is_ai,
+                fn_type,
                 visibility,
                 ..
             }) => {
-                let fn_type = if *is_ai {
-                    FunctionType::AiFunction
-                } else {
-                    FunctionType::Function
-                };
-
                 self.declare_variable(*name, Mutability::default());
                 if self.scope_depth > 0 {
                     self.mark_initialized();
@@ -375,7 +369,7 @@ impl<'gc> CodeGen<'gc> {
                     params,
                     return_type,
                     body,
-                    fn_type,
+                    *fn_type,
                 )?;
 
                 if self.scope_depth == 0 {

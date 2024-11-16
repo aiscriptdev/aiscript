@@ -285,13 +285,11 @@ impl<'gc> fmt::Display for PrettyPrint<'_, Stmt<'gc>> {
                 name,
                 params,
                 body,
-                is_ai,
                 line,
                 ..
             } => {
                 writeln!(f, "{indent}Function Statement [line {line}]")?;
                 writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                writeln!(f, "{}Is AI: {}", "  ".repeat(self.indent + 1), is_ai)?;
                 writeln!(f, "{}Parameters:", "  ".repeat(self.indent + 1))?;
                 for param in params {
                     writeln!(f, "{}{:?}", "  ".repeat(self.indent + 2), param)?;
