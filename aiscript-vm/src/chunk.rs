@@ -6,7 +6,10 @@ use std::{
 
 use gc_arena::Collect;
 
-use crate::{ast::Visibility, Value};
+use crate::{
+    ast::{ChunkId, Visibility},
+    Value,
+};
 
 #[derive(Copy, Clone, Debug, Collect)]
 #[collect(require_static)]
@@ -27,7 +30,10 @@ pub enum OpCode {
     Less,
     Print,
     Pop,
-    DefineGlobal(u8, Visibility),
+    DefineGlobal {
+        name_constant: u8,
+        visibility: Visibility,
+    },
     GetGlobal(u8),
     SetGlobal(u8),
     GetLocal(u8),
@@ -35,8 +41,13 @@ pub enum OpCode {
     JumpIfFalse(u16),
     Jump(u16),
     Loop(u16),
-    Call(u8, u8), // positional_count, keyword_count
-    Closure(u8),  // chunk id
+    Call {
+        positional_count: u8,
+        keyword_count: u8,
+    },
+    Closure {
+        chunk_id: ChunkId,
+    },
     GetUpvalue(u8),
     SetUpvalue(u8),
     CloseUpvalue,
@@ -44,12 +55,25 @@ pub enum OpCode {
     SetProperty(u8),
     GetProperty(u8),
     Method(u8),
-    Invoke(u8, u8, u8), // method_constant, positional_count, keyword_count
+    Invoke {
+        method_constant: u8,
+        positional_count: u8,
+        keyword_count: u8,
+    },
     Inherit,
     GetSuper(u8),
-    SuperInvoke(u8, u8, u8), // method_constant, positional_count, keyword_count
-    ImportModule(u8),        // Import a module, constant index contains module name
-    GetModuleVar(u8, u8),    // Get variable from module (module name index, var name index)
+    SuperInvoke {
+        method_constant: u8,
+        positional_count: u8,
+        keyword_count: u8,
+    },
+    // Import a module, constant index contains module name
+    ImportModule(u8),
+    // Get variable from module (module name index, var name index)
+    GetModuleVar {
+        module_name_constant: u8,
+        var_name_constant: u8,
+    },
     // AI
     Prompt,
     Agent(u8), // constant index
@@ -187,7 +211,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Less => simple_instruction("LESS"),
                 OpCode::Print => simple_instruction("PRINT"),
                 OpCode::Pop => simple_instruction("POP"),
-                OpCode::DefineGlobal(c, _v) => self.constant_instruction("DEFINE_GLOBAL", c),
+                OpCode::DefineGlobal { name_constant, .. } => {
+                    self.constant_instruction("DEFINE_GLOBAL", name_constant)
+                }
                 OpCode::GetGlobal(c) => self.constant_instruction("GET_GLOBAL", c),
                 OpCode::SetGlobal(c) => self.constant_instruction("SET_GLOBAL", c),
                 OpCode::GetLocal(byte) => self.byte_instruction("GET_LOCAL", byte),
@@ -197,14 +223,20 @@ impl<'gc> Chunk<'gc> {
                 }
                 OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
                 OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
-                OpCode::Call(arity, kw_args) => {
-                    println!("{:-16} {:4} {:4}", "OP_CALL", arity, kw_args);
+                OpCode::Call {
+                    positional_count,
+                    keyword_count,
+                } => {
+                    println!(
+                        "{:-16} {:4} {:4}",
+                        "OP_CALL", positional_count, keyword_count
+                    );
                 }
-                OpCode::Closure(c) => {
+                OpCode::Closure { chunk_id } => {
                     // let mut offset = offset + 1;
                     // let constant = self.code[offset] as usize;
                     // offset += 1;
-                    println!("{:-16} {:4}", "OP_CLOSURE", c);
+                    println!("{:-16} {:4}", "OP_CLOSURE", chunk_id);
 
                     // let function = self.constans[c as usize].as_closure().unwrap().function;
                     // function.upvalues.iter().for_each(|upvalue| {
@@ -225,14 +257,27 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SetProperty(c) => self.constant_instruction("SET_PROPERTY", c),
                 OpCode::GetProperty(c) => self.constant_instruction("GET_PROPERTY", c),
                 OpCode::Method(c) => self.constant_instruction("METHOD", c),
-                OpCode::Invoke(name, arity, _) => self.invoke_instruction("INVOKE", name, arity),
+                OpCode::Invoke {
+                    method_constant,
+                    positional_count,
+                    ..
+                } => self.invoke_instruction("INVOKE", method_constant, positional_count),
                 OpCode::Inherit => simple_instruction("INHERIT"),
                 OpCode::GetSuper(c) => self.constant_instruction("GET_SUPER", c),
-                OpCode::SuperInvoke(name, arity, _) => {
-                    self.invoke_instruction("SUPER_INVOKE", name, arity)
-                }
+                OpCode::SuperInvoke {
+                    method_constant,
+                    positional_count,
+                    ..
+                } => self.invoke_instruction("SUPER_INVOKE", method_constant, positional_count),
                 OpCode::ImportModule(c) => self.constant_instruction("IMPORT_MODULE", c),
-                OpCode::GetModuleVar(a, b) => self.invoke_instruction("GET_MODULE_VAR", a, b),
+                OpCode::GetModuleVar {
+                    module_name_constant,
+                    var_name_constant,
+                } => self.invoke_instruction(
+                    "GET_MODULE_VAR",
+                    module_name_constant,
+                    var_name_constant,
+                ),
                 OpCode::Prompt => simple_instruction("PROMPT"),
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);

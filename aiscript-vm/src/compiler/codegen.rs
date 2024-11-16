@@ -1,12 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     mem,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU16, Ordering},
 };
 
 use crate::{
     ai::Agent,
-    ast::{AgentDecl, ClassDecl, FunctionDecl, Mutability, VariableDecl},
+    ast::{AgentDecl, ChunkId, ClassDecl, FunctionDecl, Mutability, VariableDecl},
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
 const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
-pub static CHUNK_ID: AtomicUsize = AtomicUsize::new(0);
+pub static CHUNK_ID: AtomicU16 = AtomicU16::new(0);
 
 #[derive(Debug, Clone, Default)]
 struct Local<'gc> {
@@ -41,7 +41,7 @@ struct LoopScope {
 
 pub struct CodeGen<'gc> {
     ctx: Context<'gc>,
-    chunks: HashMap<usize, Function<'gc>>,
+    chunks: HashMap<ChunkId, Function<'gc>>,
     // <function mangled name, chunk_id>
     named_id_map: HashMap<String, FnDef>,
     type_resolver: TypeResolver<'gc>,
@@ -97,7 +97,7 @@ impl<'gc> CodeGen<'gc> {
     pub fn generate(
         program: Program<'gc>,
         ctx: Context<'gc>,
-    ) -> Result<HashMap<usize, Function<'gc>>, VmError> {
+    ) -> Result<HashMap<ChunkId, Function<'gc>>, VmError> {
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
         for stmt in &program.statements {
@@ -240,7 +240,10 @@ impl<'gc> CodeGen<'gc> {
                     self.mark_initialized();
                 } else {
                     let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
+                    self.emit(OpCode::DefineGlobal {
+                        name_constant: global as u8,
+                        visibility: *visibility,
+                    });
                 }
             }
             Stmt::Const {
@@ -256,7 +259,10 @@ impl<'gc> CodeGen<'gc> {
                 } else {
                     self.const_globals.insert(name.lexeme);
                     let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
+                    self.emit(OpCode::DefineGlobal {
+                        name_constant: global as u8,
+                        visibility: *visibility,
+                    });
                 }
             }
             Stmt::Block { statements, .. } => {
@@ -374,7 +380,10 @@ impl<'gc> CodeGen<'gc> {
 
                 if self.scope_depth == 0 {
                     let global = self.identifier_constant(name.lexeme);
-                    self.emit(OpCode::DefineGlobal(global as u8, *visibility));
+                    self.emit(OpCode::DefineGlobal {
+                        name_constant: global as u8,
+                        visibility: *visibility,
+                    });
                 }
             }
             Stmt::Return { value, .. } => {
@@ -382,7 +391,7 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(expr)?;
                     self.emit(OpCode::Return);
                 } else {
-                    if self.fn_type == FunctionType::Initializer {
+                    if self.fn_type == FunctionType::Constructor {
                         self.emit(OpCode::GetLocal(0));
                     } else {
                         self.emit(OpCode::Nil);
@@ -400,7 +409,10 @@ impl<'gc> CodeGen<'gc> {
                 // Emit class declaration
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::Class(name_constant as u8));
-                self.emit(OpCode::DefineGlobal(name_constant as u8, *visibility));
+                self.emit(OpCode::DefineGlobal {
+                    name_constant: name_constant as u8,
+                    visibility: *visibility,
+                });
 
                 // Handle inheritance
                 if let Some(superclass) = superclass {
@@ -440,7 +452,7 @@ impl<'gc> CodeGen<'gc> {
                     }) = method
                     {
                         let fn_type = if method_name.lexeme == "init" {
-                            FunctionType::Initializer
+                            FunctionType::Constructor
                         } else {
                             FunctionType::Method
                         };
@@ -530,7 +542,10 @@ impl<'gc> CodeGen<'gc> {
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
                 let name_constant = self.identifier_constant(name.lexeme);
-                self.emit(OpCode::DefineGlobal(name_constant as u8, *visibility));
+                self.emit(OpCode::DefineGlobal {
+                    name_constant: name_constant as u8,
+                    visibility: *visibility,
+                });
                 // self.emit(OpCode::Pop);
             }
         }
@@ -611,10 +626,10 @@ impl<'gc> CodeGen<'gc> {
                 }
                 // Create and emit constants for the keyword names
                 self.generate_keyword_args(keyword_args)?;
-                self.emit(OpCode::Call(
-                    arguments.len() as u8,
-                    keyword_args.len() as u8,
-                ));
+                self.emit(OpCode::Call {
+                    positional_count: arguments.len() as u8,
+                    keyword_count: keyword_args.len() as u8,
+                });
             }
             Expr::Invoke {
                 object,
@@ -629,11 +644,11 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(arg)?;
                 }
                 self.generate_keyword_args(keyword_args)?;
-                self.emit(OpCode::Invoke(
-                    method_constant as u8,
-                    arguments.len() as u8,
-                    keyword_args.len() as u8,
-                ));
+                self.emit(OpCode::Invoke {
+                    method_constant: method_constant as u8,
+                    positional_count: arguments.len() as u8,
+                    keyword_count: keyword_args.len() as u8,
+                });
             }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
@@ -700,11 +715,11 @@ impl<'gc> CodeGen<'gc> {
                 }
 
                 let method_constant = self.identifier_constant(method.lexeme);
-                self.emit(OpCode::SuperInvoke(
-                    method_constant as u8,
-                    arguments.len() as u8,
-                    keyword_args.len() as u8,
-                ));
+                self.emit(OpCode::SuperInvoke {
+                    method_constant: method_constant as u8,
+                    positional_count: arguments.len() as u8,
+                    keyword_count: keyword_args.len() as u8,
+                });
             }
             Expr::And { left, right, .. } => {
                 self.generate_expr(left)?;
@@ -753,7 +768,7 @@ impl<'gc> CodeGen<'gc> {
         return_type: &Option<Token<'gc>>,
         body: &[Stmt<'gc>],
         fn_type: FunctionType,
-    ) -> Result<usize, VmError> {
+    ) -> Result<ChunkId, VmError> {
         // Validate parameter types
         for (param_token, param) in params {
             if let Some(param_type) = param.type_hint.as_ref().copied() {
@@ -837,7 +852,7 @@ impl<'gc> CodeGen<'gc> {
             let chunks = mem::take(&mut self.chunks);
             *self = *enclosing;
             self.chunks.extend(chunks);
-            self.emit(OpCode::Closure(chunk_id as u8));
+            self.emit(OpCode::Closure { chunk_id });
         }
         Ok(chunk_id)
     }
@@ -853,7 +868,7 @@ impl<'gc> CodeGen<'gc> {
     }
 
     fn emit_return(&mut self) {
-        if self.fn_type == FunctionType::Initializer {
+        if self.fn_type == FunctionType::Constructor {
             self.emit(OpCode::GetLocal(0));
         } else {
             self.emit(OpCode::Nil);

@@ -7,6 +7,10 @@ use crate::object::FunctionType;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
+/// Use u16 to represent the chunk id
+/// It is enough for a program to assign id for each function chunk.
+pub type ChunkId = u16;
+
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub enum Mutability {
     #[default]
@@ -94,14 +98,14 @@ impl<'gc> Parameter<'gc> {
 #[derive(Debug, Clone, Collect)]
 #[collect(require_static)]
 pub struct FnDef {
-    pub chunk_id: usize,
+    pub chunk_id: ChunkId,
     pub doc: String,
     pub params: IndexMap<String, PrimitiveType>,
 }
 
 impl FnDef {
     pub fn new<'gc>(
-        chunk_id: usize,
+        chunk_id: ChunkId,
         doc: &Option<Token<'gc>>,
         params: &IndexMap<Token<'gc>, Parameter<'gc>>,
     ) -> Self {

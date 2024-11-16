@@ -396,7 +396,7 @@ impl<'gc> Parser<'gc> {
         let name = self.previous;
         self.scopes.push(name.lexeme.to_string());
         if self.fn_type == FunctionType::Method && name.lexeme == "init" {
-            self.fn_type = FunctionType::Initializer;
+            self.fn_type = FunctionType::Constructor;
         }
 
         self.consume(TokenType::OpenParen, "Expect '(' after function name.");
@@ -624,7 +624,7 @@ impl<'gc> Parser<'gc> {
 
     fn return_statement(&mut self) -> Option<Stmt<'gc>> {
         let value = if !self.check(TokenType::Semicolon) {
-            if self.fn_type == FunctionType::Initializer {
+            if self.fn_type == FunctionType::Constructor {
                 self.error("Can't return a value from an initializer.");
             }
             Some(self.expression()?)

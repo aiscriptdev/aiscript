@@ -70,12 +70,17 @@ pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {
+    // Regular functions
     AiFunction,
     Function,
-    Tool,
+    // Class methods
     AiMethod,
     Method,
-    Initializer,
+    // Class constructor
+    Constructor,
+    // Agent tool function
+    Tool,
+    // Root script function
     Script,
 }
 

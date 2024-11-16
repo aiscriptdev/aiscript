@@ -14,7 +14,7 @@ use gc_arena::{
 
 use crate::{
     ai,
-    ast::Visibility,
+    ast::{ChunkId, Visibility},
     builtins,
     module::{Module, ModuleManager, ModuleSource},
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
@@ -87,7 +87,7 @@ impl<'gc> CallFrame<'gc> {
 
 pub struct State<'gc> {
     mc: &'gc Mutation<'gc>,
-    pub(super) chunks: BTreeMap<usize, Gc<'gc, Function<'gc>>>,
+    pub(super) chunks: BTreeMap<ChunkId, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
     frame_count: usize,
     stack: [Value<'gc>; STACK_MAX_SIZE],
@@ -226,7 +226,7 @@ impl<'gc> State<'gc> {
         self.strings.intern_static(self.mc, s.as_bytes())
     }
 
-    pub fn get_chunk(&mut self, chunk_id: usize) -> Result<Gc<'gc, Function<'gc>>, VmError> {
+    pub fn get_chunk(&mut self, chunk_id: ChunkId) -> Result<Gc<'gc, Function<'gc>>, VmError> {
         self.chunks.get(&chunk_id).copied().ok_or_else(|| {
             VmError::RuntimeError(format!("Failed to find chunk with id {}", chunk_id))
         })
@@ -235,7 +235,7 @@ impl<'gc> State<'gc> {
     // Call function with params
     pub fn call_function(
         &mut self,
-        chunk_id: usize,
+        chunk_id: ChunkId,
         params: Vec<Value<'gc>>,
     ) -> Result<(), VmError> {
         let function = self.get_chunk(chunk_id)?;
@@ -367,8 +367,11 @@ impl<'gc> State<'gc> {
             OpCode::Pop => {
                 self.pop_stack();
             }
-            OpCode::DefineGlobal(byte, visibility) => {
-                let variable_name = frame.read_constant(byte).as_string()?;
+            OpCode::DefineGlobal {
+                name_constant,
+                visibility,
+            } => {
+                let variable_name = frame.read_constant(name_constant).as_string()?;
                 let value = *self.peek(0);
 
                 // Define in global scope with visibility
@@ -416,16 +419,19 @@ impl<'gc> State<'gc> {
             OpCode::Loop(offset) => {
                 frame.ip -= offset as usize;
             }
-            OpCode::Call(args_count, keyword_args_count) => {
+            OpCode::Call {
+                positional_count,
+                keyword_count,
+            } => {
                 // *2 because each keyword arg has name and value
                 // Get the actual function from the correct stack position
                 // Need to peek past all args (both positional and keyword) to get to the function
-                let arg_slot_count = args_count + keyword_args_count * 2;
+                let arg_slot_count = positional_count + keyword_count * 2;
                 let callee = *self.peek(arg_slot_count as usize);
-                self.call_value(callee, args_count, keyword_args_count)?;
+                self.call_value(callee, positional_count, keyword_count)?;
             }
-            OpCode::Closure(chunk_id) => {
-                let function = self.get_chunk(chunk_id as usize)?;
+            OpCode::Closure { chunk_id } => {
+                let function = self.get_chunk(chunk_id)?;
                 let mut closure = Closure::new(self.mc, function);
 
                 closure
@@ -534,9 +540,13 @@ impl<'gc> State<'gc> {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 self.define_method(name);
             }
-            OpCode::Invoke(byte, arg_count, keyword_args_count) => {
-                let method_name = frame.read_constant(byte).as_string().unwrap();
-                self.invoke(method_name, arg_count, keyword_args_count)?;
+            OpCode::Invoke {
+                method_constant,
+                positional_count,
+                keyword_count,
+            } => {
+                let method_name = frame.read_constant(method_constant).as_string().unwrap();
+                self.invoke(method_name, positional_count, keyword_count)?;
             }
             OpCode::Inherit => {
                 if let Value::Class(superclass) = self.peek(1) {
@@ -555,10 +565,14 @@ impl<'gc> State<'gc> {
                 let superclass = self.pop_stack().as_class()?;
                 self.bind_method(superclass, name)?
             }
-            OpCode::SuperInvoke(byte, arg_count, keyword_args_count) => {
-                let method_name = frame.read_constant(byte).as_string().unwrap();
+            OpCode::SuperInvoke {
+                method_constant,
+                positional_count,
+                keyword_count,
+            } => {
+                let method_name = frame.read_constant(method_constant).as_string().unwrap();
                 let superclass = self.pop_stack().as_class()?;
-                self.invoke_from_class(superclass, method_name, arg_count, keyword_args_count)?;
+                self.invoke_from_class(superclass, method_name, positional_count, keyword_count)?;
             }
             OpCode::Prompt => {
                 let message = self.pop_stack().as_string().unwrap().to_string();
@@ -573,9 +587,12 @@ impl<'gc> State<'gc> {
                 let module_name = frame.read_constant(module_name_idx).as_string()?;
                 self.import_module(module_name)?;
             }
-            OpCode::GetModuleVar(module_idx, name_idx) => {
-                let module_name = frame.read_constant(module_idx).as_string()?;
-                let var_name = frame.read_constant(name_idx).as_string()?;
+            OpCode::GetModuleVar {
+                module_name_constant,
+                var_name_constant,
+            } => {
+                let module_name = frame.read_constant(module_name_constant).as_string()?;
+                let var_name = frame.read_constant(var_name_constant).as_string()?;
 
                 if let Some(value) = self.module_manager.get_export(module_name, var_name) {
                     self.push_stack(value);
@@ -616,7 +633,7 @@ impl<'gc> State<'gc> {
 
     pub fn eval_function(
         &mut self,
-        chunk_id: usize,
+        chunk_id: ChunkId,
         params: Vec<Value<'gc>>,
     ) -> Result<ReturnValue, VmError> {
         // Remember the current frame count in order to exit the loop at the correct frame.
