@@ -1,6 +1,6 @@
 class Foo {
-  bar() { return this; }
-  baz() { return "baz"; }
+  fn bar() { return this; }
+  fn baz() { return "baz"; }
 }
 
 print Foo().bar().baz(); // expect: baz

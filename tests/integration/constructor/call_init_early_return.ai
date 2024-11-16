@@ -1,5 +1,5 @@
 class Foo {
-  init() {
+  fn init() {
     print "init";
     return;
     print "nope";

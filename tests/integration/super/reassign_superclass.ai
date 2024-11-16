@@ -1,17 +1,17 @@
 class Base {
-  method() {
+  fn method() {
     print "Base.method()";
   }
 }
 
 class Derived(Base) {
-  method() {
+  fn method() {
     super.method();
   }
 }
 
 class OtherBase {
-  method() {
+  fn method() {
     print "OtherBase.method()";
   }
 }

@@ -1,6 +1,6 @@
 class Foo {
   // 256 parameters.
-  method(
+  fn method(
     a1,
     a2,
     a3,

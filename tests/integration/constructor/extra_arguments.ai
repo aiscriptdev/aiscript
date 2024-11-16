@@ -1,5 +1,5 @@
 class Foo {
-  init(a, b) {
+  fn init(a, b) {
     this.a = a;
     this.b = b;
   }

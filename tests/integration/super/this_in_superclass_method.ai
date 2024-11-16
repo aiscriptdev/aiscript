@@ -1,11 +1,11 @@
 class Base {
-  init(a) {
+  fn init(a) {
     this.a = a;
   }
 }
 
 class Derived(Base) {
-  init(a, b) {
+  fn init(a, b) {
     super.init(a);
     this.b = b;
   }

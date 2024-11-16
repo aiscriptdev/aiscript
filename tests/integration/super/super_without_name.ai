@@ -1,7 +1,7 @@
 class A {}
 
 class B(A) {
-  method() {
+  fn method() {
     super.; // Error at ';': Expect superclass method name.
   }
 }

@@ -73,9 +73,16 @@ pub enum FunctionType {
     AiFunction,
     Function,
     Tool,
+    AiMethod,
     Method,
     Initializer,
     Script,
+}
+
+impl FunctionType {
+    pub fn is_ai_function(&self) -> bool {
+        matches!(self, Self::AiFunction | Self::AiMethod)
+    }
 }
 
 #[derive(Debug, Collect)]

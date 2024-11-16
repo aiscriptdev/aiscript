@@ -1,7 +1,7 @@
 let f;
 
 class Foo {
-  method(param) {
+  fn method(param) {
     fn f_() {
       print param;
     }

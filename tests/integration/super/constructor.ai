@@ -1,11 +1,11 @@
 class Base {
-  init(a, b) {
+  fn init(a, b) {
     print "Base.init(" + a + ", " + b + ")";
   }
 }
 
 class Derived(Base) {
-  init() {
+  fn init() {
     print "Derived.init()";
     super.init("a", "b");
   }

@@ -1,0 +1,13 @@
+class Foo {
+    pub fn f0() {}
+
+    ai fn f1() {
+        prompt "1 + 1 =?";
+    }
+
+    fn f2() {
+        prompt "1 + 1 =?"; // Error at 'prompt': Can't prompt outside of ai function or root script.
+    }
+
+    f3() {} // Error at 'f3': Expect 'fn' or 'ai fn' modifier for method.
+}

@@ -1,6 +1,6 @@
 // Bound methods have identity equality.
 class Foo {
-  method() {}
+  fn method() {}
 }
 
 let foo = Foo();

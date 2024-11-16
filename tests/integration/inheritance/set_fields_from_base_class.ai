@@ -1,22 +1,22 @@
 class Foo {
-  foo(a, b) {
+  fn foo(a, b) {
     this.field1 = a;
     this.field2 = b;
   }
 
-  fooPrint() {
+  fn fooPrint() {
     print this.field1;
     print this.field2;
   }
 }
 
 class Bar(Foo) {
-  bar(a, b) {
+  fn bar(a, b) {
     this.field1 = a;
     this.field2 = b;
   }
 
-  barPrint() {
+  fn barPrint() {
     print this.field1;
     print this.field2;
   }

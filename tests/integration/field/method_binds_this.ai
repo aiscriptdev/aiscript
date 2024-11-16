@@ -1,5 +1,5 @@
 class Foo {
-  sayName(a) {
+  fn sayName(a) {
     print this.name;
     print a;
   }

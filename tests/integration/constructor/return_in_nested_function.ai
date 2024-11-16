@@ -1,5 +1,5 @@
 class Foo {
-  init() {
+  fn init() {
     fn init() {
       return "bar";
     }

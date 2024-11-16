@@ -1,5 +1,5 @@
 class Foo {
-  getClosure() {
+  fn getClosure() {
     fn f() {
       fn g() {
         fn h() {
@@ -12,7 +12,7 @@ class Foo {
     return f;
   }
 
-  toString() { return "Foo"; }
+  fn toString() { return "Foo"; }
 }
 
 let closure = Foo().getClosure();

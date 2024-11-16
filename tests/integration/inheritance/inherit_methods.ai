@@ -1,11 +1,11 @@
 class Foo {
-  methodOnFoo() { print "foo"; }
-  override() { print "foo"; }
+  fn methodOnFoo() { print "foo"; }
+  fn override() { print "foo"; }
 }
 
 class Bar(Foo) {
-  methodOnBar() { print "bar"; }
-  override() { print "bar"; }
+  fn methodOnBar() { print "bar"; }
+  fn override() { print "bar"; }
 }
 
 let bar = Bar();

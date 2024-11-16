@@ -1,5 +1,5 @@
 class Foo {
-  method() { }
+  fn method() { }
 }
 let foo = Foo();
 print foo.method; // expect: <fn method>

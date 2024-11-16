@@ -1,21 +1,21 @@
 class A {
-  say() {
+  fn say() {
     print "A";
   }
 }
 
 class B(A) {
-  test() {
+  fn test() {
     super.say();
   }
 
-  say() {
+  fn say() {
     print "B";
   }
 }
 
 class C(B) {
-  say() {
+  fn say() {
     print "C";
   }
 }

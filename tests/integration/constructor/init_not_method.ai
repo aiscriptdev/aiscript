@@ -1,5 +1,5 @@
 class Foo {
-  init(arg) {
+  fn init(arg) {
     print "Foo.init(" + arg + ")";
     this.field = "init";
   }

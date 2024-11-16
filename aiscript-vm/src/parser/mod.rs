@@ -347,7 +347,21 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            methods.push(self.func_declaration(FunctionType::Method, Visibility::Private)?);
+            let method_vis = if self.match_token(TokenType::Pub) {
+                Visibility::Public
+            } else {
+                Visibility::Private
+            };
+            let method = if self.match_token(TokenType::AI) {
+                self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
+                self.func_declaration(FunctionType::AiMethod, method_vis)?
+            } else if self.match_token(TokenType::Fn) {
+                self.func_declaration(FunctionType::Method, method_vis)?
+            } else {
+                self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
+                return None;
+            };
+            methods.push(method);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -899,8 +913,8 @@ impl<'gc> Parser<'gc> {
     }
 
     fn prompt(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        if self.fn_type != FunctionType::AiFunction && self.fn_type != FunctionType::Script {
-            self.error("Can't prompt outside of ai function or root.");
+        if !self.fn_type.is_ai_function() && self.fn_type != FunctionType::Script {
+            self.error("Can't prompt outside of ai function or root script.");
         }
         let expr = Box::new(self.expression()?);
         Some(Expr::Prompt {

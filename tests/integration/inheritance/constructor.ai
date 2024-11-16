@@ -1,9 +1,9 @@
 class A {
-  init(param) {
+  fn init(param) {
     this.field = param;
   }
 
-  test() {
+  fn test() {
     print this.field;
   }
 }

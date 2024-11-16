@@ -1,12 +1,12 @@
 class Outer {
-  method() {
+  fn method() {
     print this; // expect: Outer {}
 
     fn f() {
       print this; // expect: Outer {}
 
       class Inner {
-        method() {
+        fn method() {
           print this; // expect: Inner {}
         }
       }

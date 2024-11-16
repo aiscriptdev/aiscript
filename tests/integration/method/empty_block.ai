@@ -1,5 +1,5 @@
 class Foo {
-  bar() {}
+  fn bar() {}
 }
 
 print Foo().bar(); // expect: nil
