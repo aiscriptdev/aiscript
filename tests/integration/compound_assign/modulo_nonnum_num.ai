@@ -1,0 +1,2 @@
+let i = 1;
+i -= "1"; // expect runtime error: Operands must be numbers.

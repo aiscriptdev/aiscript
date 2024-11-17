@@ -853,22 +853,65 @@ impl<'gc> Parser<'gc> {
         }
     }
 
+    fn match_compound_assignment(&mut self) -> Option<TokenType> {
+        let kind = match self.current.kind {
+            TokenType::PlusEqual => Some(TokenType::Plus),
+            TokenType::MinusEqual => Some(TokenType::Minus),
+            TokenType::StarEqual => Some(TokenType::Star),
+            TokenType::SlashEqual => Some(TokenType::Slash),
+            TokenType::PercentEqual => Some(TokenType::Percent),
+            _ => None,
+        };
+
+        if kind.is_some() {
+            self.advance();
+        }
+        kind
+    }
+
+    fn parse_compound_assignment(
+        &mut self,
+        name: Token<'gc>,
+        op_kind: TokenType,
+    ) -> Option<Expr<'gc>> {
+        let right = Box::new(self.expression()?);
+        let operator = Token::new(op_kind, self.previous.lexeme, self.previous.line);
+
+        Some(Expr::Assign {
+            name,
+            value: Box::new(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name,
+                    line: name.line,
+                }),
+                operator,
+                right,
+                line: operator.line,
+            }),
+            line: operator.line,
+        })
+    }
+
     fn variable(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
         let name = self.previous;
 
-        if can_assign && self.match_token(TokenType::Equal) {
-            let value = Box::new(self.expression()?);
-            Some(Expr::Assign {
-                name,
-                value,
-                line: self.previous.line,
-            })
-        } else {
-            Some(Expr::Variable {
-                name,
-                line: name.line,
-            })
+        if can_assign {
+            if let Some(op_kind) = self.match_compound_assignment() {
+                return self.parse_compound_assignment(name, op_kind);
+            } else if self.match_token(TokenType::Equal) {
+                let value = Box::new(self.expression()?);
+                return Some(Expr::Assign {
+                    name,
+                    value,
+                    line: self.previous.line,
+                });
+            }
         }
+
+        Some(Expr::Variable {
+            name,
+            line: name.line,
+        })
     }
 
     fn super_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -948,8 +991,19 @@ impl<'gc> Parser<'gc> {
         }
 
         let expr = self.previous_expr.take()?;
-        if can_assign && self.match_token(TokenType::Equal) {
-            self.error("Invalid assignment target.");
+        if can_assign && !matches!(expr, Expr::Variable { .. }) {
+            match self.current.kind {
+                TokenType::Equal
+                | TokenType::PlusEqual
+                | TokenType::MinusEqual
+                | TokenType::StarEqual
+                | TokenType::SlashEqual
+                | TokenType::PercentEqual => {
+                    self.error_at_current("Invalid assignment target.");
+                    return None;
+                }
+                _ => {}
+            }
         }
         Some(expr)
     }

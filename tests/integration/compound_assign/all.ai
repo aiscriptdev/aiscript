@@ -1,0 +1,11 @@
+let i = 1;
+i *= 2;
+print i;    // expect: 2
+i += 3;
+print i;    // expect: 5
+i /= 2;
+print i;    // expect: 2.5
+i -= 1.5;
+print i;    // expect: 1
+i %= 2;
+print i;    // expect: 1

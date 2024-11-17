@@ -1,0 +1,6 @@
+let i = 0;
+i += 1;
+print i; // expect: 1
+
+i += -1;
+print i; // expect: 0

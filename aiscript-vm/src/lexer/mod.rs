@@ -37,6 +37,13 @@ pub enum TokenType {
     Arrow,        // ->
     StarStar,     // **
 
+    // Compound assignment
+    PlusEqual,    // +=
+    MinusEqual,   // -=
+    StarEqual,    // *=
+    SlashEqual,   // /=
+    PercentEqual, // %=
+
     // Literals
     Identifier, // Variable/function names
     String,     // "string literal"
@@ -185,32 +192,6 @@ impl<'a> Scanner<'a> {
             }
             None => &self.source[self.current..],
         }
-    }
-
-    /// Returns the previous and current character as a string slice
-    fn peek2(&mut self) -> &str {
-        // Find the start of the previous character
-        let mut prev_start = self.current;
-        let mut found = false;
-        for i in (0..self.current).rev() {
-            if self.source.is_char_boundary(i) {
-                prev_start = i;
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            prev_start = 0;
-        }
-
-        // Find the end of the current character
-        let next_boundary = self.source[self.current..]
-            .char_indices()
-            .next()
-            .map(|(_, ch)| self.current + ch.len_utf8())
-            .unwrap_or(self.source.len());
-
-        &self.source[prev_start..next_boundary]
     }
 
     /// Skips whitespace and comments
@@ -383,28 +364,61 @@ impl<'a> Scanner<'a> {
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
             '-' => {
-                if self.peek() == Some('>') {
+                let p = self.peek();
+                let kind = if p == Some('>') {
                     self.advance();
-                    self.make_token(TokenType::Arrow)
+                    TokenType::Arrow
+                } else if p == Some('=') {
+                    self.advance();
+                    TokenType::MinusEqual
                 } else {
-                    self.make_token(TokenType::Minus)
-                }
+                    TokenType::Minus
+                };
+                self.make_token(kind)
             }
-            '+' => self.make_token(TokenType::Plus),
-            '/' => self.make_token(TokenType::Slash),
+            '+' => {
+                let kind = if self.peek() == Some('=') {
+                    self.advance();
+                    TokenType::PlusEqual
+                } else {
+                    TokenType::Plus
+                };
+                self.make_token(kind)
+            }
+            '/' => {
+                let kind = if self.peek() == Some('=') {
+                    self.advance();
+                    TokenType::SlashEqual
+                } else {
+                    TokenType::Slash
+                };
+                self.make_token(kind)
+            }
             '*' => {
-                let kind = if self.peek2() == "**" {
+                let p = self.peek();
+                let kind = if p == Some('*') {
                     self.advance();
                     TokenType::StarStar
+                } else if p == Some('=') {
+                    self.advance();
+                    TokenType::StarEqual
                 } else {
                     TokenType::Star
                 };
                 self.make_token(kind)
             }
             ':' => self.make_token(TokenType::Colon),
-            '%' => self.make_token(TokenType::Percent),
+            '%' => {
+                let kind = if self.peek() == Some('=') {
+                    self.advance();
+                    TokenType::PercentEqual
+                } else {
+                    TokenType::Percent
+                };
+                self.make_token(kind)
+            }
             '!' => {
-                let kind = if self.peek2() == "!=" {
+                let kind = if self.peek() == Some('=') {
                     self.advance();
                     TokenType::BangEqual
                 } else {
@@ -413,7 +427,7 @@ impl<'a> Scanner<'a> {
                 self.make_token(kind)
             }
             '=' => {
-                let kind = if self.peek2() == "==" {
+                let kind = if self.peek() == Some('=') {
                     self.advance();
                     TokenType::EqualEqual
                 } else {
@@ -422,7 +436,7 @@ impl<'a> Scanner<'a> {
                 self.make_token(kind)
             }
             '<' => {
-                let kind = if self.peek2() == "<=" {
+                let kind = if self.peek() == Some('=') {
                     self.advance();
                     TokenType::LessEqual
                 } else {
@@ -431,7 +445,7 @@ impl<'a> Scanner<'a> {
                 self.make_token(kind)
             }
             '>' => {
-                let kind = if self.peek2() == ">=" {
+                let kind = if self.peek() == Some('=') {
                     self.advance();
                     TokenType::GreaterEqual
                 } else {
