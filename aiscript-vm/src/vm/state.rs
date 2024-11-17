@@ -115,6 +115,8 @@ unsafe impl<'gc> Collect for State<'gc> {
         self.strings.trace(cc);
         self.globals.trace(cc);
         self.open_upvalues.trace(cc);
+        self.module_manager.trace(cc);
+        self.current_module.trace(cc);
     }
 }
 

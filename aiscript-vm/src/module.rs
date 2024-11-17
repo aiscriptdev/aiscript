@@ -18,6 +18,8 @@ pub enum ModuleSource {
     New { source: String, path: PathBuf },
 }
 
+#[derive(Debug, Collect)]
+#[collect(no_drop)]
 pub struct ModuleManager<'gc> {
     pub modules: HashMap<InternedString<'gc>, Module<'gc>>,
     search_paths: Vec<PathBuf>,
