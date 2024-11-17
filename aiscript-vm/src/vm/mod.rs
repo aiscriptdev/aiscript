@@ -5,6 +5,7 @@ pub use state::State;
 
 use crate::{
     object::{Class, Instance},
+    stdlib,
     string::{InternedString, InternedStringSet},
     ReturnValue, Value,
 };
@@ -42,9 +43,27 @@ impl Default for Vm {
 
 impl Vm {
     pub fn new() -> Self {
-        Vm {
+        let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| State::new(mc)),
-        }
+        };
+        vm.init_stdlib();
+        vm
+    }
+
+    fn init_stdlib(&mut self) {
+        self.arena.mutate_root(|mc, state| {
+            let ctx = Context {
+                mutation: mc,
+                strings: state.strings,
+            };
+
+            // Initialize standard library modules
+            let std_math = stdlib::create_math_module(ctx);
+            let math_name = ctx.intern(b"std.math");
+            state
+                .module_manager
+                .register_native_module(math_name, std_math);
+        });
     }
 
     #[cfg(feature = "v1")]
