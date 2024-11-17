@@ -78,6 +78,7 @@ impl<'gc> ModuleManager<'gc> {
         }
     }
 
+    #[allow(unused)]
     pub fn add_search_path(&mut self, path: PathBuf) {
         self.search_paths.push(path);
     }

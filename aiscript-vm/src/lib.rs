@@ -7,6 +7,7 @@ mod lexer;
 mod module;
 mod object;
 mod parser;
+mod stdlib;
 mod string;
 mod string_utils;
 mod ty;
@@ -22,6 +23,8 @@ pub(crate) use chunk::{Chunk, OpCode};
 pub use value::Value;
 pub use vm::Vm;
 pub use vm::VmError;
+
+pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Result<Value<'gc>, VmError>;
 
 #[derive(Debug, PartialEq)]
 pub enum ReturnValue {

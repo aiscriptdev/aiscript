@@ -4,10 +4,10 @@ use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
     ai::Agent,
-    object::{BoundMethod, Class, Closure, Instance, NativeFn},
+    object::{BoundMethod, Class, Closure, Instance},
     string::InternedString,
     vm::VmError,
-    ReturnValue,
+    NativeFn, ReturnValue,
 };
 
 #[derive(Debug, Copy, Clone)]

@@ -170,9 +170,31 @@ impl<'gc> Parser<'gc> {
     }
 
     fn use_declaration(&mut self) -> Option<Stmt<'gc>> {
+        // Create a vector to store all parts of the module path
+        let mut path_parts = Vec::new();
+
         self.consume(TokenType::Identifier, "Expect module name after 'use'.");
-        let path = self.previous;
+        path_parts.push(self.previous);
+
+        // Handle dotted module paths (e.g., "std.math")
+        while self.match_token(TokenType::Dot) {
+            self.consume(TokenType::Identifier, "Expect identifier after '.'.");
+            path_parts.push(self.previous);
+        }
+
         self.consume(TokenType::Semicolon, "Expect ';' after module path.");
+
+        // Combine all parts into a single module path
+        let mut full_path = String::new();
+        for (i, part) in path_parts.iter().enumerate() {
+            if i > 0 {
+                full_path.push('.');
+            }
+            full_path.push_str(part.lexeme);
+        }
+
+        // Create a new token with the full path
+        let path = Token::new(TokenType::Identifier, full_path.leak(), path_parts[0].line);
 
         Some(Stmt::Use {
             path,

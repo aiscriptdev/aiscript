@@ -66,7 +66,6 @@ impl<'gc> Display for Function<'gc> {
     }
 }
 
-pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {

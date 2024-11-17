@@ -17,9 +17,9 @@ use crate::{
     ast::{ChunkId, Visibility},
     builtins,
     module::{ModuleKind, ModuleManager, ModuleSource},
-    object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
+    object::{BoundMethod, Class, Closure, Function, Instance, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
-    OpCode, ReturnValue, Value,
+    NativeFn, OpCode, ReturnValue, Value,
 };
 
 use super::{fuel::Fuel, Context, VmError};
@@ -95,7 +95,7 @@ pub struct State<'gc> {
     pub(super) strings: InternedStringSet<'gc>,
     pub(super) globals: Table<'gc>,
     open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
-    module_manager: ModuleManager<'gc>,
+    pub module_manager: ModuleManager<'gc>,
     current_module: Option<InternedString<'gc>>,
 }
 
@@ -136,36 +136,44 @@ impl<'gc> State<'gc> {
             current_module: None,
         }
     }
-    pub fn import_module(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+    pub fn import_module(&mut self, path: InternedString<'gc>) -> Result<(), VmError> {
+        // Get the simple name (last component) from the path
+        let simple_name = path.to_str().unwrap().split('.').last().unwrap();
+        let simple_name = self.intern(simple_name.as_bytes());
+
+        // Check if simple name is already used
+        if self.globals.contains_key(&simple_name) {
+            return Err(VmError::RuntimeError(format!(
+                "Name '{}' is already in use",
+                simple_name
+            )));
+        }
+
         // Get module source
-        let module_source = self.module_manager.get_or_load_module(name)?;
+        let module_source = self.module_manager.get_or_load_module(path)?;
 
         match module_source {
             ModuleSource::Cached => {
-                // Module is already loaded (could be either script or native)
+                // For any module (std or script), just bind it to its simple name
+                self.globals.insert(simple_name, Value::Module(path));
                 Ok(())
             }
-            ModuleSource::New { source, path } => {
-                // Set up module context
-                let prev_module = self.current_module.replace(name);
+            ModuleSource::New {
+                source,
+                path: module_path,
+            } => {
+                let prev_module = self.current_module.replace(path);
                 let prev_globals = mem::take(&mut self.globals);
 
-                #[cfg(feature = "debug")]
-                println!("Compiling module {}", name);
-
-                // Create new module
                 let module = ModuleKind::Script {
-                    name,
+                    name: path,
                     exports: HashMap::default(),
                     globals: HashMap::default(),
-                    path: path.clone(),
+                    path: module_path,
                 };
 
-                // Register the module before executing its code
-                // This allows the module to find itself when it needs to export its values
-                self.module_manager.register_script_module(name, module);
+                self.module_manager.register_script_module(path, module);
 
-                // Compile and execute module code
                 let context = Context {
                     mutation: self.mc,
                     strings: self.strings,
@@ -174,36 +182,21 @@ impl<'gc> State<'gc> {
                 let source: &'static str = Box::leak(source.into_boxed_str());
                 let chunks = crate::compiler::compile(context, source)?;
 
-                #[cfg(feature = "debug")]
-                {
-                    println!(
-                        "self chunks id: {:?}",
-                        self.chunks.keys().collect::<Vec<_>>()
-                    );
-                    println!(
-                        "imported chunks id: {:?}",
-                        chunks.keys().collect::<Vec<_>>()
-                    );
-                }
-
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
-                // Store the chunks in State.chunks before executing
                 self.chunks.extend(chunks);
-
-                // Execute module code
                 self.eval_function(imported_script_chunk_id, vec![])?;
 
-                // Save module's globals
                 if let Some(ModuleKind::Script {
                     ref mut globals, ..
-                }) = self.module_manager.modules.get_mut(&name)
+                }) = self.module_manager.modules.get_mut(&path)
                 {
                     *globals = mem::replace(&mut self.globals, prev_globals);
                 }
 
-                // Restore previous context
-                self.current_module = prev_module;
+                // Add the module to globals with its simple name
+                self.globals.insert(simple_name, Value::Module(path));
 
+                self.current_module = prev_module;
                 Ok(())
             }
         }
@@ -860,7 +853,7 @@ impl<'gc> State<'gc> {
                         "Native functions don't support keyword arguments.".into(),
                     ));
                 }
-                let result = function(self.pop_stack_n(args_count as usize));
+                let result = function(self.pop_stack_n(args_count as usize))?;
                 self.stack_top -= 1; // Remove the function
                 self.push_stack(result);
                 Ok(())
