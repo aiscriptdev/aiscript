@@ -23,6 +23,7 @@ pub enum TokenType {
     Slash,     // /
     Star,      // *
     Colon,     // :
+    Percent,   // %
 
     // Comparison and logical operators
     Bang,         // !
@@ -392,6 +393,7 @@ impl<'a> Scanner<'a> {
             '/' => self.make_token(TokenType::Slash),
             '*' => self.make_token(TokenType::Star),
             ':' => self.make_token(TokenType::Colon),
+            '%' => self.make_token(TokenType::Percent),
             '!' => {
                 let kind = if self.peek2() == "!=" {
                     self.advance();

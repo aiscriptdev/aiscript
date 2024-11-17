@@ -1099,6 +1099,11 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::Plus => ParseRule::new(None, Some(Parser::binary), Precedence::Term),
         TokenType::Slash => ParseRule::new(None, Some(Parser::binary), Precedence::Factor),
         TokenType::Star => ParseRule::new(None, Some(Parser::binary), Precedence::Factor),
+        TokenType::Percent => ParseRule::new(
+            None,
+            Some(Parser::binary),
+            Precedence::Factor, // Same precedence as multiply/divide
+        ),
         TokenType::Bang => ParseRule::new(Some(Parser::unary), None, Precedence::None),
         TokenType::BangEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
         TokenType::EqualEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Equality),

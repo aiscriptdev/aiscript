@@ -323,6 +323,9 @@ impl<'gc> State<'gc> {
             OpCode::Divide => {
                 binary_op!(self, /);
             }
+            OpCode::Modulo => {
+                binary_op!(self, %);
+            }
             OpCode::Negate => {
                 let v = self
                     .pop_stack()
