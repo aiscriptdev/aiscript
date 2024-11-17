@@ -16,7 +16,7 @@ use crate::{
     ai,
     ast::{ChunkId, Visibility},
     builtins,
-    module::{Module, ModuleManager, ModuleSource},
+    module::{ModuleKind, ModuleManager, ModuleSource},
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     OpCode, ReturnValue, Value,
@@ -136,23 +136,34 @@ impl<'gc> State<'gc> {
             current_module: None,
         }
     }
-
     pub fn import_module(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
         // Get module source
         let module_source = self.module_manager.get_or_load_module(name)?;
 
         match module_source {
-            ModuleSource::Cached => Ok(()), // Module already loaded
+            ModuleSource::Cached => {
+                // Module is already loaded (could be either script or native)
+                Ok(())
+            }
             ModuleSource::New { source, path } => {
-                // Create new module with its own globals
-                let module = Module::new(name, path);
-
                 // Set up module context
                 let prev_module = self.current_module.replace(name);
-                let prev_globals = mem::replace(&mut self.globals, module.globals.clone());
+                let prev_globals = mem::take(&mut self.globals);
 
                 #[cfg(feature = "debug")]
                 println!("Compiling module {}", name);
+
+                // Create new module
+                let module = ModuleKind::Script {
+                    name,
+                    exports: HashMap::default(),
+                    globals: HashMap::default(),
+                    path: path.clone(),
+                };
+
+                // Register the module before executing its code
+                // This allows the module to find itself when it needs to export its values
+                self.module_manager.register_script_module(name, module);
 
                 // Compile and execute module code
                 let context = Context {
@@ -163,9 +174,6 @@ impl<'gc> State<'gc> {
                 let source: &'static str = Box::leak(source.into_boxed_str());
                 let chunks = crate::compiler::compile(context, source)?;
 
-                // Register the module before executing its code
-                // This allows the module to find itself when it needs to export its values
-                self.module_manager.register_module(name, module);
                 #[cfg(feature = "debug")]
                 {
                     println!(
@@ -177,16 +185,20 @@ impl<'gc> State<'gc> {
                         chunks.keys().collect::<Vec<_>>()
                     );
                 }
+
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 // Store the chunks in State.chunks before executing
                 self.chunks.extend(chunks);
 
-                // Execute each chunk of module code
+                // Execute module code
                 self.eval_function(imported_script_chunk_id, vec![])?;
 
                 // Save module's globals
-                if let Some(module) = self.module_manager.modules.get_mut(&name) {
-                    module.globals = mem::replace(&mut self.globals, prev_globals);
+                if let Some(ModuleKind::Script {
+                    ref mut globals, ..
+                }) = self.module_manager.modules.get_mut(&name)
+                {
+                    *globals = mem::replace(&mut self.globals, prev_globals);
                 }
 
                 // Restore previous context
@@ -196,11 +208,10 @@ impl<'gc> State<'gc> {
             }
         }
     }
-
     pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
         // First check if it's a module name
-        if let Some(_module) = self.module_manager.modules.get(&name) {
-            return Some(Value::Module(name));
+        if let Some(module) = self.module_manager.get_module(name) {
+            return Some(Value::Module(module.name()));
         }
 
         // Then check current globals scope
@@ -210,8 +221,10 @@ impl<'gc> State<'gc> {
 
         // Finally check current module's globals if we're in a module
         if let Some(current_module) = self.current_module {
-            if let Some(module) = self.module_manager.modules.get(&current_module) {
-                if let Some(value) = module.globals.get(&name).copied() {
+            if let Some(ModuleKind::Script { globals, .. }) =
+                self.module_manager.modules.get(&current_module)
+            {
+                if let Some(value) = globals.get(&name).copied() {
                     return Some(value);
                 }
             }
@@ -652,8 +665,9 @@ impl<'gc> State<'gc> {
             if let Some(current_module) = self.current_module {
                 if let Some(module) = self.module_manager.modules.get_mut(&current_module) {
                     #[cfg(feature = "debug")]
-                    println!("Exporting {} from module {}", name, module.name);
-                    module.exports.insert(name, value);
+                    println!("Exporting {} from module {}", name, module.name());
+
+                    module.add_export(name, value);
                 }
             }
         }
