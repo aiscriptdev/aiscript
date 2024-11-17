@@ -569,21 +569,12 @@ impl<'gc> CodeGen<'gc> {
                     TokenType::Minus => self.emit(OpCode::Subtract),
                     TokenType::Star => self.emit(OpCode::Multiply),
                     TokenType::Slash => self.emit(OpCode::Divide),
-                    TokenType::BangEqual => {
-                        self.emit(OpCode::Equal);
-                        self.emit(OpCode::Not);
-                    }
+                    TokenType::BangEqual => self.emit(OpCode::NotEqual),
                     TokenType::EqualEqual => self.emit(OpCode::Equal),
                     TokenType::Greater => self.emit(OpCode::Greater),
-                    TokenType::GreaterEqual => {
-                        self.emit(OpCode::Less);
-                        self.emit(OpCode::Not);
-                    }
+                    TokenType::GreaterEqual => self.emit(OpCode::GreaterEqual),
                     TokenType::Less => self.emit(OpCode::Less),
-                    TokenType::LessEqual => {
-                        self.emit(OpCode::Greater);
-                        self.emit(OpCode::Not);
-                    }
+                    TokenType::LessEqual => self.emit(OpCode::LessEqual),
                     _ => return Err(VmError::CompileError),
                 }
             }
@@ -593,8 +584,7 @@ impl<'gc> CodeGen<'gc> {
             Expr::Literal { value, .. } => match value {
                 Literal::Number(n) => self.emit_constant(Value::from(*n)),
                 Literal::String(s) => self.emit_constant(Value::from(*s)),
-                Literal::Boolean(true) => self.emit(OpCode::True),
-                Literal::Boolean(false) => self.emit(OpCode::False),
+                Literal::Boolean(b) => self.emit(OpCode::Bool(*b)),
                 Literal::Nil => self.emit(OpCode::Nil),
             },
             Expr::Unary {

@@ -345,8 +345,7 @@ impl<'gc> State<'gc> {
                 self.push_stack(return_value);
             }
             OpCode::Nil => self.push_stack(Value::Nil),
-            OpCode::True => self.push_stack(Value::Boolean(true)),
-            OpCode::False => self.push_stack(Value::Boolean(false)),
+            OpCode::Bool(b) => self.push_stack(Value::Boolean(b)),
             OpCode::Not => {
                 let v = self.pop_stack().is_falsy();
                 self.push_stack((v).into())
@@ -356,11 +355,22 @@ impl<'gc> State<'gc> {
                 let a = self.pop_stack();
                 self.push_stack(a.equals(&b).into());
             }
+            OpCode::NotEqual => {
+                let b = self.pop_stack();
+                let a = self.pop_stack();
+                self.push_stack((!a.equals(&b)).into());
+            }
             OpCode::Greater => {
                 binary_op!(self, >);
             }
+            OpCode::GreaterEqual => {
+                binary_op!(self, >=);
+            }
             OpCode::Less => {
                 binary_op!(self, <);
+            }
+            OpCode::LessEqual => {
+                binary_op!(self, <=);
             }
             OpCode::Print => {
                 let value = self.pop_stack();
