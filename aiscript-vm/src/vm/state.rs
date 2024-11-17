@@ -853,7 +853,7 @@ impl<'gc> State<'gc> {
                         "Native functions don't support keyword arguments.".into(),
                     ));
                 }
-                let result = function(self.pop_stack_n(args_count as usize))?;
+                let result = function(self.mc, self.pop_stack_n(args_count as usize))?;
                 self.stack_top -= 1; // Remove the function
                 self.push_stack(result);
                 Ok(())

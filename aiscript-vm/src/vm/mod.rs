@@ -58,11 +58,12 @@ impl Vm {
             };
 
             // Initialize standard library modules
-            let std_math = stdlib::create_math_module(ctx);
-            let math_name = ctx.intern(b"std.math");
             state
                 .module_manager
-                .register_native_module(math_name, std_math);
+                .register_native_module(ctx.intern(b"std.math"), stdlib::create_math_module(ctx));
+            state
+                .module_manager
+                .register_native_module(ctx.intern(b"std.io"), stdlib::create_io_module(ctx));
         });
     }
 

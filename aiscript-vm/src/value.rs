@@ -14,7 +14,10 @@ use crate::{
 pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
+    // For identifiers, module names, etc.
     String(InternedString<'gc>),
+    // For file contents, user input, etc. Not interned.
+    IoString(Gc<'gc, String>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
     Class(GcRefLock<'gc, Class<'gc>>),
@@ -51,6 +54,7 @@ impl<'gc> Display for Value<'gc> {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::IoString(s) => write!(f, "{}", s),
             Value::Closure(closure) => {
                 if let Some(name) = closure.function.name {
                     write!(f, "<fn {}>", name)
@@ -117,6 +121,15 @@ impl<'gc> Value<'gc> {
     pub fn as_string(self) -> Result<InternedString<'gc>, VmError> {
         match self {
             Value::String(value) => Ok(value),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to string, the value is {v}"
+            ))),
+        }
+    }
+
+    pub fn as_io_string(self) -> Result<Gc<'gc, String>, VmError> {
+        match self {
+            Value::IoString(value) => Ok(value),
             v => Err(VmError::RuntimeError(format!(
                 "cannot convert to string, the value is {v}"
             ))),
@@ -231,6 +244,12 @@ impl<'gc> From<bool> for Value<'gc> {
 impl<'gc> From<InternedString<'gc>> for Value<'gc> {
     fn from(value: InternedString<'gc>) -> Self {
         Value::String(value)
+    }
+}
+
+impl<'gc> From<Gc<'gc, String>> for Value<'gc> {
+    fn from(value: Gc<'gc, String>) -> Self {
+        Value::IoString(value)
     }
 }
 
