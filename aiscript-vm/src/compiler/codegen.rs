@@ -568,6 +568,7 @@ impl<'gc> CodeGen<'gc> {
                     TokenType::Plus => self.emit(OpCode::Add),
                     TokenType::Minus => self.emit(OpCode::Subtract),
                     TokenType::Star => self.emit(OpCode::Multiply),
+                    TokenType::StarStar => self.emit(OpCode::Power),
                     TokenType::Slash => self.emit(OpCode::Divide),
                     TokenType::Percent => self.emit(OpCode::Modulo),
                     TokenType::BangEqual => self.emit(OpCode::NotEqual),

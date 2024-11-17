@@ -1052,6 +1052,7 @@ enum Precedence {
     Comparison, // < > <= >=
     Term,       // + -
     Factor,     // * /
+    Power,      // **
     Unary,      // ! -
     Call,       // . ()
     Primary,
@@ -1099,6 +1100,11 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::Plus => ParseRule::new(None, Some(Parser::binary), Precedence::Term),
         TokenType::Slash => ParseRule::new(None, Some(Parser::binary), Precedence::Factor),
         TokenType::Star => ParseRule::new(None, Some(Parser::binary), Precedence::Factor),
+        TokenType::StarStar => ParseRule::new(
+            None,
+            Some(Parser::binary),
+            Precedence::Power, // Higher precedence than multiplication
+        ),
         TokenType::Percent => ParseRule::new(
             None,
             Some(Parser::binary),

@@ -35,6 +35,7 @@ pub enum TokenType {
     Less,         // <
     LessEqual,    // <=
     Arrow,        // ->
+    StarStar,     // **
 
     // Literals
     Identifier, // Variable/function names
@@ -391,7 +392,15 @@ impl<'a> Scanner<'a> {
             }
             '+' => self.make_token(TokenType::Plus),
             '/' => self.make_token(TokenType::Slash),
-            '*' => self.make_token(TokenType::Star),
+            '*' => {
+                let kind = if self.peek2() == "**" {
+                    self.advance();
+                    TokenType::StarStar
+                } else {
+                    TokenType::Star
+                };
+                self.make_token(kind)
+            }
             ':' => self.make_token(TokenType::Colon),
             '%' => self.make_token(TokenType::Percent),
             '!' => {

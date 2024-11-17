@@ -326,6 +326,19 @@ impl<'gc> State<'gc> {
             OpCode::Modulo => {
                 binary_op!(self, %);
             }
+            OpCode::Power => {
+                let b = self
+                    .pop_stack()
+                    .as_number()
+                    .map_err(|_| self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+                let a = self
+                    .pop_stack()
+                    .as_number()
+                    .map_err(|_| self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+
+                // Use f64's powf method for power operation
+                self.push_stack(a.powf(b).into());
+            }
             OpCode::Negate => {
                 let v = self
                     .pop_stack()
