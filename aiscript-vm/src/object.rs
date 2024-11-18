@@ -66,7 +66,6 @@ impl<'gc> Display for Function<'gc> {
     }
 }
 
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {
     // Regular functions
@@ -108,6 +107,12 @@ pub struct Instance<'gc> {
 pub struct BoundMethod<'gc> {
     pub receiver: Value<'gc>,
     pub method: Gc<'gc, Closure<'gc>>,
+}
+
+#[derive(Debug, Collect, Default)]
+#[collect(no_drop)]
+pub struct Object<'gc> {
+    pub fields: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 impl<'gc> Class<'gc> {

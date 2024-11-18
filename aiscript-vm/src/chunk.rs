@@ -71,6 +71,7 @@ pub enum OpCode {
         positional_count: u8,
         keyword_count: u8,
     },
+    MakeObject(u8), //  number of key-value pairs in the object
     // Import a module, constant index contains module name
     ImportModule(u8),
     // Get variable from module (module name index, var name index)
@@ -277,6 +278,7 @@ impl<'gc> Chunk<'gc> {
                     positional_count,
                     ..
                 } => self.invoke_instruction("SUPER_INVOKE", method_constant, positional_count),
+                OpCode::MakeObject(c) => self.constant_instruction("MAKE_OBJECT", c),
                 OpCode::ImportModule(c) => self.constant_instruction("IMPORT_MODULE", c),
                 OpCode::GetModuleVar {
                     module_name_constant,

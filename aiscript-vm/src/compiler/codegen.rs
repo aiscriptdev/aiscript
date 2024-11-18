@@ -556,7 +556,26 @@ impl<'gc> CodeGen<'gc> {
         self.current_line = expr.line();
         match expr {
             Expr::Array { .. } => {}
-            Expr::Object { properties, line } => {}
+            Expr::Object { properties, .. } => {
+                // Check number of properties doesn't exceed u8::MAX
+                if properties.len() > u8::MAX as usize {
+                    self.error("Too many properties in object literal.");
+                    return Err(VmError::CompileError);
+                }
+
+                // For each property, emit its key as constant and generate its value expression
+                for (key, value) in properties {
+                    // Emit key name as constant
+                    let key_constant = self.identifier_constant(key.lexeme);
+                    self.emit(OpCode::Constant(key_constant as u8));
+
+                    // Generate code for value expression
+                    self.generate_expr(value)?;
+                }
+
+                // Emit MakeObject instruction with property count
+                self.emit(OpCode::MakeObject(properties.len() as u8));
+            }
             Expr::Binary {
                 left,
                 operator,

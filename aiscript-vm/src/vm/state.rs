@@ -17,7 +17,7 @@ use crate::{
     ast::{ChunkId, Visibility},
     builtins,
     module::{ModuleKind, ModuleManager, ModuleSource},
-    object::{BoundMethod, Class, Closure, Function, Instance, Upvalue, UpvalueObj},
+    object::{BoundMethod, Class, Closure, Function, Instance, Object, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     NativeFn, OpCode, ReturnValue, Value,
 };
@@ -528,6 +528,15 @@ impl<'gc> State<'gc> {
             OpCode::GetProperty(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
+                    Value::Object(obj) => {
+                        if let Some(property) = obj.borrow().fields.get(&name) {
+                            self.pop_stack(); // Object
+                            self.push_stack(*property);
+                        } else {
+                            return Err(self
+                                .runtime_error(format!("Undefined property '{}'.", name).into()));
+                        }
+                    }
                     Value::Instance(instance) => {
                         if let Some(property) = instance.borrow().fields.get(&name) {
                             self.pop_stack(); // Instance
@@ -557,17 +566,27 @@ impl<'gc> State<'gc> {
                 }
             }
             OpCode::SetProperty(byte) => {
-                if let Ok(instantce) = self.peek(1).as_instance() {
-                    let value = *self.peek(0);
-                    let frame = self.current_frame();
-                    let name = frame.read_constant(byte).as_string().unwrap();
-                    instantce.borrow_mut(self.mc).fields.insert(name, value);
+                let value = *self.peek(0);
+                match *self.peek(1) {
+                    Value::Instance(instantce) => {
+                        let frame = self.current_frame();
+                        let name = frame.read_constant(byte).as_string().unwrap();
+                        instantce.borrow_mut(self.mc).fields.insert(name, value);
 
-                    let value = self.pop_stack(); // Value
-                    self.pop_stack(); // Instance
-                    self.push_stack(value);
-                } else {
-                    return Err(self.runtime_error("Only instances have fields.".into()));
+                        let value = self.pop_stack(); // Value
+                        self.pop_stack(); // Instance
+                        self.push_stack(value);
+                    }
+                    Value::Object(obj) => {
+                        let frame = self.current_frame();
+                        let name = frame.read_constant(byte).as_string().unwrap();
+                        obj.borrow_mut(self.mc).fields.insert(name, value);
+
+                        let value = self.pop_stack(); // Value
+                        self.pop_stack(); // Object
+                        self.push_stack(value);
+                    }
+                    _ => return Err(self.runtime_error("Only instances have fields.".into())),
                 }
             }
             OpCode::Method(byte) => {
@@ -607,6 +626,27 @@ impl<'gc> State<'gc> {
                 let method_name = frame.read_constant(method_constant).as_string().unwrap();
                 let superclass = self.pop_stack().as_class()?;
                 self.invoke_from_class(superclass, method_name, positional_count, keyword_count)?;
+            }
+            OpCode::MakeObject(count) => {
+                let mut object = Object::default();
+                let start = self.stack_top - (count as usize * 2); // Each property has key and value
+
+                // Process pairs of values from the stack (key, value)
+                for i in (0..count as usize).map(|i| i * 2) {
+                    let value = self.stack[start + i + 1]; // Value is second in pair
+                    let key = self.stack[start + i] // Key is first in pair
+                        .as_string()
+                        .map_err(|_| self.runtime_error("Object key must be a string.".into()))?;
+
+                    object.fields.insert(key, value);
+                }
+
+                // Pop all the key-value pairs
+                self.stack_top = start;
+
+                // Create new object and push it onto stack
+                let object = Gc::new(self.mc, RefLock::new(object));
+                self.push_stack(Value::Object(object));
             }
             OpCode::Prompt => {
                 let message = self.pop_stack().as_string().unwrap().to_string();

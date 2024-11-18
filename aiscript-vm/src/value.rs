@@ -4,7 +4,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc};
 
 use crate::{
     ai::Agent,
-    object::{BoundMethod, Class, Closure, Instance},
+    object::{BoundMethod, Class, Closure, Instance, Object},
     string::InternedString,
     vm::VmError,
     NativeFn, ReturnValue,
@@ -20,6 +20,7 @@ pub enum Value<'gc> {
     IoString(Gc<'gc, String>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
+    Object(GcRefLock<'gc, Object<'gc>>),
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
@@ -63,6 +64,18 @@ impl<'gc> Display for Value<'gc> {
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
+            Value::Object(obj) => {
+                write!(f, "{{")?;
+                let mut first = true;
+                for (key, value) in &obj.borrow().fields {
+                    if !first {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", key, value)?;
+                    first = false;
+                }
+                write!(f, "}}")
+            }
             Value::Class(class) => write!(f, "{}", class.borrow().name),
             Value::Instance(instance) => {
                 let mut s = format!("{} {{", instance.borrow().class.borrow().name);
@@ -184,6 +197,20 @@ impl<'gc> Value<'gc> {
             Value::Module(name) => Some(*name),
             _ => None,
         }
+    }
+
+    pub fn as_object(self) -> Result<GcRefLock<'gc, Object<'gc>>, VmError> {
+        match self {
+            Value::Object(obj) => Ok(obj),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to object: {:?}",
+                v
+            ))),
+        }
+    }
+
+    pub fn is_object(&self) -> bool {
+        matches!(self, Value::Object(_))
     }
 
     pub fn is_bound_method(&self) -> bool {
