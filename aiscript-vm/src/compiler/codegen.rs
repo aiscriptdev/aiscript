@@ -556,6 +556,7 @@ impl<'gc> CodeGen<'gc> {
         self.current_line = expr.line();
         match expr {
             Expr::Array { .. } => {}
+            Expr::Object { properties, line } => {}
             Expr::Binary {
                 left,
                 operator,

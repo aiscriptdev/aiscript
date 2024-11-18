@@ -127,6 +127,10 @@ impl FnDef {
 
 #[derive(Debug, Clone)]
 pub enum Expr<'gc> {
+    Object {
+        properties: Vec<(Token<'gc>, Expr<'gc>)>,
+        line: u32,
+    },
     Binary {
         left: Box<Expr<'gc>>,
         operator: Token<'gc>,
@@ -215,7 +219,8 @@ pub enum Expr<'gc> {
 impl<'gc> Expr<'gc> {
     pub fn line(&self) -> u32 {
         match self {
-            Self::Binary { line, .. }
+            Self::Object { line, .. }
+            | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
             | Self::Array { line, .. }
             | Self::Literal { line, .. }
