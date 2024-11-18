@@ -140,6 +140,19 @@ impl RequestProcessor {
         .into_iter()
         .collect()
     }
+
+    fn header_instance(&self) -> HashMap<String, Value> {
+        self.request
+            .headers()
+            .iter()
+            .map(|(name, value)| {
+                (
+                    name.as_str().to_owned(),
+                    Value::String(value.to_str().unwrap().to_owned()),
+                )
+            })
+            .collect()
+    }
 }
 
 impl Future for RequestProcessor {
@@ -183,6 +196,7 @@ impl Future for RequestProcessor {
                 }
                 ProcessingState::ValidatingBody => {
                     let request_instance = self.request_instance();
+                    let header_instance = self.header_instance();
                     let request = mem::take(&mut self.request);
                     let body_fut: BoxFuture<Result<Value, ServerError>> =
                         match self.endpoint.body_type {
@@ -236,6 +250,7 @@ impl Future for RequestProcessor {
                         vm.inject_variables(query_data);
                         vm.inject_variables(body_data);
                         vm.inject_instance("request", request_instance);
+                        vm.inject_instance("header", header_instance);
                         vm.interpret()
                     });
                     self.state = ProcessingState::Executing(handle);

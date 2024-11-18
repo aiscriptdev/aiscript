@@ -13,6 +13,8 @@ route /poc {
         let name = "aiscript";
         print name;
         print request;
+        print header;
+        print header.connection;
         return "get: hello" + name + request.path;
     }
 

@@ -159,11 +159,10 @@ impl Vm {
         });
     }
 
-    pub fn inject_instance(
-        &mut self,
-        name: &'static str,
-        fields: HashMap<&'static str, serde_json::Value>,
-    ) {
+    pub fn inject_instance<K>(&mut self, name: &'static str, fields: HashMap<K, serde_json::Value>)
+    where
+        K: AsRef<str> + Eq,
+    {
         self.arena.mutate_root(|mc, state| {
             let name = state.intern_static(name);
             let class = Gc::new(mc, RefLock::new(Class::new(name)));
@@ -179,7 +178,9 @@ impl Vm {
                     serde_json::Value::Null => Value::Nil,
                     _ => continue,
                 };
-                instance.fields.insert(state.intern_static(key), v);
+                instance
+                    .fields
+                    .insert(state.intern(key.as_ref().as_bytes()), v);
             }
             state
                 .globals
