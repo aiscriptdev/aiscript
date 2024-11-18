@@ -8,30 +8,10 @@ use gc_arena::{Gc, Mutation};
 
 use crate::{
     module::ModuleKind,
+    string_arg,
     value::Value,
     vm::{Context, VmError},
 };
-
-// Helper macros for arg handling
-macro_rules! get_string_arg {
-    ($args:expr, $index:expr, $fn_name:expr) => {
-        match $args.get($index) {
-            Some(value) => value.as_string().map_err(|_| {
-                VmError::RuntimeError(format!(
-                    "{}: argument {} must be a string",
-                    $fn_name,
-                    $index + 1
-                ))
-            }),
-            None => Err(VmError::RuntimeError(format!(
-                "{}: expected {} arguments, got {}",
-                $fn_name,
-                $index + 1,
-                $args.len()
-            ))),
-        }
-    };
-}
 
 pub fn create_io_module(ctx: Context) -> ModuleKind {
     let name = ctx.intern(b"std.io");
@@ -87,7 +67,7 @@ pub fn create_io_module(ctx: Context) -> ModuleKind {
 
 // File reading functions
 fn io_read_file<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "read_file")?.to_string();
+    let path = string_arg!(args, 0, "read_file")?.to_string();
     match fs::read_to_string(&path) {
         Ok(content) => Ok(Value::IoString(Gc::new(mc, content))),
         Err(e) => Err(VmError::RuntimeError(format!(
@@ -101,7 +81,7 @@ fn io_read_file<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Va
 //     _mc: &'gc Mutation<'gc>,
 //     args: Vec<Value<'gc>>,
 // ) -> Result<Value<'gc>, VmError> {
-//     let path = get_string_arg!(args, 0, "read_bytes")?.to_string();
+//     let path = string_arg!(args, 0, "read_bytes")?.to_string();
 //     match fs::read(&path) {
 //         Ok(bytes) => {
 //             // Convert bytes to a comma-separated string of numbers
@@ -125,7 +105,7 @@ fn io_read_lines<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "read_lines")?.to_string();
+    let path = string_arg!(args, 0, "read_lines")?.to_string();
     let file = File::open(&path)
         .map_err(|e| VmError::RuntimeError(format!("Failed to open file '{}': {}", path, e)))?;
 
@@ -143,8 +123,8 @@ fn io_write_file<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "write_file")?.to_string();
-    let content = get_string_arg!(args, 1, "write_file")?.to_string();
+    let path = string_arg!(args, 0, "write_file")?.to_string();
+    let content = string_arg!(args, 1, "write_file")?.to_string();
 
     fs::write(&path, content)
         .map_err(|e| VmError::RuntimeError(format!("Failed to write to file '{}': {}", path, e)))?;
@@ -156,8 +136,8 @@ fn io_append_file<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "append_file")?.to_string();
-    let content = get_string_arg!(args, 1, "append_file")?.to_string();
+    let path = string_arg!(args, 0, "append_file")?.to_string();
+    let content = string_arg!(args, 1, "append_file")?.to_string();
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -174,7 +154,7 @@ fn io_append_file<'gc>(
 
 // Standard input/output functions
 fn io_print<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let text = get_string_arg!(args, 0, "print")?.to_string();
+    let text = string_arg!(args, 0, "print")?.to_string();
     print!("{}", text);
     io::stdout()
         .flush()
@@ -183,7 +163,7 @@ fn io_print<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value
 }
 
 fn io_println<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let text = get_string_arg!(args, 0, "println")?.to_string();
+    let text = string_arg!(args, 0, "println")?.to_string();
     println!("{}", text);
     Ok(Value::Boolean(true))
 }
@@ -209,17 +189,17 @@ fn io_input<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
 
 // File/directory operations
 fn io_exists<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "exists")?.to_string();
+    let path = string_arg!(args, 0, "exists")?.to_string();
     Ok(Value::Boolean(Path::new(&path).exists()))
 }
 
 fn io_is_file<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "is_file")?.to_string();
+    let path = string_arg!(args, 0, "is_file")?.to_string();
     Ok(Value::Boolean(Path::new(&path).is_file()))
 }
 
 fn io_is_dir<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "is_dir")?.to_string();
+    let path = string_arg!(args, 0, "is_dir")?.to_string();
     Ok(Value::Boolean(Path::new(&path).is_dir()))
 }
 
@@ -227,7 +207,7 @@ fn io_create_dir<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "create_dir")?.to_string();
+    let path = string_arg!(args, 0, "create_dir")?.to_string();
     fs::create_dir_all(&path).map_err(|e| {
         VmError::RuntimeError(format!("Failed to create directory '{}': {}", path, e))
     })?;
@@ -238,7 +218,7 @@ fn io_remove_file<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "remove_file")?.to_string();
+    let path = string_arg!(args, 0, "remove_file")?.to_string();
     fs::remove_file(&path)
         .map_err(|e| VmError::RuntimeError(format!("Failed to remove file '{}': {}", path, e)))?;
     Ok(Value::Boolean(true))
@@ -248,7 +228,7 @@ fn io_remove_dir<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let path = get_string_arg!(args, 0, "remove_dir")?.to_string();
+    let path = string_arg!(args, 0, "remove_dir")?.to_string();
     let recursive = args.get(1).map(|v| v.as_boolean()).unwrap_or(false);
 
     if recursive {
@@ -262,8 +242,8 @@ fn io_remove_dir<'gc>(
 }
 
 fn io_rename<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let from = get_string_arg!(args, 0, "rename")?.to_string();
-    let to = get_string_arg!(args, 1, "rename")?.to_string();
+    let from = string_arg!(args, 0, "rename")?.to_string();
+    let to = string_arg!(args, 1, "rename")?.to_string();
 
     fs::rename(&from, &to).map_err(|e| {
         VmError::RuntimeError(format!("Failed to rename '{}' to '{}': {}", from, to, e))

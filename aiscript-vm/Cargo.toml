@@ -16,6 +16,7 @@ num_enum = "0.7.3"
 serde_json = "1.0.132"
 tokio = { version = "1.41.0" }
 indexmap = "2.6.0"
+chrono = "0.4.38"
 
 [features]
 # v1 one-pass compiler

@@ -64,6 +64,9 @@ impl Vm {
             state
                 .module_manager
                 .register_native_module(ctx.intern(b"std.io"), stdlib::create_io_module(ctx));
+            state
+                .module_manager
+                .register_native_module(ctx.intern(b"std.time"), stdlib::create_time_module(ctx));
         });
     }
 

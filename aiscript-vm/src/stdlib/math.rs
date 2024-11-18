@@ -1,32 +1,6 @@
 use gc_arena::Mutation;
 
-use crate::{module::ModuleKind, vm::Context, Value, VmError};
-
-/// Macro to get and validate a float argument from a slice of Values
-///
-/// # Arguments
-/// * `args` - The vector of arguments
-/// * `index` - The index of the argument to get
-/// * `fn_name` - The name of the function for error messages
-macro_rules! float_arg {
-    ($args:expr, $index:expr, $fn_name:expr) => {
-        match $args.get($index) {
-            Some(value) => value.as_number().map_err(|_| {
-                VmError::RuntimeError(format!(
-                    "{}: argument {} must be a number",
-                    $fn_name,
-                    $index + 1
-                ))
-            }),
-            None => Err(VmError::RuntimeError(format!(
-                "{}: expected {} arguments, got {}",
-                $fn_name,
-                $index + 1,
-                $args.len()
-            ))),
-        }
-    };
-}
+use crate::{float_arg, module::ModuleKind, vm::Context, Value, VmError};
 
 pub fn create_math_module(ctx: Context) -> ModuleKind {
     let name = ctx.intern(b"std.math");
