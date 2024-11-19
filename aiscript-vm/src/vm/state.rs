@@ -529,13 +529,9 @@ impl<'gc> State<'gc> {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
                     Value::Object(obj) => {
-                        if let Some(property) = obj.borrow().fields.get(&name) {
-                            self.pop_stack(); // Object
-                            self.push_stack(*property);
-                        } else {
-                            return Err(self
-                                .runtime_error(format!("Undefined property '{}'.", name).into()));
-                        }
+                        // Default is nil if no key found
+                        let value = obj.borrow().fields.get(&name).copied().unwrap_or_default();
+                        self.push_stack(value);
                     }
                     Value::Instance(instance) => {
                         if let Some(property) = instance.borrow().fields.get(&name) {
@@ -660,15 +656,9 @@ impl<'gc> State<'gc> {
                             self.runtime_error("Index key must be a string.".into())
                         })?;
 
-                        // Get value from object's fields
-                        let obj = obj.borrow();
-                        if let Some(&value) = obj.fields.get(&key) {
-                            self.push_stack(value);
-                        } else {
-                            return Err(
-                                self.runtime_error(format!("Undefined property '{}'.", key).into())
-                            );
-                        }
+                        // Get value from object's fields, default is nil if not key found.
+                        let value = obj.borrow().fields.get(&key).copied().unwrap_or_default();
+                        self.push_stack(value);
                     }
                     Value::Instance(_) => {
                         return Err(self.runtime_error(

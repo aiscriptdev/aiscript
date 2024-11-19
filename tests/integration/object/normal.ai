@@ -1,0 +1,33 @@
+let empty = {};
+print empty; // expect: {}
+
+const point = {
+    x: 5 + 5, 
+    y: 100 / 5,
+};
+
+print point.x; // expect: 10
+print point.y; // expect: 20
+print point["x"];  // expect: 10
+
+let key = "x";
+point[key] = 30;
+print point[key];  // expect: 30
+print point["invalid_key"]; // expect: nil
+print point.invalid_key; // expect: nil
+print point.key; // expect: nil
+
+if (point.x > 1 and point["y"] < 100) {
+    print "Bingo!"; // expect: Bingo!
+}
+
+let nested = {
+    pos: {x: 1, y: 2, t: "tt"},
+    color: "red",
+};
+print nested.pos.x; // expect: 1
+print nested.pos.t;  // expect: tt
+print nested.color;  // expect: red
+
+nested.pos.xx = "xx";
+print nested.pos.xx; // expect: xx

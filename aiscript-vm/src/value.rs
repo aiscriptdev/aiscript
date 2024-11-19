@@ -10,7 +10,7 @@ use crate::{
     NativeFn, ReturnValue,
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
@@ -26,6 +26,7 @@ pub enum Value<'gc> {
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
     Module(InternedString<'gc>),
     Agent(Gc<'gc, Agent<'gc>>),
+    #[default]
     Nil,
 }
 
