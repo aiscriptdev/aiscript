@@ -14,7 +14,6 @@ use crate::{
     VmError,
 };
 
-mod expr_test;
 mod stmt_test;
 
 type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc>>;
@@ -735,7 +734,6 @@ impl<'gc> Parser<'gc> {
         }
 
         loop {
-            // Parse property key
             let property = if self.match_token(TokenType::OpenBracket) {
                 // Computed property name: [expr]
                 let key_expr = Box::new(self.expression()?);
@@ -760,13 +758,22 @@ impl<'gc> Parser<'gc> {
 
                 ObjectProperty::Literal { key, value }
             } else if self.check(TokenType::Identifier) {
-                // Identifier key
+                // Could be either shorthand {a} or regular {a: expr}
                 self.advance();
                 let key = self.previous;
-                self.consume(TokenType::Colon, "Expect ':' after property name.");
-                let value = Box::new(self.expression()?);
 
-                ObjectProperty::Literal { key, value }
+                if self.match_token(TokenType::Colon) {
+                    // Regular property
+                    let value = Box::new(self.expression()?);
+                    ObjectProperty::Literal { key, value }
+                } else {
+                    // Shorthand property {a} -> {a: a}
+                    let value = Box::new(Expr::Variable {
+                        name: key,
+                        line: key.line,
+                    });
+                    ObjectProperty::Literal { key, value }
+                }
             } else {
                 self.error_at_current(
                     "Expect property name string, identifier, or computed [expression].",
