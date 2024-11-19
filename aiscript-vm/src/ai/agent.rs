@@ -191,7 +191,7 @@ impl<'gc> Agent<'gc> {
             if let Some(tool_def) = self.tools.get(name) {
                 // FIXME: pass params as the correct order
                 let params = vec![];
-                let result = state.eval_function(tool_def.chunk_id, params).unwrap();
+                let result = state.eval_function(tool_def.chunk_id, &params).unwrap();
                 let content = if let ReturnValue::Agent(agent_name) = &result {
                     let agent_name = state.intern(agent_name.as_bytes());
                     response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());

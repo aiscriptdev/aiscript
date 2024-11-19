@@ -98,6 +98,8 @@ impl<'gc> CodeGen<'gc> {
         program: Program<'gc>,
         ctx: Context<'gc>,
     ) -> Result<HashMap<ChunkId, Function<'gc>>, VmError> {
+        // Reset CHUNK_ID initial value to get the same id for repeat compile
+        CHUNK_ID.store(0, Ordering::Relaxed);
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
         for stmt in &program.statements {

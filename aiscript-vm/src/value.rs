@@ -1,12 +1,12 @@
 use std::{collections::HashMap, fmt::Display};
 
-use gc_arena::{lock::GcRefLock, Collect, Gc};
+use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
 
 use crate::{
     ai::Agent,
     object::{BoundMethod, Class, Closure, Instance, Object},
     string::InternedString,
-    vm::VmError,
+    vm::{Context, VmError},
     NativeFn, ReturnValue,
 };
 
@@ -257,6 +257,30 @@ impl<'gc> Value<'gc> {
 
     pub fn is_falsy(&self) -> bool {
         self.is_nil() || (self.is_boolean() && !self.as_boolean())
+    }
+
+    pub fn from_serde_value(ctx: Context<'gc>, value: &serde_json::Value) -> Value<'gc> {
+        match value {
+            serde_json::Value::Bool(b) => Value::Boolean(*b),
+            serde_json::Value::Number(number) => Value::Number(number.as_f64().unwrap()),
+            serde_json::Value::String(str) => {
+                let s = ctx.intern(str.as_bytes());
+                Value::from(s)
+            }
+            serde_json::Value::Object(obj) => {
+                let fields = obj
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (
+                            ctx.intern(key.as_bytes()),
+                            Value::from_serde_value(ctx, value),
+                        )
+                    })
+                    .collect();
+                Value::Object(Gc::new(&ctx, RefLock::new(Object { fields })))
+            }
+            _ => Value::Nil,
+        }
     }
 }
 

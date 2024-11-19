@@ -4,6 +4,7 @@ use gc_arena::{arena::CollectionPhase, lock::RefLock, Arena, Gc, Mutation, Roota
 pub use state::State;
 
 use crate::{
+    ast::ChunkId,
     object::{Class, Instance},
     stdlib,
     string::{InternedString, InternedStringSet},
@@ -102,9 +103,28 @@ impl Vm {
             state.define_builtins();
             // The script function's chunk id is always the highest chunk id.
             let script_chunk_id = state.chunks.keys().max().copied().unwrap();
-            state.call_function(script_chunk_id, vec![])
-        })?;
-        Ok(())
+            state.call_function(script_chunk_id, &[])
+        })
+    }
+
+    pub fn eval_function(
+        &mut self,
+        chunk_id: ChunkId,
+        params: &[serde_json::Value],
+    ) -> Result<ReturnValue, VmError> {
+        self.arena.mutate_root(|mc, state| {
+            let ctx = Context {
+                mutation: mc,
+                strings: state.strings,
+            };
+            state.eval_function(
+                chunk_id,
+                &params
+                    .iter()
+                    .map(|v| Value::from_serde_value(ctx, v))
+                    .collect::<Vec<_>>(),
+            )
+        })
     }
 
     pub fn interpret(&mut self) -> Result<ReturnValue, VmError> {

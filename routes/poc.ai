@@ -10,12 +10,15 @@ route /poc {
             age: int = 18
         }
 
-        let name = "aiscript";
-        print name;
+        print query;
+        print body;
         print request;
         print header;
-        print header.connection;
-        return "get: hello" + name + request.path;
+        print query.content;
+        print query.age + 2;
+        let name = "aiscript";
+        print "name: " + "123";
+        return "get: hello";
     }
 
     /// Post and put hello API

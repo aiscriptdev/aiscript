@@ -184,7 +184,7 @@ impl<'gc> State<'gc> {
 
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 self.chunks.extend(chunks);
-                self.eval_function(imported_script_chunk_id, vec![])?;
+                self.eval_function(imported_script_chunk_id, &[])?;
 
                 if let Some(ModuleKind::Script {
                     ref mut globals, ..
@@ -244,7 +244,7 @@ impl<'gc> State<'gc> {
     pub fn call_function(
         &mut self,
         chunk_id: ChunkId,
-        params: Vec<Value<'gc>>,
+        params: &[Value<'gc>],
     ) -> Result<(), VmError> {
         let function = self.get_chunk(chunk_id)?;
         #[cfg(feature = "debug")]
@@ -253,7 +253,7 @@ impl<'gc> State<'gc> {
         let closure = Gc::new(self.mc, Closure::new(self.mc, function));
         self.push_stack(Value::from(closure));
         for param in params {
-            self.push_stack(param);
+            self.push_stack(*param);
         }
         self.call(closure, function.arity, 0)
     }
@@ -308,7 +308,10 @@ impl<'gc> State<'gc> {
                 (Value::Number(_), Value::Number(_)) => {
                     binary_op!(self, +);
                 }
-                (Value::String(_), Value::String(_)) => {
+                (Value::String(_), Value::String(_))
+                | (Value::IoString(_), Value::IoString(_))
+                | (Value::String(_), Value::IoString(_))
+                | (Value::IoString(_), Value::String(_)) => {
                     let b = self.pop_stack().as_string()?;
                     let a = self.pop_stack().as_string()?;
                     let s = self.intern(format!("{a}{b}").as_bytes());
@@ -756,7 +759,7 @@ impl<'gc> State<'gc> {
     pub fn eval_function(
         &mut self,
         chunk_id: ChunkId,
-        params: Vec<Value<'gc>>,
+        params: &[Value<'gc>],
     ) -> Result<ReturnValue, VmError> {
         // Remember the current frame count in order to exit the loop at the correct frame.
         let frame_count = self.frame_count;

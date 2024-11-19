@@ -121,6 +121,7 @@ impl<'a> Parser<'a> {
 
         Ok((path_str, params))
     }
+
     fn parse_endpoint(&mut self) -> Result<Endpoint, String> {
         let docs = self.parse_docs()?;
         let path_specs = self.parse_path_specs()?;
@@ -166,7 +167,7 @@ impl<'a> Parser<'a> {
         }
 
         let statements = match self.lexer.read_raw_script(&self.current_token) {
-            Ok(script) => script,
+            Ok(script) => format!("fn handler(query, body, request, header){{{}}}", script),
             _ => return Err("Expected script content".to_string()),
         };
         // Get the next token ready for the next endpoint

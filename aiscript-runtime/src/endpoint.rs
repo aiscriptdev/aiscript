@@ -117,7 +117,7 @@ impl RequestProcessor {
             .map_err(ServerError::FormParseError)
     }
 
-    fn request_instance(&self) -> HashMap<&'static str, Value> {
+    fn get_request(&self) -> HashMap<&'static str, Value> {
         let uri = self.request.uri();
         [
             ("method", self.request.method().as_str().into()),
@@ -141,7 +141,7 @@ impl RequestProcessor {
         .collect()
     }
 
-    fn header_instance(&self) -> HashMap<String, Value> {
+    fn get_header(&self) -> HashMap<String, Value> {
         self.request
             .headers()
             .iter()
@@ -177,14 +177,11 @@ impl Future for RequestProcessor {
                                 break;
                             }
                             self.query_data.insert(field.name.clone(), value.clone());
+                        } else if let Some(default) = &field.default {
+                            self.query_data.insert(field.name.clone(), default.clone());
                         } else if field.required {
-                            if let Some(default) = &field.default {
-                                self.query_data.insert(field.name.clone(), default.clone());
-                            } else {
-                                failed_validation =
-                                    Some(ServerError::MissingField(field.name.clone()));
-                                break;
-                            }
+                            failed_validation = Some(ServerError::MissingField(field.name.clone()));
+                            break;
                         }
                     }
 
@@ -195,8 +192,8 @@ impl Future for RequestProcessor {
                     self.state = ProcessingState::ValidatingBody;
                 }
                 ProcessingState::ValidatingBody => {
-                    let request_instance = self.request_instance();
-                    let header_instance = self.header_instance();
+                    let request_obj = self.get_request();
+                    let header_obj = self.get_header();
                     let request = mem::take(&mut self.request);
                     let body_fut: BoxFuture<Result<Value, ServerError>> =
                         match self.endpoint.body_type {
@@ -224,14 +221,11 @@ impl Future for RequestProcessor {
                                 break;
                             }
                             self.body_data.insert(field.name.clone(), value.clone());
+                        } else if let Some(default) = &field.default {
+                            self.body_data.insert(field.name.clone(), default.clone());
                         } else if field.required {
-                            if let Some(default) = &field.default {
-                                self.body_data.insert(field.name.clone(), default.clone());
-                            } else {
-                                failed_validation =
-                                    Some(ServerError::MissingField(field.name.clone()));
-                                break;
-                            }
+                            failed_validation = Some(ServerError::MissingField(field.name.clone()));
+                            break;
                         }
                     }
 
@@ -244,24 +238,30 @@ impl Future for RequestProcessor {
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
                     let handle = task::spawn_blocking(move || {
-                        // aiscript_vm::eval(script)
                         let mut vm = Vm::new();
                         vm.compile(script)?;
-                        vm.inject_variables(query_data);
-                        vm.inject_variables(body_data);
-                        vm.inject_instance("request", request_instance);
-                        vm.inject_instance("header", header_instance);
-                        vm.interpret()
+                        vm.eval_function(
+                            0,
+                            &[
+                                Value::Object(query_data.into_iter().collect()),
+                                Value::Object(body_data.into_iter().collect()),
+                                Value::Object(
+                                    request_obj
+                                        .into_iter()
+                                        .map(|(k, v)| (k.to_owned(), v))
+                                        .collect(),
+                                ),
+                                Value::Object(header_obj.into_iter().collect()),
+                            ],
+                        )
                     });
                     self.state = ProcessingState::Executing(handle);
                 }
                 ProcessingState::Executing(handle) => {
                     return match Pin::new(handle).poll(cx) {
-                        Poll::Ready(result) => Poll::Ready(Ok(format!(
-                            "Query: {:?}, Body: {:?}, Result: {:?}",
-                            self.query_data, self.body_data, result
-                        )
-                        .into_response())),
+                        Poll::Ready(result) => {
+                            Poll::Ready(Ok(format!("Result: {:?}", result).into_response()))
+                        }
                         Poll::Pending => Poll::Pending,
                     };
                 }
