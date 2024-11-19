@@ -648,6 +648,65 @@ impl<'gc> State<'gc> {
                 let object = Gc::new(self.mc, RefLock::new(object));
                 self.push_stack(Value::Object(object));
             }
+            OpCode::GetIndex => {
+                // Stack: [object] [key]
+                let key = self.pop_stack();
+                let target = self.pop_stack();
+
+                match target {
+                    Value::Object(obj) => {
+                        // Convert key to string
+                        let key = key.as_string().map_err(|_| {
+                            self.runtime_error("Index key must be a string.".into())
+                        })?;
+
+                        // Get value from object's fields
+                        let obj = obj.borrow();
+                        if let Some(&value) = obj.fields.get(&key) {
+                            self.push_stack(value);
+                        } else {
+                            return Err(
+                                self.runtime_error(format!("Undefined property '{}'.", key).into())
+                            );
+                        }
+                    }
+                    Value::Instance(_) => {
+                        return Err(self.runtime_error(
+                            "Use dot notation for accessing instance properties.".into(),
+                        ));
+                    }
+                    _ => {
+                        return Err(self.runtime_error("Only objects support indexing.".into()));
+                    }
+                }
+            }
+            OpCode::SetIndex => {
+                // Stack: [object] [key] [value]
+                let value = self.pop_stack();
+                let key = match self.peek(0).as_string() {
+                    Ok(key) => key,
+                    Err(_) => {
+                        return Err(self.runtime_error("Index key must be a string.".into()));
+                    }
+                };
+                match self.peek(1) {
+                    Value::Object(obj) => {
+                        // Pop remaining operands now that we know they're valid
+                        // Set the field
+                        obj.borrow_mut(self.mc).fields.insert(key, value);
+                        // Push value back for assignment expressions
+                        self.push_stack(value);
+                    }
+                    Value::Instance(_) => {
+                        return Err(self.runtime_error(
+                            "Use dot notation for accessing instance properties.".into(),
+                        ));
+                    }
+                    _ => {
+                        return Err(self.runtime_error("Only objects support indexing.".into()));
+                    }
+                }
+            }
             OpCode::Prompt => {
                 let message = self.pop_stack().as_string().unwrap().to_string();
                 let result = Value::from(self.intern(ai::prompt(message).as_bytes()));

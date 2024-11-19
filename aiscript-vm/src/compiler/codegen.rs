@@ -662,6 +662,19 @@ impl<'gc> CodeGen<'gc> {
                     keyword_count: keyword_args.len() as u8,
                 });
             }
+            Expr::Index {
+                object, key, value, ..
+            } => {
+                self.generate_expr(object)?; // Push object
+                self.generate_expr(key)?; // Push key
+
+                if let Some(val) = value {
+                    self.generate_expr(val)?; // Push value if it's a set operation
+                    self.emit(OpCode::SetIndex);
+                } else {
+                    self.emit(OpCode::GetIndex);
+                }
+            }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
                 let name_constant = self.identifier_constant(name.lexeme);

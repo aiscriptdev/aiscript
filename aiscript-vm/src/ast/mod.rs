@@ -158,6 +158,12 @@ pub enum Expr<'gc> {
         name: Token<'gc>,
         line: u32,
     },
+    Index {
+        object: Box<Expr<'gc>>,
+        key: Box<Expr<'gc>>,
+        value: Option<Box<Expr<'gc>>>,
+        line: u32,
+    },
     Assign {
         name: Token<'gc>,
         value: Box<Expr<'gc>>,
@@ -226,6 +232,7 @@ impl<'gc> Expr<'gc> {
             | Self::Literal { line, .. }
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }
+            | Self::Index { line, .. }
             | Self::Assign { line, .. }
             | Self::And { line, .. }
             | Self::Or { line, .. }

@@ -886,6 +886,27 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn index(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
+        let object = Box::new(self.previous_expr.take()?);
+
+        let key = Box::new(self.expression()?);
+        self.consume(TokenType::CloseBracket, "Expect ']' after index.");
+
+        let line = self.previous.line;
+        let value = if can_assign && self.match_token(TokenType::Equal) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+
+        Some(Expr::Index {
+            object,
+            key,
+            value,
+            line,
+        })
+    }
+
     fn dot(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
         self.consume(TokenType::Identifier, "Expect property name after '.'.");
         let name = self.previous;
@@ -1213,7 +1234,9 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenParen => {
             ParseRule::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
         }
-        TokenType::OpenBracket => ParseRule::new(Some(Parser::array), None, Precedence::Call),
+        TokenType::OpenBracket => {
+            ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
+        }
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)
