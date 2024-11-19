@@ -41,10 +41,14 @@ unsafe impl<'gc> Collect for Value<'gc> {
     fn trace(&self, cc: &gc_arena::Collection) {
         match self {
             Value::String(s) => s.trace(cc),
+            Value::IoString(s) => s.trace(cc),
             Value::Closure(closure) => closure.trace(cc),
+            Value::Object(obj) => obj.trace(cc),
             Value::Class(class) => class.trace(cc),
             Value::Instance(instance) => instance.trace(cc),
             Value::BoundMethod(bound) => bound.trace(cc),
+            Value::Module(module) => module.trace(cc),
+            Value::Agent(agent) => agent.trace(cc),
             _ => {}
         }
     }
