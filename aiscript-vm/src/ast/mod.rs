@@ -126,9 +126,23 @@ impl FnDef {
 }
 
 #[derive(Debug, Clone)]
+pub enum ObjectProperty<'gc> {
+    // Regular property with literal name
+    Literal {
+        key: Token<'gc>,
+        value: Box<Expr<'gc>>,
+    },
+    // Computed property name
+    Computed {
+        key_expr: Box<Expr<'gc>>,
+        value: Box<Expr<'gc>>,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub enum Expr<'gc> {
     Object {
-        properties: Vec<(Token<'gc>, Expr<'gc>)>,
+        properties: Vec<ObjectProperty<'gc>>,
         line: u32,
     },
     Binary {

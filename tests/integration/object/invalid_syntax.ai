@@ -1,12 +1,12 @@
 let x = {
-    1: "value1" // Error at '1': Expected property name string or identifier.
+    1: "value1" // Error at '1': Expect property name string, identifier, or computed [expression].
 };
 
 let y1 = {
-    "a" 1 // Error at '1': Expected ':' after property name.
+    "a" 1 // Error at '1': Expect ':' after property name.
 };
 let y2 = {
-    a 1 // Error at '1': Expected ':' after property name.
+    a 1 // Error at '1': Expect ':' after property name.
 };
 
-let z = { "z": 1; // Error at ';': Expected '}' after object literal.
+let z = { "z": 1; // Error at ';': Expect '}' after object literal.

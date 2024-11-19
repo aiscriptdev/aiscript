@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     ai::Agent,
-    ast::{AgentDecl, ChunkId, ClassDecl, FunctionDecl, Mutability, VariableDecl},
+    ast::{AgentDecl, ChunkId, ClassDecl, FunctionDecl, Mutability, ObjectProperty, VariableDecl},
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -557,23 +557,29 @@ impl<'gc> CodeGen<'gc> {
         match expr {
             Expr::Array { .. } => {}
             Expr::Object { properties, .. } => {
-                // Check number of properties doesn't exceed u8::MAX
-                if properties.len() > u8::MAX as usize {
-                    self.error("Too many properties in object literal.");
-                    return Err(VmError::CompileError);
+                // For each property, first emit key and value onto stack
+                for property in properties {
+                    match property {
+                        ObjectProperty::Literal { key, value } => {
+                            // For literal key, emit as constant string
+                            let key_constant = self.identifier_constant(key.lexeme);
+                            self.emit(OpCode::Constant(key_constant as u8));
+
+                            // Generate value code
+                            self.generate_expr(value)?;
+                        }
+                        ObjectProperty::Computed { key_expr, value } => {
+                            // Generate key expression code
+                            self.generate_expr(key_expr)?;
+
+                            // Generate value code
+                            self.generate_expr(value)?;
+                        }
+                    }
                 }
 
-                // For each property, emit its key as constant and generate its value expression
-                for (key, value) in properties {
-                    // Emit key name as constant
-                    let key_constant = self.identifier_constant(key.lexeme);
-                    self.emit(OpCode::Constant(key_constant as u8));
-
-                    // Generate code for value expression
-                    self.generate_expr(value)?;
-                }
-
-                // Emit MakeObject instruction with property count
+                // Now create object with all properties
+                // Stack has pairs of [key1, value1, key2, value2, ...]
                 self.emit(OpCode::MakeObject(properties.len() as u8));
             }
             Expr::Binary {

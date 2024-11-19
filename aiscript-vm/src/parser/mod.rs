@@ -8,7 +8,7 @@ use super::{
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{
-    ast::{AgentDecl, ClassDecl, FunctionDecl, VariableDecl, Visibility},
+    ast::{AgentDecl, ClassDecl, FunctionDecl, ObjectProperty, VariableDecl, Visibility},
     object::FunctionType,
     vm::Context,
     VmError,
@@ -735,26 +735,46 @@ impl<'gc> Parser<'gc> {
         }
 
         loop {
-            // Property key can be either identifier or string
-            let key = if self.check(TokenType::String) {
+            // Parse property key
+            let property = if self.match_token(TokenType::OpenBracket) {
+                // Computed property name: [expr]
+                let key_expr = Box::new(self.expression()?);
+                self.consume(
+                    TokenType::CloseBracket,
+                    "Expect ']' after computed property name.",
+                );
+                self.consume(TokenType::Colon, "Expect ':' after computed property name.");
+                let value = Box::new(self.expression()?);
+
+                ObjectProperty::Computed { key_expr, value }
+            } else if self.check(TokenType::String) {
+                // String literal key
                 self.advance();
-                // Remove quotes from string literal
-                let lexeme = self.previous.lexeme.trim_matches('"');
-                Token::new(TokenType::Identifier, lexeme, self.previous.line)
+                let key = Token::new(
+                    TokenType::Identifier,
+                    self.previous.lexeme.trim_matches('"'),
+                    self.previous.line,
+                );
+                self.consume(TokenType::Colon, "Expect ':' after property name.");
+                let value = Box::new(self.expression()?);
+
+                ObjectProperty::Literal { key, value }
             } else if self.check(TokenType::Identifier) {
+                // Identifier key
                 self.advance();
-                self.previous
+                let key = self.previous;
+                self.consume(TokenType::Colon, "Expect ':' after property name.");
+                let value = Box::new(self.expression()?);
+
+                ObjectProperty::Literal { key, value }
             } else {
-                self.error_at_current("Expected property name string or identifier.");
+                self.error_at_current(
+                    "Expect property name string, identifier, or computed [expression].",
+                );
                 return None;
             };
 
-            // Parse colon
-            self.consume(TokenType::Colon, "Expected ':' after property name.");
-
-            // Parse property value
-            let value = self.expression()?;
-            properties.push((key, value));
+            properties.push(property);
 
             if !self.match_token(TokenType::Comma) {
                 break;
@@ -766,7 +786,7 @@ impl<'gc> Parser<'gc> {
             }
         }
 
-        self.consume(TokenType::CloseBrace, "Expected '}' after object literal.");
+        self.consume(TokenType::CloseBrace, "Expect '}' after object literal.");
 
         Some(Expr::Object { properties, line })
     }

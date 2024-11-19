@@ -625,22 +625,20 @@ impl<'gc> State<'gc> {
             }
             OpCode::MakeObject(count) => {
                 let mut object = Object::default();
-                let start = self.stack_top - (count as usize * 2); // Each property has key and value
+                let count = count as usize;
 
-                // Process pairs of values from the stack (key, value)
-                for i in (0..count as usize).map(|i| i * 2) {
-                    let value = self.stack[start + i + 1]; // Value is second in pair
-                    let key = self.stack[start + i] // Key is first in pair
+                // Stack has pairs of [key1, value1, key2, value2, ...]
+                // Process from last to first pair
+                for _ in (0..count).rev() {
+                    let value = self.pop_stack();
+                    let key = self
+                        .pop_stack()
                         .as_string()
                         .map_err(|_| self.runtime_error("Object key must be a string.".into()))?;
 
                     object.fields.insert(key, value);
                 }
 
-                // Pop all the key-value pairs
-                self.stack_top = start;
-
-                // Create new object and push it onto stack
                 let object = Gc::new(self.mc, RefLock::new(object));
                 self.push_stack(Value::Object(object));
             }

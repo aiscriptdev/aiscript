@@ -1,0 +1,36 @@
+// Basic computed property
+let key = "x";
+let obj = {[key]: 1};
+print obj.x;      // expect: 1
+
+// Mixed with regular properties
+let k = "y";
+let obj2 = {
+    x: 1,         // Regular
+    [k]: 2,       // Computed
+    "z": 3        // Quoted
+};
+print obj2[k]; // expect: 2
+
+// Expressions as keys
+let prefix = "key";
+fn get_key() {
+  return prefix;
+}
+let obj3 = {
+    [prefix + "1"]: "value",
+    [get_key()]: "dynamic",
+    // [1 + 2]: "three"
+};
+print obj3["key1"]; // expect: value
+print obj3["key"]; // expect: dynamic
+
+// Nested computed properties
+let k1 = "outer";
+let k2 = "inner";
+let nested = {
+    [k1]: {
+        [k2]: "value"
+    }
+};
+print nested[k1][k2]; // expect: value
