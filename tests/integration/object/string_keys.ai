@@ -1,0 +1,12 @@
+let obj = {
+    "name": "Alice",
+    age: 20,
+    "my-key": true,
+    "space key": 1,
+};
+print obj.name; // expect: Alice
+print obj["name"]; // expect: Alice
+print obj.age; // expect: 20
+print obj["age"]; // expect: 20
+print obj["my-key"]; // expect: true
+print obj["space key"]; // expect: 1

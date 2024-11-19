@@ -735,13 +735,19 @@ impl<'gc> Parser<'gc> {
         }
 
         loop {
-            // Parse property key (must be an identifier)
-            if !self.check(TokenType::Identifier) {
-                self.error("Expected property name.");
+            // Property key can be either identifier or string
+            let key = if self.check(TokenType::String) {
+                self.advance();
+                // Remove quotes from string literal
+                let lexeme = self.previous.lexeme.trim_matches('"');
+                Token::new(TokenType::Identifier, lexeme, self.previous.line)
+            } else if self.check(TokenType::Identifier) {
+                self.advance();
+                self.previous
+            } else {
+                self.error_at_current("Expected property name string or identifier.");
                 return None;
-            }
-            self.advance();
-            let key = self.previous;
+            };
 
             // Parse colon
             self.consume(TokenType::Colon, "Expected ':' after property name.");
