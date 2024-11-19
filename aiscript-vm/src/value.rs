@@ -104,11 +104,16 @@ impl<'gc> Value<'gc> {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
             (Value::String(a), Value::String(b)) => a.equals(b),
-            (Value::Nil, Value::Nil) => true,
+            (Value::IoString(a), Value::IoString(b)) => *a == *b,
+            (Value::String(a), Value::IoString(b)) => a.as_bytes() == b.as_bytes(),
+            (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
+            (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
             (Value::Instance(a), Value::Instance(b)) => Gc::ptr_eq(*a, *b),
             (Value::BoundMethod(a), Value::BoundMethod(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Agent(a), Value::Agent(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Nil, Value::Nil) => true,
             _ => false,
         }
     }
