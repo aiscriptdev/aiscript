@@ -17,7 +17,7 @@ route /poc {
         print query.content;
         print query.age + 2;
         let name = "aiscript";
-        print "name: " + "123";
+        print "name: " + name;
         return "get: hello";
     }
 

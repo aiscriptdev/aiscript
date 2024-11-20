@@ -52,7 +52,6 @@ pub struct Endpoint {
 }
 
 enum ProcessingState {
-    Init,
     ValidatingQuery,
     ValidatingBody,
     Executing(JoinHandle<Result<ReturnValue, VmError>>),
@@ -73,7 +72,7 @@ impl RequestProcessor {
             request,
             query_data: HashMap::new(),
             body_data: HashMap::new(),
-            state: ProcessingState::Init,
+            state: ProcessingState::ValidatingQuery,
         }
     }
     fn validate_field(field: &Field, value: &Value) -> Result<(), ServerError> {
@@ -161,9 +160,6 @@ impl Future for RequestProcessor {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             match &mut self.state {
-                ProcessingState::Init => {
-                    self.state = ProcessingState::ValidatingQuery;
-                }
                 ProcessingState::ValidatingQuery => {
                     let query = extract::Query::<Value>::try_from_uri(self.request.uri())
                         .map(|extract::Query(q)| q)

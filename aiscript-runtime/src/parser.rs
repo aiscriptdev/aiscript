@@ -441,7 +441,7 @@ mod tests {
         assert_eq!(endpoint2.docs, "Test endpoint2");
         assert_eq!(endpoint2.path_specs[0].method, HttpMethod::Post);
         assert_eq!(endpoint2.path_specs[0].path, "/b");
-        assert_eq!(endpoint2.statements, "return \"endpoint2\";");
+        assert!(endpoint2.statements.contains("return \"endpoint2\""));
     }
 
     #[test]

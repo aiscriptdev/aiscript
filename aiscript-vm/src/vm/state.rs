@@ -532,6 +532,8 @@ impl<'gc> State<'gc> {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
                     Value::Object(obj) => {
+                        // Pop the target object first
+                        self.pop_stack();
                         // Default is nil if no key found
                         let value = obj.borrow().fields.get(&name).copied().unwrap_or_default();
                         self.push_stack(value);
