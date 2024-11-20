@@ -557,7 +557,13 @@ impl<'gc> CodeGen<'gc> {
     fn generate_expr(&mut self, expr: &Expr<'gc>) -> Result<(), VmError> {
         self.current_line = expr.line();
         match expr {
-            Expr::Array { .. } => {}
+            Expr::Array { elements, .. } => {
+                // Generate code for each element
+                for element in elements {
+                    self.generate_expr(element)?;
+                }
+                self.emit(OpCode::MakeArray(elements.len() as u8));
+            }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack
                 for property in properties {

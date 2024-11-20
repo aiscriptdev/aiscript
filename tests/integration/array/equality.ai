@@ -1,0 +1,37 @@
+// Basic array equality
+print [] == []; // expect: false
+print [] != []; // expect: true
+print [] == nil; // expect: false
+print [] != nil; // expect: true
+
+// Compare arrays with elements
+print [1,2] == [1,2]; // expect: false
+print [1,2] != [1,2]; // expect: true
+print [1] == [2]; // expect: false
+
+// Same array reference
+let a1 = [1,2];
+print a1 == a1; // expect: true
+a1[2] = 3;
+print a1 == a1; // expect: true
+
+// Different array references
+let a2 = [1,2];
+let a3 = [1,2];
+print a2 == a3; // expect: false
+print a2 != a3; // expect: true
+
+// Nested arrays
+print [[1,2],[3,4]] == [[1,2],[3,4]]; // expect: false
+let m1 = [[1,2]];
+let m2 = [[1,2]];
+print m1 == m2; // expect: false
+print m1[0] == m2[0]; // expect: false
+
+// Arrays in objects
+let obj = {arr: [1,2]};
+let obj2 = {arr: [1,2]};
+print obj.arr == obj2.arr; // expect: false
+
+// Object with array and array with object
+print {arr:[1]} == [{"x":1}]; // expect: false

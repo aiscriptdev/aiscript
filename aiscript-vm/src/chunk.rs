@@ -72,6 +72,7 @@ pub enum OpCode {
         keyword_count: u8,
     },
     MakeObject(u8), //  number of key-value pairs in the object
+    MakeArray(u8),  // Number of elements
     SetIndex,
     GetIndex,
     // Import a module, constant index contains module name
@@ -281,6 +282,7 @@ impl<'gc> Chunk<'gc> {
                     ..
                 } => self.invoke_instruction("SUPER_INVOKE", method_constant, positional_count),
                 OpCode::MakeObject(c) => self.constant_instruction("MAKE_OBJECT", c),
+                OpCode::MakeArray(c) => self.constant_instruction("MAKE_ARRAY", c),
                 OpCode::GetIndex => simple_instruction("GET_INDEX"),
                 OpCode::SetIndex => simple_instruction("SET_INDEX"),
                 OpCode::ImportModule(c) => self.constant_instruction("IMPORT_MODULE", c),

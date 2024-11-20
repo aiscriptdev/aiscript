@@ -20,6 +20,7 @@ pub enum Value<'gc> {
     IoString(Gc<'gc, String>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
+    Array(GcRefLock<'gc, Vec<Value<'gc>>>),
     Object(GcRefLock<'gc, Object<'gc>>),
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
@@ -43,6 +44,7 @@ unsafe impl<'gc> Collect for Value<'gc> {
             Value::String(s) => s.trace(cc),
             Value::IoString(s) => s.trace(cc),
             Value::Closure(closure) => closure.trace(cc),
+            Value::Array(array) => array.trace(cc),
             Value::Object(obj) => obj.trace(cc),
             Value::Class(class) => class.trace(cc),
             Value::Instance(instance) => instance.trace(cc),
@@ -69,6 +71,17 @@ impl<'gc> Display for Value<'gc> {
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
+            Value::Array(array) => {
+                let array = array.borrow();
+                write!(f, "[")?;
+                for (i, value) in array.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", value)?;
+                }
+                write!(f, "]")
+            }
             Value::Object(obj) => {
                 write!(f, "{{")?;
                 let mut first = true;
@@ -111,6 +124,7 @@ impl<'gc> Value<'gc> {
             (Value::IoString(a), Value::IoString(b)) => *a == *b,
             (Value::String(a), Value::IoString(b)) => a.as_bytes() == b.as_bytes(),
             (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
+            (Value::Array(a), Value::Array(b)) => Gc::ptr_eq(*a, *b),
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),

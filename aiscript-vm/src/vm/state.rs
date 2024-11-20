@@ -647,6 +647,12 @@ impl<'gc> State<'gc> {
                 let object = Gc::new(self.mc, RefLock::new(object));
                 self.push_stack(Value::Object(object));
             }
+            OpCode::MakeArray(count) => {
+                let count = count as usize;
+                let elements: Vec<Value<'gc>> = self.pop_stack_n(count);
+                let array = Value::Array(Gc::new(self.mc, RefLock::new(elements)));
+                self.push_stack(array);
+            }
             OpCode::GetIndex => {
                 // Stack: [object] [key]
                 let key = self.pop_stack();
@@ -663,31 +669,12 @@ impl<'gc> State<'gc> {
                         let value = obj.borrow().fields.get(&key).copied().unwrap_or_default();
                         self.push_stack(value);
                     }
-                    Value::Instance(_) => {
-                        return Err(self.runtime_error(
-                            "Use dot notation for accessing instance properties.".into(),
-                        ));
-                    }
-                    _ => {
-                        return Err(self.runtime_error("Only objects support indexing.".into()));
-                    }
-                }
-            }
-            OpCode::SetIndex => {
-                // Stack: [object] [key] [value]
-                let value = self.pop_stack();
-                let key = match self.peek(0).as_string() {
-                    Ok(key) => key,
-                    Err(_) => {
-                        return Err(self.runtime_error("Index key must be a string.".into()));
-                    }
-                };
-                match self.peek(1) {
-                    Value::Object(obj) => {
-                        // Pop remaining operands now that we know they're valid
-                        // Set the field
-                        obj.borrow_mut(self.mc).fields.insert(key, value);
-                        // Push value back for assignment expressions
+                    Value::Array(array) => {
+                        let index = key.as_number().map_err(|_| {
+                            self.runtime_error("Array index must be a number.".into())
+                        })?;
+                        let array = array.borrow();
+                        let value = array.get(index as usize).copied().unwrap_or(Value::Nil);
                         self.push_stack(value);
                     }
                     Value::Instance(_) => {
@@ -696,7 +683,47 @@ impl<'gc> State<'gc> {
                         ));
                     }
                     _ => {
-                        return Err(self.runtime_error("Only objects support indexing.".into()));
+                        return Err(
+                            self.runtime_error("Only object and array support indexing.".into())
+                        );
+                    }
+                }
+            }
+            OpCode::SetIndex => {
+                // Stack: [object] [key] [value]
+                let value = self.pop_stack();
+                let index = self.pop_stack();
+                let target = self.pop_stack();
+                match target {
+                    Value::Object(obj) => {
+                        // Pop remaining operands now that we know they're valid
+                        // Set the field
+                        let key = index.as_string().unwrap();
+                        obj.borrow_mut(self.mc).fields.insert(key, value);
+                        // Push value back for assignment expressions
+                        self.push_stack(value);
+                    }
+                    Value::Array(array) => {
+                        let index = index.as_number().unwrap();
+                        let mut array = array.borrow_mut(self.mc);
+                        let index = index as usize;
+
+                        // Grow array if needed
+                        if index >= array.len() {
+                            array.resize(index + 1, Value::Nil);
+                        }
+                        array[index] = value;
+                        self.push_stack(value);
+                    }
+                    Value::Instance(_) => {
+                        return Err(self.runtime_error(
+                            "Use dot notation for accessing instance properties.".into(),
+                        ));
+                    }
+                    _ => {
+                        return Err(
+                            self.runtime_error("Only object and array support indexing.".into())
+                        );
                     }
                 }
             }

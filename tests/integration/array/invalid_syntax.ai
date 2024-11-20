@@ -1,0 +1,12 @@
+// Invalid array literal syntax
+let a1 = [
+   "value" "bad" // Error at '"bad"': Expect ',' after array element.
+];
+
+let a2 = [
+   1 2 3 // Error at '2': Expect ',' after array element.
+];
+
+// Invalid array access
+let arr = [1,2];
+print arr[]; // Error at ']': Expect expression.

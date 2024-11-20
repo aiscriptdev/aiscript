@@ -894,14 +894,24 @@ impl<'gc> Parser<'gc> {
             loop {
                 elements.push(self.expression()?);
 
+                if !self.check(TokenType::Comma) && !self.check(TokenType::CloseBracket) {
+                    self.error_at_current("Expect ',' after array element.");
+                    return None;
+                }
+
                 if !self.match_token(TokenType::Comma) {
                     break;
                 }
+
+                // Check for trailing comma
+                // if self.check(TokenType::CloseBracket) {
+                //     self.error_at_current("Expect expression after ','.");
+                //     return None;
+                // }
             }
         }
 
         self.consume(TokenType::CloseBracket, "Expect ']' after array elements.");
-
         Some(Expr::Array { elements, line })
     }
 
