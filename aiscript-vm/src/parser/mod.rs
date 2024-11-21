@@ -904,10 +904,9 @@ impl<'gc> Parser<'gc> {
                 }
 
                 // Check for trailing comma
-                // if self.check(TokenType::CloseBracket) {
-                //     self.error_at_current("Expect expression after ','.");
-                //     return None;
-                // }
+                if self.check(TokenType::CloseBracket) {
+                    break;
+                }
             }
         }
 

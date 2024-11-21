@@ -21,7 +21,7 @@ print nums; // expect: [10, 2, 3]
 // Nested arrays 
 let matrix = [
  [1, 2],
- [3, 4]
+ [3, 4], // trailing comma
 ];
 print matrix[0][1]; // expect: 2
 matrix[1][0] = 5;
@@ -30,7 +30,7 @@ print matrix[1]; // expect: [5, 4]
 // Arrays in objects
 let obj = {
  numbers: [1, 2, 3],
- strings: ["a", "b"]
+ strings: ["a", "b"],
 };
 print obj.numbers[0]; // expect: 1
 obj.strings[1] = "c";
