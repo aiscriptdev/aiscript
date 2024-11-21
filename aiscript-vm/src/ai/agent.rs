@@ -189,8 +189,24 @@ impl<'gc> Agent<'gc> {
         for tool_call in tool_calls.as_ref().unwrap() {
             let name = tool_call.function.name.as_ref().unwrap();
             if let Some(tool_def) = self.tools.get(name) {
-                // FIXME: pass params as the correct order
-                let params = vec![];
+                // Pass params as the keyword args
+                let arguments = serde_json::from_str::<serde_json::Value>(
+                    tool_call.function.arguments.as_ref().unwrap(),
+                )
+                .unwrap();
+                let params = tool_def
+                    .params
+                    .keys()
+                    .filter_map(|key| {
+                        arguments.get(key).map(|v| {
+                            vec![
+                                Value::String(state.intern(key.as_bytes())),
+                                Value::String(state.intern(v.as_str().unwrap().as_bytes())),
+                            ]
+                        })
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>();
                 let result = state.eval_function(tool_def.chunk_id, &params).unwrap();
                 let content = if let ReturnValue::Agent(agent_name) = &result {
                     let agent_name = state.intern(agent_name.as_bytes());
@@ -257,12 +273,14 @@ pub async fn _run_agent<'gc>(
                 .tool_choice(ToolChoiceType::Auto)
                 .parallel_tool_calls(true);
         }
-        #[cfg(feature = "debug")]
-        println!("chat completion request: {:?}", req);
+        if debug {
+            println!("chat completion request: {:?}", req);
+        }
         let result = client.chat_completion(req).await.unwrap();
         let response = &result.choices[0].message;
-        #[cfg(feature = "debug")]
-        println!("chat completion response: {:?}", response);
+        if debug {
+            println!("chat completion response: {:?}", response);
+        }
         history.push(convert_chat_response_message(response.clone()));
         if response.tool_calls.is_none() {
             return response.content.clone().unwrap_or_default();
@@ -271,8 +289,9 @@ pub async fn _run_agent<'gc>(
             if let Some(handoff_agent) = response.agent {
                 agent = handoff_agent;
             }
-            #[cfg(feature = "debug")]
-            println!("tool function call response: {:?}", response);
+            if debug {
+                println!("tool function call response: {:?}", response);
+            }
             history.extend(response.messages);
         }
     }
