@@ -262,8 +262,14 @@ impl<'gc> State<'gc> {
 impl<'gc> State<'gc> {
     fn runtime_error(&mut self, message: Cow<'static, str>) -> VmError {
         let mut error_message = String::from(message);
-        (0..self.frame_count).rev().for_each(|i| {
+        for i in (0..self.frame_count).rev() {
             let frame = &self.frames[i];
+            // Break loop if reach the un-initialized callframe.
+            // Call Vm::eval_function directly will reach this case,
+            // since it never init the root script.
+            if frame.ip == 0 {
+                break;
+            }
             let function = &frame.closure.function;
             error_message.push_str(&format!(
                 "\n[line {}] in ",
@@ -276,7 +282,7 @@ impl<'gc> State<'gc> {
             };
             error_message.push_str(name);
             error_message.push('\n');
-        });
+        }
         VmError::RuntimeError(error_message)
     }
 
