@@ -190,43 +190,46 @@ impl Future for RequestProcessor {
                 ProcessingState::ValidatingBody => {
                     let request_obj = self.get_request();
                     let header_obj = self.get_header();
-                    let request = mem::take(&mut self.request);
-                    let body_fut: BoxFuture<Result<Value, ServerError>> =
-                        match self.endpoint.body_type {
-                            BodyKind::Json => Box::pin(Self::process_json_body(request)),
-                            BodyKind::Form => Box::pin(Self::process_form_body(request)),
+                    if !self.endpoint.body_fields.is_empty() {
+                        let request = mem::take(&mut self.request);
+                        let body_fut: BoxFuture<Result<Value, ServerError>> =
+                            match self.endpoint.body_type {
+                                BodyKind::Json => Box::pin(Self::process_json_body(request)),
+                                BodyKind::Form => Box::pin(Self::process_form_body(request)),
+                            };
+
+                        tokio::pin!(body_fut);
+
+                        let body = match body_fut.poll(cx) {
+                            Poll::Pending => return Poll::Pending,
+                            Poll::Ready(Ok(value)) => value,
+                            Poll::Ready(Err(e)) => {
+                                return Poll::Ready(Ok(
+                                    format!("Body parsing error: {:?}", e).into_response()
+                                ))
+                            }
                         };
 
-                    tokio::pin!(body_fut);
-
-                    let body = match body_fut.poll(cx) {
-                        Poll::Pending => return Poll::Pending,
-                        Poll::Ready(Ok(value)) => value,
-                        Poll::Ready(Err(e)) => {
-                            return Poll::Ready(Ok(
-                                format!("Body parsing error: {:?}", e).into_response()
-                            ))
-                        }
-                    };
-
-                    let mut failed_validation = None;
-                    for field in mem::take(&mut self.endpoint.body_fields) {
-                        if let Some(value) = body.get(&field.name) {
-                            if let Err(e) = Self::validate_field(&field, value) {
-                                failed_validation = Some(e);
+                        let mut failed_validation = None;
+                        for field in mem::take(&mut self.endpoint.body_fields) {
+                            if let Some(value) = body.get(&field.name) {
+                                if let Err(e) = Self::validate_field(&field, value) {
+                                    failed_validation = Some(e);
+                                    break;
+                                }
+                                self.body_data.insert(field.name.clone(), value.clone());
+                            } else if let Some(default) = &field.default {
+                                self.body_data.insert(field.name.clone(), default.clone());
+                            } else if field.required {
+                                failed_validation =
+                                    Some(ServerError::MissingField(field.name.clone()));
                                 break;
                             }
-                            self.body_data.insert(field.name.clone(), value.clone());
-                        } else if let Some(default) = &field.default {
-                            self.body_data.insert(field.name.clone(), default.clone());
-                        } else if field.required {
-                            failed_validation = Some(ServerError::MissingField(field.name.clone()));
-                            break;
                         }
-                    }
 
-                    if let Some(error) = failed_validation {
-                        return Poll::Ready(Ok(error.into_response()));
+                        if let Some(error) = failed_validation {
+                            return Poll::Ready(Ok(error.into_response()));
+                        }
                     }
 
                     let script = mem::take(&mut self.endpoint.script);
@@ -255,8 +258,11 @@ impl Future for RequestProcessor {
                 }
                 ProcessingState::Executing(handle) => {
                     return match Pin::new(handle).poll(cx) {
-                        Poll::Ready(result) => {
-                            Poll::Ready(Ok(format!("Result: {:?}", result).into_response()))
+                        Poll::Ready(Ok(result)) => {
+                            Poll::Ready(Ok(format!("Result: {}", result.unwrap()).into_response()))
+                        }
+                        Poll::Ready(Err(err)) => {
+                            Poll::Ready(Ok(format!("Error:: {err}").into_response()))
                         }
                         Poll::Pending => Poll::Pending,
                     };
