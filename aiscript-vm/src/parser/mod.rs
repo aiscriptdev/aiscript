@@ -1315,6 +1315,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::True | TokenType::False | TokenType::Nil => {
             ParseRule::new(Some(Parser::literal), None, Precedence::None)
         }
+        TokenType::In => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         TokenType::Prompt => ParseRule::new(Some(Parser::prompt), None, Precedence::None),
         _ => ParseRule::new(None, None, Precedence::None),
     }

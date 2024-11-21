@@ -733,6 +733,32 @@ impl<'gc> State<'gc> {
                     }
                 }
             }
+            OpCode::In => {
+                let target = self.pop_stack();
+                let value = self.pop_stack();
+
+                let result = match target {
+                    Value::Array(array) => {
+                        let array = array.borrow();
+                        array.contains(&value)
+                    }
+                    Value::Object(obj) => {
+                        let key = value.as_string().map_err(|_| {
+                            self.runtime_error(
+                                "Object key must be a string in 'in' operator.".into(),
+                            )
+                        })?;
+                        obj.borrow().fields.contains_key(&key)
+                    }
+                    _ => {
+                        return Err(self.runtime_error(
+                            "Right operand of 'in' operator must be array or object.".into(),
+                        ));
+                    }
+                };
+
+                self.push_stack(Value::Boolean(result));
+            }
             OpCode::Prompt => {
                 let message = self.pop_stack().as_string().unwrap().to_string();
                 let result = Value::from(self.intern(ai::prompt(message).as_bytes()));

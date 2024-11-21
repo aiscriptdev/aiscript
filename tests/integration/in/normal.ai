@@ -1,0 +1,11 @@
+let arr = [1, 2, 3, 4];
+print 1 in arr;  // expect: true
+print 5 in arr;  // expect: false
+let key = 3;
+print key in arr; // expect: true
+
+let obj = {a: "value"};
+print "a" in obj;  // expect: true
+print "b" in obj;  // expect: false
+let key = "key";
+print key in arr; // expect: false

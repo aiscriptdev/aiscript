@@ -611,6 +611,7 @@ impl<'gc> CodeGen<'gc> {
                     TokenType::GreaterEqual => self.emit(OpCode::GreaterEqual),
                     TokenType::Less => self.emit(OpCode::Less),
                     TokenType::LessEqual => self.emit(OpCode::LessEqual),
+                    TokenType::In => self.emit(OpCode::In),
                     _ => return Err(VmError::CompileError),
                 }
             }

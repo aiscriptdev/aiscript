@@ -56,6 +56,12 @@ unsafe impl<'gc> Collect for Value<'gc> {
     }
 }
 
+impl<'gc> PartialEq for Value<'gc> {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
+    }
+}
+
 impl<'gc> Display for Value<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -132,6 +138,7 @@ impl<'gc> Value<'gc> {
             (Value::BoundMethod(a), Value::BoundMethod(b)) => Gc::ptr_eq(*a, *b),
             (Value::Agent(a), Value::Agent(b)) => Gc::ptr_eq(*a, *b),
             (Value::Nil, Value::Nil) => true,
+            // _ => core::mem::discriminant(self) == core::mem::discriminant(other),
             _ => false,
         }
     }
