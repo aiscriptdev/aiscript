@@ -226,6 +226,10 @@ impl<'gc> State<'gc> {
         None
     }
 
+    pub fn gc_ref<T: Collect>(&mut self, value: T) -> GcRefLock<'gc, T> {
+        Gc::new(self.mc, RefLock::new(value))
+    }
+
     pub fn intern(&mut self, s: &[u8]) -> InternedString<'gc> {
         self.strings.intern(self.mc, s)
     }
@@ -1069,7 +1073,7 @@ impl<'gc> State<'gc> {
                     // The stack before call run_agent:
                     // [ <fn script> ][ agent Triage ][ debug ][ true ][ input ][ some message ]
                     // 0033    | OP_INVOKE        (0 args) 17 'run'
-                    // The stack after called run_agent: 
+                    // The stack after called run_agent:
                     // [ <fn script> ][ agent Triage ]
                     self.stack_top -= (args_count + keyword_args_count * 2) as usize;
                     let result = ai::run_agent(self, agent, args);

@@ -16,7 +16,7 @@ use tokio::runtime::Handle;
 use crate::{
     ast::{Expr, FnDef, Literal},
     lexer::Token,
-    object::Function,
+    object::{Function, Object},
     string::InternedString,
     ty::PrimitiveType,
     vm::{Context, State},
@@ -53,6 +53,23 @@ pub enum ToolChoice {
 struct Response<'gc> {
     agent: Option<Gc<'gc, Agent<'gc>>>,
     messages: Vec<ChatCompletionMessage>,
+}
+
+fn make_response_object<'gc>(
+    state: &mut State<'gc>,
+    agent: Gc<'gc, Agent<'gc>>,
+    message: String,
+) -> Value<'gc> {
+    let fields = [
+        (state.intern_static("agent"), Value::Agent(agent)),
+        (
+            state.intern_static("message"),
+            Value::String(state.intern(message.as_bytes())),
+        ),
+    ]
+    .into_iter()
+    .collect();
+    Value::Object(state.gc_ref(Object { fields }))
 }
 
 fn agent_methods<'gc>(ctx: &Context<'gc>) -> HashMap<InternedString<'gc>, Gc<'gc, Function<'gc>>> {
@@ -183,7 +200,7 @@ impl<'gc> Agent<'gc> {
         &self,
         state: &mut State<'gc>,
         tool_calls: &Option<Vec<ToolCall>>,
-    ) -> Response<'gc> {
+    ) -> Result<Response<'gc>, String> {
         let mut response = Response::default();
         for tool_call in tool_calls.as_ref().unwrap() {
             let name = tool_call.function.name.as_ref().unwrap();
@@ -221,10 +238,12 @@ impl<'gc> Agent<'gc> {
                     tool_calls: None,
                     tool_call_id: Some(tool_call.id.clone()),
                 });
+            } else {
+                return Err(format!("Warning: unknow tool function: {name}"));
             }
         }
 
-        response
+        Ok(response)
     }
 }
 
@@ -233,13 +252,17 @@ pub async fn _run_agent<'gc>(
     state: &mut State<'gc>,
     agent: Gc<'gc, Agent<'gc>>,
     args: Vec<Value<'gc>>,
-) -> String {
+) -> Value<'gc> {
     let message = args[0];
     let debug = args[1].as_boolean();
     println!("debug: {debug}");
-    format!(
-        "input: {},instructions: {}, model: {}, tools: {:?}",
-        message, agent.instructions, agent.model, agent.tools
+    return make_response_object(
+        state,
+        agent,
+        format!(
+            "input: {},instructions: {}, model: {}, tools: {:?}",
+            message, agent.instructions, agent.model, agent.tools
+        ),
     )
 }
 
@@ -248,7 +271,7 @@ pub async fn _run_agent<'gc>(
     state: &mut State<'gc>,
     mut agent: Gc<'gc, Agent<'gc>>,
     args: Vec<Value<'gc>>,
-) -> String {
+) -> Value<'gc> {
     let message = args[0];
     let debug = args[1].as_boolean();
     println!("debug: {debug}");
@@ -273,25 +296,33 @@ pub async fn _run_agent<'gc>(
                 .parallel_tool_calls(true);
         }
         if debug {
-            println!("chat completion request: {:?}", req);
+            println!("Request: {}", serde_json::to_string(&req).unwrap());
         }
         let result = client.chat_completion(req).await.unwrap();
         let response = &result.choices[0].message;
         if debug {
-            println!("chat completion response: {:?}", response);
+            println!("Response: {}", serde_json::to_string(&response).unwrap());
         }
         history.push(convert_chat_response_message(response.clone()));
         if response.tool_calls.is_none() {
-            return response.content.clone().unwrap_or_default();
+            return make_response_object(
+                state,
+                agent,
+                response.content.clone().unwrap_or_default(),
+            );
         } else {
-            let response = agent.handle_tool_call(state, &response.tool_calls);
-            if let Some(handoff_agent) = response.agent {
-                agent = handoff_agent;
+            match agent.handle_tool_call(state, &response.tool_calls) {
+                Ok(response) => {
+                    if let Some(handoff_agent) = response.agent {
+                        agent = handoff_agent;
+                    }
+                    if debug {
+                        println!("tool function call response: {:?}", response);
+                    }
+                    history.extend(response.messages);
+                }
+                Err(message) => return make_response_object(state, agent, message),
             }
-            if debug {
-                println!("tool function call response: {:?}", response);
-            }
-            history.extend(response.messages);
         }
     }
 }
@@ -300,7 +331,7 @@ pub fn run_agent<'gc>(
     state: &mut State<'gc>,
     agent: Gc<'gc, Agent<'gc>>,
     args: Vec<Value<'gc>>,
-) -> String {
+) -> Value<'gc> {
     if Handle::try_current().is_ok() {
         // We're in an async context, use await
         Handle::current().block_on(async { _run_agent(state, agent, args).await })
