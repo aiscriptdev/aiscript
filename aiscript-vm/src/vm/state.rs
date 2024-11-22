@@ -1065,9 +1065,15 @@ impl<'gc> State<'gc> {
             Value::Agent(agent) => {
                 if let Some(method) = agent.methods.get(&name) {
                     let args = self.check_args(method, args_count, keyword_args_count)?;
+                    // Pop the arguments from the stack.
+                    // The stack before call run_agent:
+                    // [ <fn script> ][ agent Triage ][ debug ][ true ][ input ][ some message ]
+                    // 0033    | OP_INVOKE        (0 args) 17 'run'
+                    // The stack after called run_agent: 
+                    // [ <fn script> ][ agent Triage ]
+                    self.stack_top -= (args_count + keyword_args_count * 2) as usize;
                     let result = ai::run_agent(self, agent, args);
-                    let s = self.intern(result.as_bytes());
-                    self.push_stack(Value::from(s));
+                    self.push_stack(result);
                     Ok(())
                 } else {
                     Err(self
