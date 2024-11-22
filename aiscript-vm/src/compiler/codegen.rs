@@ -539,6 +539,9 @@ impl<'gc> CodeGen<'gc> {
                             self.error_at(*name, &format!("Duplicate tool name: {}", name.lexeme));
                         }
                     }
+                    // Pop tool function from stack because we never
+                    // define global for this tool function.
+                    self.emit(OpCode::Pop);
                 }
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
