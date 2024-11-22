@@ -1,10 +1,9 @@
-use std::{collections::HashMap, env};
+use std::collections::HashMap;
 
 use gc_arena::{Collect, Gc};
 use openai_api_rs::v1::types::JSONSchemaType;
 #[cfg(not(feature = "ai_test"))]
 use openai_api_rs::v1::{
-    api::OpenAIClient,
     chat_completion::{
         ChatCompletionMessage, ChatCompletionMessageForResponse, ChatCompletionRequest, Content,
         MessageRole, Tool, ToolCall, ToolChoiceType, ToolType,
@@ -261,7 +260,7 @@ pub async fn _run_agent<'gc>(
         tool_calls: None,
         tool_call_id: None,
     });
-    let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
+    let client = super::openai_client();
     loop {
         let mut messages = vec![agent.get_instruction_message()];
         messages.extend(history.clone());

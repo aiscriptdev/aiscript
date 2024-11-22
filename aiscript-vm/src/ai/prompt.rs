@@ -7,14 +7,11 @@ async fn _prompt(message: String) -> String {
 
 #[cfg(not(feature = "ai_test"))]
 async fn _prompt(message: String) -> String {
-    use std::env;
-
     use openai_api_rs::v1::{
-        api::OpenAIClient,
         chat_completion::{self, ChatCompletionRequest},
         common::GPT3_5_TURBO,
     };
-    let client = OpenAIClient::new(env::var("OPENAI_API_KEY").unwrap().to_string());
+    let client = super::openai_client();
     let req = ChatCompletionRequest::new(
         GPT3_5_TURBO.to_string(),
         vec![chat_completion::ChatCompletionMessage {
