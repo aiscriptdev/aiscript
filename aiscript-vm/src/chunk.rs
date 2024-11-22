@@ -33,7 +33,7 @@ pub enum OpCode {
     Less,
     LessEqual,
     Print,
-    Pop,
+    Pop(u8), // Pop count
     DefineGlobal {
         name_constant: u8,
         visibility: Visibility,
@@ -223,7 +223,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Less => simple_instruction("LESS"),
                 OpCode::LessEqual => simple_instruction("LESS_EQUAL"),
                 OpCode::Print => simple_instruction("PRINT"),
-                OpCode::Pop => simple_instruction("POP"),
+                OpCode::Pop(count) => println!("{:-16} {:4}", "OP_POP", count),
                 OpCode::DefineGlobal { name_constant, .. } => {
                     self.constant_instruction("DEFINE_GLOBAL", name_constant)
                 }

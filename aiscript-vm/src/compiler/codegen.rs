@@ -210,7 +210,7 @@ impl<'gc> CodeGen<'gc> {
                 while self.local_count > 0
                     && self.locals[self.local_count - 1].depth > self.scope_depth
                 {
-                    self.emit(OpCode::Pop);
+                    self.emit(OpCode::Pop(1));
                     self.local_count -= 1;
                 }
 
@@ -220,7 +220,7 @@ impl<'gc> CodeGen<'gc> {
             }
             Stmt::Expression { expression, .. } => {
                 self.generate_expr(expression)?;
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
             }
             Stmt::Print { expression, .. } => {
                 self.generate_expr(expression)?;
@@ -282,12 +282,12 @@ impl<'gc> CodeGen<'gc> {
             } => {
                 self.generate_expr(condition)?;
                 let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
                 self.generate_stmt(then_branch)?;
 
                 let else_jump = self.emit_jump(OpCode::Jump(0));
                 self.patch_jump(then_jump);
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
 
                 if let Some(else_branch) = else_branch {
                     self.generate_stmt(else_branch)?;
@@ -317,7 +317,7 @@ impl<'gc> CodeGen<'gc> {
                 // Generate condition
                 self.generate_expr(condition)?;
                 let exit_jump = self.emit_jump(OpCode::JumpIfFalse(0));
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
 
                 if let Some(incr) = increment {
                     let body_jump = self.emit_jump(OpCode::Jump(0));
@@ -325,7 +325,7 @@ impl<'gc> CodeGen<'gc> {
 
                     // Generate increment code
                     self.generate_expr(incr)?;
-                    self.emit(OpCode::Pop);
+                    self.emit(OpCode::Pop(1));
 
                     self.emit_loop(loop_start);
 
@@ -345,7 +345,7 @@ impl<'gc> CodeGen<'gc> {
 
                 // Patch breaks and cleanup
                 self.patch_jump(exit_jump);
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
 
                 // Patch all break statements
                 if let Some(scope) = self.loop_scopes.pop() {
@@ -473,7 +473,7 @@ impl<'gc> CodeGen<'gc> {
 
                 // Once we’ve reached the end of the methods, we no longer need
                 // the class and tell the VM to pop it off the stack.
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
 
                 // Close the scope created for 'super' if there was inheritance
                 if superclass.is_some() {
@@ -539,10 +539,10 @@ impl<'gc> CodeGen<'gc> {
                             self.error_at(*name, &format!("Duplicate tool name: {}", name.lexeme));
                         }
                     }
-                    // Pop tool function from stack because we never
-                    // define global for this tool function.
-                    self.emit(OpCode::Pop);
                 }
+                // Pop tool functions from stack because we never
+                // define global for this tool function.
+                self.emit(OpCode::Pop(tools.len() as u8));
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
@@ -767,7 +767,7 @@ impl<'gc> CodeGen<'gc> {
             Expr::And { left, right, .. } => {
                 self.generate_expr(left)?;
                 let end_jump = self.emit_jump(OpCode::JumpIfFalse(0));
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
                 self.generate_expr(right)?;
                 self.patch_jump(end_jump);
             }
@@ -777,7 +777,7 @@ impl<'gc> CodeGen<'gc> {
                 let end_jump = self.emit_jump(OpCode::Jump(0));
 
                 self.patch_jump(else_jump);
-                self.emit(OpCode::Pop);
+                self.emit(OpCode::Pop(1));
                 self.generate_expr(right)?;
                 self.patch_jump(end_jump);
             }
@@ -1045,14 +1045,26 @@ impl<'gc> CodeGen<'gc> {
 
     fn end_scope(&mut self) {
         self.scope_depth -= 1;
+        let mut pop_count = 0;
 
         while self.local_count > 0 && self.locals[self.local_count - 1].depth > self.scope_depth {
             if self.locals[self.local_count - 1].is_captured {
+                // Must still handle captured variables one at a time
+                if pop_count > 0 {
+                    self.emit(OpCode::Pop(pop_count));
+                    pop_count = 0;
+                }
+                // Whenever the compiler reaches the end of a block, it discards all local
+                // variables in that block and emits an OpCode::CloseUpvalue for each local variable
                 self.emit(OpCode::CloseUpvalue);
             } else {
-                self.emit(OpCode::Pop);
+                pop_count += 1;
             }
             self.local_count -= 1;
+        }
+
+        if pop_count > 0 {
+            self.emit(OpCode::Pop(pop_count));
         }
     }
 

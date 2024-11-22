@@ -411,8 +411,8 @@ impl<'gc> State<'gc> {
                 let value = self.pop_stack();
                 println!("{value}");
             }
-            OpCode::Pop => {
-                self.pop_stack();
+            OpCode::Pop(count) => {
+                self.stack_top = self.stack_top.saturating_sub(count as usize);
             }
             OpCode::DefineGlobal {
                 name_constant,
