@@ -1,0 +1,19 @@
+// Basic usage
+print(1, 2, 3);  // expect: 1 2 3
+
+// Custom separator
+print(1, 2, 3, sep=", ");  // expect: 1, 2, 3
+
+// Custom ending
+print(1, 2, 3, end="");
+
+// Multiple types
+print("Hello", 42, true, sep="--");
+// expect: 1 2 3Hello--42--true
+
+// Custom separator and ending
+print(1, 2, 3, sep=", ", end="!");
+
+// Force flush
+print("Processing...", end="", flush=true);
+// expect: 1, 2, 3!Processing...
