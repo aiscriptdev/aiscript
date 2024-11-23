@@ -924,7 +924,16 @@ impl<'gc> State<'gc> {
     }
 
     pub fn define_builtins(&mut self) {
-        self.define_native_function("clock", builtins::clock);
+        self.define_native_function("abs", builtins::abs);
+        self.define_native_function("len", builtins::len);
+        self.define_native_function("any", builtins::any);
+        self.define_native_function("all", builtins::all);
+        self.define_native_function("min", builtins::min);
+        self.define_native_function("max", builtins::max);
+        self.define_native_function("round", builtins::round);
+        self.define_native_function("sum", builtins::sum);
+        self.define_native_function("input", builtins::input);
+        self.define_native_function("print", builtins::print);
     }
 
     fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
