@@ -3,7 +3,7 @@ let f;
 class Foo {
   fn method(param) {
     fn f_() {
-      print param;
+      print(param);
     }
     f = f_;
   }

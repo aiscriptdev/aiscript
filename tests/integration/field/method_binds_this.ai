@@ -1,7 +1,7 @@
 class Foo {
   fn sayName(a) {
-    print this.name;
-    print a;
+    print(this.name);
+    print(a);
   }
 }
 

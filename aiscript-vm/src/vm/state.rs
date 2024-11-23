@@ -407,10 +407,6 @@ impl<'gc> State<'gc> {
             OpCode::LessEqual => {
                 binary_op!(self, <=);
             }
-            OpCode::Print => {
-                let value = self.pop_stack();
-                println!("{value}");
-            }
             OpCode::Pop(count) => {
                 self.stack_top = self.stack_top.saturating_sub(count as usize);
             }

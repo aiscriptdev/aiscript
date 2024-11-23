@@ -1,6 +1,6 @@
 class A {
   fn method(arg) {
-    print "A.method(" + arg + ")";
+    print("A.method(" + arg + ")");
   }
 }
 
@@ -10,7 +10,7 @@ class B(A) {
   }
 
   fn method(arg) {
-    print "B.method(" + arg + ")";
+    print("B.method(" + arg + ")");
   }
 }
 

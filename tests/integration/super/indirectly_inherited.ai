@@ -1,6 +1,6 @@
 class A {
   fn foo() {
-    print "A.foo()";
+    print("A.foo()");
   }
 }
 
@@ -8,7 +8,7 @@ class B(A) {}
 
 class C(B) {
   fn foo() {
-    print "C.foo()";
+    print("C.foo()");
     super.foo();
   }
 }

@@ -2,4 +2,4 @@ class Foo {
   fn bar() {}
 }
 
-print Foo().bar(); // expect: nil
+print(Foo().bar()); // expect: nil

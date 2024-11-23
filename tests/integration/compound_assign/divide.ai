@@ -1,6 +1,6 @@
 let i = 2;
 i /= 2;
-print i; // expect: 1
+print(i); // expect: 1
 
 i /= -1;
-print i; // expect: -1
+print(i); // expect: -1

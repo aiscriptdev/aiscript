@@ -5,8 +5,8 @@ let f3;
 for (let i = 1; i < 4; i = i + 1) {
   let j = i;
   fn f() {
-    print i;
-    print j;
+    print(i);
+    print(j);
   }
 
   if (j == 1) f1 = f;

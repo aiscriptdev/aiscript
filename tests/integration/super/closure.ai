@@ -14,4 +14,4 @@ class Derived(Base) {
 }
 
 let closure = Derived().getClosure();
-print closure(); // expect: Base
+print(closure()); // expect: Base

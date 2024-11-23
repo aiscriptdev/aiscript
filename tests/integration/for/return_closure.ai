@@ -1,7 +1,7 @@
 fn f() {
   for (;;) {
     let i = "i";
-    fn g() { print i; }
+    fn g() { print(i); }
     return g;
   }
 }

@@ -1,18 +1,18 @@
 class Foo {
   fn inFoo() {
-    print "in foo";
+    print("in foo");
   }
 }
 
 class Bar(Foo) {
   fn inBar() {
-    print "in bar";
+    print("in bar");
   }
 }
 
 class Baz(Bar) {
   fn inBaz() {
-    print "in baz";
+    print("in baz");
   }
 }
 

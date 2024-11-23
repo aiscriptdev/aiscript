@@ -1,9 +1,9 @@
 fn test1(b = "b", a, c: str = "c") { // Error at 'a': Positional parameter must come before parameter with a default.
-    print a + b + c;
+    print(a + b + c);
 }
 fn test2(a, b = "b", bb, c: str = "c") { // Error at 'bb': Positional parameter must come before parameter with a default.
-    print a + b + c;
+    print(a + b + c);
 }
 fn test3(a, b = "b", bb, c) { // Error at 'bb': Positional parameter must come before parameter with a default.
-    print a + b + c;
+    print(a + b + c);
 }

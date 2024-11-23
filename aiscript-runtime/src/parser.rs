@@ -392,7 +392,7 @@ mod tests {
 
                     let greeting = "Hello" + name;
                     if greeting {
-                        print greeting;
+                        print(greeting);
                     }
                     return greeting;
                 }

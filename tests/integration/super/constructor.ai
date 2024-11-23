@@ -1,12 +1,12 @@
 class Base {
   fn init(a, b) {
-    print "Base.init(" + a + ", " + b + ")";
+    print("Base.init(" + a + ", " + b + ")");
   }
 }
 
 class Derived(Base) {
   fn init() {
-    print "Derived.init()";
+    print("Derived.init()");
     super.init("a", "b");
   }
 }

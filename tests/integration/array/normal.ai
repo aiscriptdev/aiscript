@@ -1,37 +1,37 @@
 // Basic array literal
 let arr = [1, 2, 3];
-print arr[0]; // expect: 1
+print(arr[0]); // expect: 1
 
 // Mixed types array 
 let mixed = [1, "two", true, nil];
-print mixed[1]; // expect: two
-print mixed[3]; // expect: nil
+print(mixed[1]); // expect: two
+print(mixed[3]); // expect: nil
 
 // Array indexing
 let i = 1; 
 let arr2 = [10, 20, 30];
-print arr2[i]; // expect: 20
+print(arr2[i]); // expect: 20
 
 // Array modification
 let nums = [1, 2];
 nums[2] = 3;
 nums[0] = 10;
-print nums; // expect: [10, 2, 3]
+print(nums); // expect: [10, 2, 3]
 
 // Nested arrays 
 let matrix = [
  [1, 2],
  [3, 4], // trailing comma
 ];
-print matrix[0][1]; // expect: 2
+print(matrix[0][1]); // expect: 2
 matrix[1][0] = 5;
-print matrix[1]; // expect: [5, 4]
+print(matrix[1]); // expect: [5, 4]
 
 // Arrays in objects
 let obj = {
  numbers: [1, 2, 3],
  strings: ["a", "b"],
 };
-print obj.numbers[0]; // expect: 1
+print(obj.numbers[0]); // expect: 1
 obj.strings[1] = "c";
-print obj.strings; // expect: [a, c]
+print(obj.strings); // expect: [a, c]

@@ -12,5 +12,5 @@ class Derived(Base) {
 }
 
 let derived = Derived("a", "b");
-print derived.a; // expect: a
-print derived.b; // expect: b
+print(derived.a); // expect: a
+print(derived.b); // expect: b

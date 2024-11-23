@@ -205,9 +205,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn statement(&mut self) -> Option<Stmt<'gc>> {
-        if self.match_token(TokenType::Print) {
-            self.print_statement()
-        } else if self.match_token(TokenType::OpenBrace) {
+        if self.match_token(TokenType::OpenBrace) {
             Some(Stmt::Block {
                 statements: self.block(),
                 line: self.previous.line,
@@ -633,15 +631,6 @@ impl<'gc> Parser<'gc> {
             condition,
             then_branch,
             else_branch,
-            line: self.previous.line,
-        })
-    }
-
-    fn print_statement(&mut self) -> Option<Stmt<'gc>> {
-        let value = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.");
-        Some(Stmt::Print {
-            expression: value,
             line: self.previous.line,
         })
     }
@@ -1215,7 +1204,6 @@ impl<'gc> Parser<'gc> {
                 | TokenType::For
                 | TokenType::If
                 | TokenType::While
-                | TokenType::Print
                 | TokenType::Return => return,
                 _ => self.advance(),
             }

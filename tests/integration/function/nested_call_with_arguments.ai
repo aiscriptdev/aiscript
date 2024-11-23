@@ -7,7 +7,7 @@ fn returnFunCallWithArg(func, arg) {
 }
 
 fn printArg(arg) {
-  print arg;
+  print(arg);
 }
 
 returnFunCallWithArg(printArg, "hello world"); // expect: hello world

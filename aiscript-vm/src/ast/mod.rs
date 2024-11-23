@@ -272,10 +272,6 @@ pub enum Stmt<'gc> {
         expression: Expr<'gc>,
         line: u32,
     },
-    Print {
-        expression: Expr<'gc>,
-        line: u32,
-    },
     Let(VariableDecl<'gc>),
     Const {
         name: Token<'gc>,
@@ -320,7 +316,6 @@ impl<'gc> Stmt<'gc> {
         match self {
             Self::Use { line, .. }
             | Self::Expression { line, .. }
-            | Self::Print { line, .. }
             | Self::Let(VariableDecl { line, .. })
             | Self::Const { line, .. }
             | Self::Break { line, .. }

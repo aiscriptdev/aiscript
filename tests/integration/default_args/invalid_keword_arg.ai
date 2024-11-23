@@ -1,6 +1,6 @@
 fn test(a, b = "b", c: str = "c") {
-    print a;
-    print b + c;
+    print(a);
+    print(b + c);
 }
 
 test("a", bb="bb"); // expect runtime error: Unknown keyword argument 'bb'.

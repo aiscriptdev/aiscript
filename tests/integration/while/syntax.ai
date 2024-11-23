@@ -1,6 +1,9 @@
 // Single-expression body.
 let c = 0;
-while (c < 3) print c = c + 1;
+while (c < 3) {
+    c += 1;
+    print(c);
+}
 // expect: 1
 // expect: 2
 // expect: 3
@@ -8,7 +11,7 @@ while (c < 3) print c = c + 1;
 // Block body.
 let a = 0;
 while (a < 3) {
-  print a;
+  print(a);
   a = a + 1;
 }
 // expect: 0

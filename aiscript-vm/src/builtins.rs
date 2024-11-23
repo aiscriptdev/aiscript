@@ -274,7 +274,7 @@ pub(crate) fn print<'gc>(
         }
         print!("{}", arg);
     }
-    // println!();
+    println!();
 
     Ok(Value::Nil)
 }
@@ -494,7 +494,12 @@ pub(crate) fn bin<'gc>(
         }
     };
 
-    Ok(Value::IoString(Gc::new(mc, format!("0b{:b}", num))))
+    // Handle negative numbers like Python does
+    if num < 0 {
+        Ok(Value::IoString(Gc::new(mc, format!("-0b{:b}", num.abs()))))
+    } else {
+        Ok(Value::IoString(Gc::new(mc, format!("0b{:b}", num))))
+    }
 }
 
 pub(crate) fn hex<'gc>(
@@ -516,7 +521,12 @@ pub(crate) fn hex<'gc>(
         }
     };
 
-    Ok(Value::IoString(Gc::new(mc, format!("0x{:x}", num))))
+    // Handle negative numbers like Python does
+    if num < 0 {
+        Ok(Value::IoString(Gc::new(mc, format!("-0x{:x}", num.abs()))))
+    } else {
+        Ok(Value::IoString(Gc::new(mc, format!("0x{:x}", num))))
+    }
 }
 
 pub(crate) fn oct<'gc>(
@@ -538,7 +548,12 @@ pub(crate) fn oct<'gc>(
         }
     };
 
-    Ok(Value::IoString(Gc::new(mc, format!("0o{:o}", num))))
+    // Handle negative numbers like Python does
+    if num < 0 {
+        Ok(Value::IoString(Gc::new(mc, format!("-0o{:o}", num.abs()))))
+    } else {
+        Ok(Value::IoString(Gc::new(mc, format!("0o{:o}", num))))
+    }
 }
 
 pub(crate) fn callable<'gc>(

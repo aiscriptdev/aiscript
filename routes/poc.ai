@@ -10,14 +10,14 @@ route /poc {
             age: int = 18
         }
 
-        print query;
-        print body;
-        print request;
-        print header;
-        print query.content;
-        print query.age + 2;
+        print(query);
+        print(body);
+        print(request);
+        print(header);
+        print(query.content);
+        print(query.age + 2);
         let name = "aiscript";
-        print "name: " + name;
+        print("name: " + name);
         return "get: hello";
     }
 

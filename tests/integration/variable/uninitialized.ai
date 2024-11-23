@@ -1,2 +1,2 @@
 let a;
-print a; // expect: nil
+print(a); // expect: nil

@@ -2,8 +2,8 @@
 let name = "Alice";
 let age = 30;
 let obj = {name, age};
-print obj.name; // expect: Alice
-print obj.age; // expect: 30
+print(obj.name); // expect: Alice
+print(obj.age); // expect: 30
 
 // Mixed with other property types
 let x = 1;
@@ -14,16 +14,16 @@ let obj2 = {
     "z": 3,            // Quoted property
     color              // Shorthand
 };
-print obj2.x; // expect: 1
-print obj2.y; // expect: 2
-print obj2.z; // expect: 3
-print obj2.color; // expect: blue
+print(obj2.x); // expect: 1
+print(obj2.y); // expect: 2
+print(obj2.z); // expect: 3
+print(obj2.color); // expect: blue
 
 // Multiple shorthands
 let a = 1;
 let b = 2;
 let c = 3;
 let obj3 = {a, b, c};  // {a: 1, b: 2, c: 3}
-print obj3.a; // expect: 1
-print obj3.b; // expect: 2
-print obj3.c; // expect: 3
+print(obj3.a); // expect: 1
+print(obj3.b); // expect: 2
+print(obj3.c); // expect: 3

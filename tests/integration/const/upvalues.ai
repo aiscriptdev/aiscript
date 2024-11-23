@@ -3,7 +3,7 @@ fn f1() {
 
     fn f2 () {
         PI = 3.2; // Error at 'PI': Cannot assign to constant variable.
-        print PI;
+        print(PI);
     }
 
     return f2;

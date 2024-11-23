@@ -16,4 +16,4 @@ class Foo {
 }
 
 let closure = Foo().getClosure();
-print closure()()(); // expect: Foo
+print(closure()()()); // expect: Foo

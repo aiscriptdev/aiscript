@@ -3,8 +3,8 @@ class Foo {
     fn init() {
       return "bar";
     }
-    print init(); // expect: bar
+    print(init()); // expect: bar
   }
 }
 
-print Foo(); // expect: Foo {}
+print(Foo()); // expect: Foo {}

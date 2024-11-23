@@ -7,9 +7,9 @@ fn f1() {
     fn f3() {
       let c = "c";
       fn f4() {
-        print a;
-        print b;
-        print c;
+        print(a);
+        print(b);
+        print(c);
       }
       f = f4;
     }

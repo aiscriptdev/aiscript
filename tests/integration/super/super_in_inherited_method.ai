@@ -1,6 +1,6 @@
 class A {
   fn say() {
-    print "A";
+    print("A");
   }
 }
 
@@ -10,13 +10,13 @@ class B(A) {
   }
 
   fn say() {
-    print "B";
+    print("B");
   }
 }
 
 class C(B) {
   fn say() {
-    print "C";
+    print("C");
   }
 }
 

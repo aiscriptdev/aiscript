@@ -4,4 +4,4 @@ ai fn ask(question) {
 }
 
 let answer = ask(p);
-print answer;
+print(answer);

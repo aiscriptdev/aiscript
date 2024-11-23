@@ -139,7 +139,7 @@ mod tests {
         let tokens: Vec<Token> = scanner.collect();
 
         // Verify the sequence of tokens
-        assert_eq!(tokens[0].kind, TokenType::Print);
+        assert_eq!(tokens[0].kind, TokenType::Identifier);
         assert_eq!(tokens[1].kind, TokenType::OpenParen);
         assert_eq!(tokens[2].kind, TokenType::String);
         assert_eq!(tokens[3].kind, TokenType::String);
@@ -268,7 +268,7 @@ fn test() { // Another comment
                 TokenType::OpenParen,
                 TokenType::CloseParen,
                 TokenType::OpenBrace,
-                TokenType::Print,
+                TokenType::Identifier,
                 TokenType::OpenParen,
                 TokenType::String,
                 TokenType::CloseParen,

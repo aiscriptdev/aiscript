@@ -222,10 +222,6 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(expression)?;
                 self.emit(OpCode::Pop(1));
             }
-            Stmt::Print { expression, .. } => {
-                self.generate_expr(expression)?;
-                self.emit(OpCode::Print);
-            }
             Stmt::Let(VariableDecl {
                 name,
                 initializer,

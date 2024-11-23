@@ -3,7 +3,7 @@
 
   {
     let a = "a";
-    fn f_() { print a; }
+    fn f_() { print(a); }
     f = f_;
   }
 

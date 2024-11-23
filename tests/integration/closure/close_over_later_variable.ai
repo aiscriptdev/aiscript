@@ -7,8 +7,8 @@ fn f() {
   let a = "a";
   let b = "b";
   fn g() {
-    print b; // expect: b
-    print a; // expect: a
+    print(b); // expect: b
+    print(a); // expect: a
   }
   g();
 }

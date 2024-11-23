@@ -2,7 +2,7 @@ let f;
 
 fn foo(param) {
   fn f_() {
-    print param;
+    print(param);
   }
   f = f_;
 }

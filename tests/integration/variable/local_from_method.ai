@@ -2,7 +2,7 @@ let foo = "variable";
 
 class Foo {
   fn method() {
-    print foo;
+    print(foo);
   }
 }
 

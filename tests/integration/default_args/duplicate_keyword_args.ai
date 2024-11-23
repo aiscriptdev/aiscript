@@ -1,6 +1,6 @@
 fn test(a, b = "b", c: str = "c") {
-    print a;
-    print b + c;
+    print(a);
+    print(b + c);
 }
 
 test("a", a="bb", b="bb"); // expect runtime error: Keyword argument 'a' was already specified as positional argument.

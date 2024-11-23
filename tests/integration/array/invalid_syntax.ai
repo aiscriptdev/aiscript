@@ -9,4 +9,4 @@ let a2 = [
 
 // Invalid array access
 let arr = [1,2];
-print arr[]; // Error at ']': Expect expression.
+print(arr[]); // Error at ']': Expect expression.

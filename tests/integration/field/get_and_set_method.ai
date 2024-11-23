@@ -1,12 +1,12 @@
 // Bound methods have identity equality.
 class Foo {
   fn method(a) {
-    print "method";
-    print a;
+    print("method");
+    print(a);
   }
   fn other(a) {
-    print "other";
-    print a;
+    print("other");
+    print(a);
   }
 }
 

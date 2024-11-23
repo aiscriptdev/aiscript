@@ -1,5 +1,5 @@
 // Assignment on RHS of variable.
 let a = "before";
 let c = a = "let";
-print a; // expect: let
-print c; // expect: let
+print(a); // expect: let
+print(c); // expect: let

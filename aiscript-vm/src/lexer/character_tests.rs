@@ -34,12 +34,14 @@ mod tests {
 
     #[test]
     fn test_utf8_in_comments() {
-        let source = "// 这是一个注释\nprint x;";
+        let source = "// 这是一个注释\nprint(x);";
         let mut scanner = Scanner::new(source);
 
         let expected_tokens = vec![
-            TokenType::Print,
+            TokenType::Identifier,
+            TokenType::OpenParen,
             TokenType::Identifier, // x
+            TokenType::CloseParen,
             TokenType::Semicolon,
             TokenType::Eof,
         ];
@@ -71,7 +73,7 @@ mod tests {
                 name: "张三",
                 age: 25,
                 greet: fn() {
-                    print "你好，" + this.name + "！";
+                    print("你好，" + this.name + "！");
                 }
             };
         "#;
@@ -96,7 +98,8 @@ mod tests {
             TokenType::OpenParen,
             TokenType::CloseParen,
             TokenType::OpenBrace,
-            TokenType::Print,
+            TokenType::Identifier,
+            TokenType::OpenParen,
             TokenType::String, // "你好，"
             TokenType::Plus,
             TokenType::This,
@@ -104,6 +107,7 @@ mod tests {
             TokenType::Identifier, // name
             TokenType::Plus,
             TokenType::String, // "！"
+            TokenType::CloseParen,
             TokenType::Semicolon,
             TokenType::CloseBrace,
             TokenType::CloseBrace,

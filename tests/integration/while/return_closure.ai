@@ -1,7 +1,7 @@
 fn f() {
   while (true) {
     let i = "i";
-    fn g() { print i; }
+    fn g() { print(i); }
     return g;
   }
 }

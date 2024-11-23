@@ -1,6 +1,6 @@
 fn test(a, b = "b", c: str = "c") {
-    print a;
-    print b + c;
+    print(a);
+    print(b + c);
 }
 
 test(); // expect runtime error: Missing required argument 'a'.

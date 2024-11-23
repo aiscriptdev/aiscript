@@ -5,7 +5,7 @@ let f3;
 let i = 1;
 while (i < 4) {
   let j = i;
-  fn f() { print j; }
+  fn f() { print(j); }
 
   if (j == 1) f1 = f;
   else if (j == 2) f2 = f;
