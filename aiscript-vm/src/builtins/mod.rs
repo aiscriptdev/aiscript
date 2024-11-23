@@ -3,10 +3,12 @@ use gc_arena::{Gc, Mutation};
 use std::io::{self, Write};
 
 mod convert;
+mod format;
 mod print;
 
 pub(crate) use convert::*;
-pub(crate) use print::*;
+pub(crate) use format::format;
+pub(crate) use print::print;
 
 pub(crate) fn abs<'gc>(
     _mc: &'gc Mutation<'gc>,

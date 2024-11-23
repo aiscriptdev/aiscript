@@ -50,7 +50,7 @@ fn parse_comments(path: &PathBuf) -> Expected {
     let content = fs::read_to_string(path).unwrap();
     for (i, line) in content.lines().enumerate() {
         if let Some(m) = output_re.captures(line) {
-            let s = m.get(1).unwrap().as_str().to_owned();
+            let s = m.get(1).unwrap().as_str().trim_matches('"').to_owned();
             expected.out.push(s);
         }
         if let Some(m) = error_line_re.captures(line) {

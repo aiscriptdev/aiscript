@@ -941,6 +941,7 @@ impl<'gc> State<'gc> {
         self.define_native_function("hex", builtins::hex);
         self.define_native_function("oct", builtins::oct);
         self.define_native_function("callable", builtins::callable);
+        self.define_native_function("format", builtins::format);
     }
 
     fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {

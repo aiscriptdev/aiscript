@@ -1,0 +1,24 @@
+// String formatting
+let s = format("{:>10}", "right");  // expect: "     right"
+print(s);
+
+// Floating point formatting
+print(format("{:.2f}", 3.14159));  // expect: 3.14
+print(format("{:x}", 255.0));      // expect: ff
+print(format("{:X}", 255.0));      // expect: FF
+print(format("{:b}", 42.0));       // expect: 101010
+
+// Integer formatting
+print(format("{:o}", 64));         // expect: 100
+print(format("{:x}", 255));        // expect: ff
+print(format("{:b}", 42));         // expect: 101010
+// Regular decimal formatting
+print(format("{:d}", 123.45));     // expect: 123
+
+// Width and alignment still work with all formats
+print(format("{:>10x}", 255.0));  // expect: "        ff"
+print(format("{:0>8b}", 42.0));   // expect: 00101010
+
+// Combining both
+print(format("{:>10}", "test"), format("{:<10}", "test"), sep=" | ");
+// expect: "      test | test      "
