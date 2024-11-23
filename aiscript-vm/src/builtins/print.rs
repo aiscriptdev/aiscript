@@ -12,7 +12,7 @@ use std::fmt::Write;
 /// flush (bool): Whether to forcibly flush the stream. Default: False
 ///
 /// fn print(*objects, sep=" ", end="\n", file=nil, flush=false) {}
-pub(crate) fn print<'gc>(
+pub(super) fn print<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {

@@ -1,7 +1,7 @@
 use crate::{Value, VmError};
 use gc_arena::{Gc, Mutation};
 
-pub(crate) fn bool<'gc>(
+pub(super) fn bool<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -29,7 +29,7 @@ pub(crate) fn bool<'gc>(
     }
 }
 
-pub(crate) fn float<'gc>(
+pub(super) fn float<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -60,7 +60,7 @@ pub(crate) fn float<'gc>(
     }
 }
 
-pub(crate) fn int<'gc>(
+pub(super) fn int<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -91,7 +91,7 @@ pub(crate) fn int<'gc>(
     }
 }
 
-pub(crate) fn ascii<'gc>(
+pub(super) fn ascii<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -119,7 +119,7 @@ pub(crate) fn ascii<'gc>(
     Ok(Value::IoString(Gc::new(mc, result)))
 }
 
-pub(crate) fn chr<'gc>(
+pub(super) fn chr<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -152,7 +152,7 @@ pub(crate) fn chr<'gc>(
     }
 }
 
-pub(crate) fn ord<'gc>(
+pub(super) fn ord<'gc>(
     _mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -183,7 +183,7 @@ pub(crate) fn ord<'gc>(
     }
 }
 
-pub(crate) fn str<'gc>(
+pub(super) fn str<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -197,7 +197,7 @@ pub(crate) fn str<'gc>(
     Ok(Value::IoString(Gc::new(mc, s)))
 }
 
-pub(crate) fn bin<'gc>(
+pub(super) fn bin<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -224,7 +224,7 @@ pub(crate) fn bin<'gc>(
     }
 }
 
-pub(crate) fn hex<'gc>(
+pub(super) fn hex<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -251,7 +251,7 @@ pub(crate) fn hex<'gc>(
     }
 }
 
-pub(crate) fn oct<'gc>(
+pub(super) fn oct<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {

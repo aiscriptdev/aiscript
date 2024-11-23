@@ -3,7 +3,7 @@ use gc_arena::{Gc, Mutation};
 use std::fmt::Write;
 
 /// Format function that implements Python-like string formatting
-pub(crate) fn format<'gc>(
+pub(super) fn format<'gc>(
     mc: &'gc Mutation<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {

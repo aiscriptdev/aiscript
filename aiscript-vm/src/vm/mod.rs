@@ -94,13 +94,15 @@ impl Vm {
 
     #[cfg(not(feature = "v1"))]
     pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
+        use crate::builtins;
+
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
                 strings: state.strings,
             };
             state.chunks = crate::compiler::compile(context, source)?;
-            state.define_builtins();
+            builtins::define_native_functions(state);
             // The script function's chunk id is always the highest chunk id.
             let script_chunk_id = state.chunks.keys().max().copied().unwrap();
             state.call_function(script_chunk_id, &[])

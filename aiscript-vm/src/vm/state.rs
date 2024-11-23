@@ -15,7 +15,6 @@ use gc_arena::{
 use crate::{
     ai,
     ast::{ChunkId, Visibility},
-    builtins,
     module::{ModuleKind, ModuleManager, ModuleSource},
     object::{BoundMethod, Class, Closure, Function, Instance, Object, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
@@ -136,6 +135,7 @@ impl<'gc> State<'gc> {
             current_module: None,
         }
     }
+
     pub fn import_module(&mut self, path: InternedString<'gc>) -> Result<(), VmError> {
         // Get the simple name (last component) from the path
         let simple_name = path.to_str().unwrap().split('.').last().unwrap();
@@ -919,32 +919,7 @@ impl<'gc> State<'gc> {
         self.pop_stack();
     }
 
-    pub fn define_builtins(&mut self) {
-        self.define_native_function("abs", builtins::abs);
-        self.define_native_function("len", builtins::len);
-        self.define_native_function("any", builtins::any);
-        self.define_native_function("all", builtins::all);
-        self.define_native_function("min", builtins::min);
-        self.define_native_function("max", builtins::max);
-        self.define_native_function("round", builtins::round);
-        self.define_native_function("sum", builtins::sum);
-        self.define_native_function("input", builtins::input);
-        self.define_native_function("print", builtins::print);
-        self.define_native_function("bool", builtins::bool);
-        self.define_native_function("float", builtins::float);
-        self.define_native_function("int", builtins::int);
-        self.define_native_function("str", builtins::str);
-        self.define_native_function("ascii", builtins::ascii);
-        self.define_native_function("chr", builtins::chr);
-        self.define_native_function("ord", builtins::ord);
-        self.define_native_function("bin", builtins::bin);
-        self.define_native_function("hex", builtins::hex);
-        self.define_native_function("oct", builtins::oct);
-        self.define_native_function("callable", builtins::callable);
-        self.define_native_function("format", builtins::format);
-    }
-
-    fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
+    pub(crate) fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
         let s = self.intern_static(name);
         self.globals.insert(s, Value::NativeFunction(function));
     }

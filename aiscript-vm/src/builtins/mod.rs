@@ -1,4 +1,4 @@
-use crate::{Value, VmError};
+use crate::{vm::State, Value, VmError};
 use gc_arena::{Gc, Mutation};
 use std::io::{self, Write};
 
@@ -6,14 +6,36 @@ mod convert;
 mod format;
 mod print;
 
-pub(crate) use convert::*;
-pub(crate) use format::format;
-pub(crate) use print::print;
+use convert::*;
+use format::format;
+use print::print;
 
-pub(crate) fn abs<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+pub(crate) fn define_native_functions(state: &mut State) {
+    state.define_native_function("abs", abs);
+    state.define_native_function("len", len);
+    state.define_native_function("any", any);
+    state.define_native_function("all", all);
+    state.define_native_function("min", min);
+    state.define_native_function("max", max);
+    state.define_native_function("round", round);
+    state.define_native_function("sum", sum);
+    state.define_native_function("input", input);
+    state.define_native_function("print", print);
+    state.define_native_function("bool", bool);
+    state.define_native_function("float", float);
+    state.define_native_function("int", int);
+    state.define_native_function("str", str);
+    state.define_native_function("ascii", ascii);
+    state.define_native_function("chr", chr);
+    state.define_native_function("ord", ord);
+    state.define_native_function("bin", bin);
+    state.define_native_function("hex", hex);
+    state.define_native_function("oct", oct);
+    state.define_native_function("callable", callable);
+    state.define_native_function("format", format);
+}
+
+fn abs<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "abs() takes exactly one argument".into(),
@@ -28,10 +50,7 @@ pub(crate) fn abs<'gc>(
     }
 }
 
-pub(crate) fn len<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn len<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "len() takes exactly one argument".into(),
@@ -49,10 +68,7 @@ pub(crate) fn len<'gc>(
     }
 }
 
-pub(crate) fn any<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn any<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "any() takes exactly one argument".into(),
@@ -70,10 +86,7 @@ pub(crate) fn any<'gc>(
     }
 }
 
-pub(crate) fn all<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn all<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "all() takes exactly one argument".into(),
@@ -91,10 +104,7 @@ pub(crate) fn all<'gc>(
     }
 }
 
-pub(crate) fn min<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn min<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
         return Err(VmError::RuntimeError(
             "min() takes at least one argument".into(),
@@ -139,10 +149,7 @@ pub(crate) fn min<'gc>(
     }
 }
 
-pub(crate) fn max<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn max<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
         return Err(VmError::RuntimeError(
             "max() takes at least one argument".into(),
@@ -187,10 +194,7 @@ pub(crate) fn max<'gc>(
     }
 }
 
-pub(crate) fn round<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn round<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "round() takes exactly one argument".into(),
@@ -205,10 +209,7 @@ pub(crate) fn round<'gc>(
     }
 }
 
-pub(crate) fn sum<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn sum<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "sum() takes exactly one argument".into(),
@@ -236,10 +237,7 @@ pub(crate) fn sum<'gc>(
     }
 }
 
-pub(crate) fn input<'gc>(
-    mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn input<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     // If a prompt is provided, print it without a newline
     if let Some(prompt) = args.first() {
         match prompt {
@@ -265,10 +263,7 @@ pub(crate) fn input<'gc>(
     Ok(Value::IoString(Gc::new(mc, input)))
 }
 
-pub(crate) fn callable<'gc>(
-    _mc: &'gc Mutation<'gc>,
-    args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn callable<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "callable() takes exactly one argument".into(),
