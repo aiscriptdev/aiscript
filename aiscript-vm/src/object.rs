@@ -68,6 +68,7 @@ impl<'gc> Display for Function<'gc> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {
+    Lambda,
     // Regular functions
     AiFunction,
     Function,

@@ -514,6 +514,63 @@ impl<'gc> Parser<'gc> {
         }))
     }
 
+    fn lambda(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let line = self.previous.line;
+        let mut params = Vec::new();
+
+        // Parse parameters between pipes (||)
+        if !self.match_token(TokenType::Pipe) {
+            loop {
+                if params.len() >= 255 {
+                    self.error_at_current("Can't have more than 255 parameters.");
+                    break;
+                }
+
+                self.consume(TokenType::Identifier, "Expect parameter name.");
+                params.push(self.previous);
+
+                if !self.match_token(TokenType::Comma) {
+                    break;
+                }
+            }
+            self.consume(TokenType::Pipe, "Expect '|' after lambda parameters.");
+        }
+
+        // Parse body
+        let body = if self.match_token(TokenType::OpenBrace) {
+            // Block body
+            let mut statements = Vec::new();
+            while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+                if let Some(declaration) = self.declaration() {
+                    statements.push(declaration);
+                }
+            }
+            self.consume(TokenType::CloseBrace, "Expect '}' after lambda body.");
+
+            // Create block expression
+            Box::new(Expr::Block {
+                statements,
+                line: self.previous.line,
+            })
+        } else {
+            // Single expression body - wrap in a block with return statement
+            let expr = self.expression()?;
+            Box::new(Expr::Block {
+                statements: vec![Stmt::Return {
+                    value: Some(expr),
+                    line: self.previous.line,
+                }],
+                line: self.previous.line,
+            })
+        };
+
+        Some(Expr::Lambda {
+            params,
+            body,
+            line,
+        })
+    }
+
     fn const_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect constant name.");
         let name = self.previous;
@@ -1267,6 +1324,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenBracket => {
             ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
         }
+        TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)

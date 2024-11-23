@@ -193,6 +193,15 @@ pub enum Expr<'gc> {
         right: Box<Expr<'gc>>,
         line: u32,
     },
+    Lambda {
+        params: Vec<Token<'gc>>,
+        body: Box<Expr<'gc>>,
+        line: u32,
+    },
+    Block {
+        statements: Vec<Stmt<'gc>>,
+        line: u32,
+    },
     Call {
         callee: Box<Expr<'gc>>,
         arguments: Vec<Expr<'gc>>,
@@ -250,6 +259,8 @@ impl<'gc> Expr<'gc> {
             | Self::Assign { line, .. }
             | Self::And { line, .. }
             | Self::Or { line, .. }
+            | Self::Lambda { line, .. }
+            | Self::Block { line, .. }
             | Self::Call { line, .. }
             | Self::Invoke { line, .. }
             | Self::Get { line, .. }

@@ -640,6 +640,72 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(value)?;
                 self.named_variable(name, true)?;
             }
+            Expr::Block { statements, .. } => {
+                // Generate code for each statement in the block
+                for stmt in statements {
+                    self.generate_stmt(stmt)?;
+                }
+
+                // If the block doesn't end with a return statement,
+                // implicitly return nil
+                if !matches!(statements.last(), Some(Stmt::Return { .. })) {
+                    self.emit(OpCode::Nil);
+                }
+            }
+            Expr::Lambda { params, body, .. } => {
+                // Create a new compiler for the lambda
+                let name = format!("lambda_{}", CHUNK_ID.load(Ordering::Relaxed));
+                let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
+
+                // Create the lambda compiler and swap with self
+                let mut lambda_compiler = Self::new(self.ctx, FunctionType::Lambda, &name);
+                lambda_compiler.named_id_map = self.named_id_map.clone();
+
+                // Store current compiler as enclosing and set enclosing for lambda
+                let current_compiler = mem::replace(self, *lambda_compiler);
+                self.enclosing = Some(Box::new(current_compiler));
+
+                // Set up function parameters
+                self.function.arity = params.len() as u8;
+                self.function.max_arity = params.len() as u8;
+
+                // Add parameters as locals
+                self.begin_scope();
+                for param in params {
+                    self.declare_variable(*param, Mutability::Mutable);
+                    self.mark_initialized();
+                }
+
+                // Generate code for the body (which is a Block expression)
+                self.generate_expr(body)?;
+
+                // Always end with return
+                self.emit(OpCode::Return);
+
+                self.end_scope();
+
+                // Check for errors
+                if self.had_error {
+                    return Err(VmError::CompileError);
+                }
+
+                // Get the generated function and chunks
+                self.function.shrink_to_fit();
+                let generated_function = mem::take(&mut self.function);
+                let generated_chunks = mem::take(&mut self.chunks);
+
+                // Get the enclosing compiler back
+                if let Some(enclosing) = self.enclosing.take() {
+                    let _ = mem::replace(self, *enclosing);
+                }
+
+                // Store the generated function and extend chunks
+                self.chunks.insert(chunk_id, generated_function);
+                self.chunks.extend(generated_chunks);
+
+                // Emit closure instruction
+                self.emit(OpCode::Closure { chunk_id });
+            }
             Expr::Call {
                 callee,
                 arguments,

@@ -1,0 +1,39 @@
+
+// Multiple lambdas capturing same variable
+let x = 0;
+let add_one = || { x = x + 1; return x; };
+let get_x = || x;
+print(add_one()); // expect: 1
+print(get_x()); // expect: 1
+print(add_one()); // expect: 2
+print(get_x()); // expect: 2
+
+
+// Capture in block lambda
+let multiplier = 2;
+let multiply = |x| {
+    let result = x * multiplier;
+    return result;
+};
+print(multiply(5)); // expect: 10
+
+// Capture across function boundary
+fn make_doubler(factor) {
+    return |x| x * factor;
+}
+let double = make_doubler(2);
+let triple = make_doubler(3);
+print(double(5)); // expect: 10
+print(triple(5)); // expect: 15
+
+// Deep nesting with multiple captures
+let make_adder = |x| {
+    let base = x;
+    return |y| {
+        let inner_base = base;
+        return |z| inner_base + y + z;
+    };
+};
+let add_five = make_adder(5);
+let add_five_two = add_five(2);
+print(add_five_two(3)); // expect: 10

@@ -24,6 +24,7 @@ pub enum TokenType {
     Star,      // *
     Colon,     // :
     Percent,   // %
+    Pipe,      // |
 
     // Comparison and logical operators
     Bang,         // !
@@ -363,6 +364,7 @@ impl<'a> Scanner<'a> {
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
+            '|' => self.make_token(TokenType::Pipe),
             '-' => {
                 let p = self.peek();
                 let kind = if p == Some('>') {

@@ -1,0 +1,92 @@
+// Empty parameter list
+let get_five = || 5;
+print(get_five()); // expect: 5
+
+// Expression lambdas
+let double = |x| x * 2;
+print(double(2)); // expect: 4
+print(double(5)); // expect: 10
+
+// Multiple parameters
+let add = |a, b| a + b;
+print(add(2, 3)); // expect: 5
+print(add(10, 20)); // expect: 30
+
+// Block body with return
+let process = |x| {
+    let temp = x * 2;
+    return temp + 1;
+};
+print(process(3)); // expect: 7
+
+// Block body with implicit return
+let greet = |name| {
+    print("Hello, " + name); // expect: Hello, Alice
+    return "greeting done";
+};
+print(greet("Alice")); // expect: greeting done
+
+// Nested lambdas
+let make_adder = |x| {
+    return |y| x + y;
+};
+let add_five = make_adder(5);
+print(add_five(3)); // expect: 8
+
+// Lambda with closure
+let counter = || {
+    let count = 0;
+    return |x| {
+        count = count + x;
+        return count;
+    };
+};
+let count = counter();
+print(count(1)); // expect: 1
+print(count(2)); // expect: 3
+print(count(3)); // expect: 6
+
+// Using lambda with array map
+fn map(arr, f) {
+    let result = [];
+    for (let i = 0; i < len(arr); i += 1) {
+        result[i] = f(arr[i]);
+    }
+    return result;
+}
+
+let numbers = [1, 2, 3, 4];
+let doubled = map(numbers, |x| x * 2);
+print(doubled); // expect: [2, 4, 6, 8]
+
+// Lambda with early return
+let find_positive = |x| {
+    if (x <= 0) {
+        return 0;
+    }
+    return x;
+};
+print(find_positive(5)); // expect: 5
+print(find_positive(-3)); // expect: 0
+
+// Lambda capturing variables from outer scope
+let multiplier = 2;
+let times = |x| x * multiplier;
+print(times(4)); // expect: 8
+multiplier = 3;
+print(times(4)); // expect: 12
+
+// Passing lambda as argument
+fn apply(f, x) {
+    return f(x);
+}
+print(apply(|x| x * x, 3)); // expect: 9
+
+// Recursive lambda using let binding
+let fib = |n| {
+    if (n <= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+};
+print(fib(6)); // expect: 8
