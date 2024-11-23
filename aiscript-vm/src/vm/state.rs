@@ -934,6 +934,17 @@ impl<'gc> State<'gc> {
         self.define_native_function("sum", builtins::sum);
         self.define_native_function("input", builtins::input);
         self.define_native_function("print", builtins::print);
+        self.define_native_function("bool", builtins::bool);
+        self.define_native_function("float", builtins::float);
+        self.define_native_function("int", builtins::int);
+        self.define_native_function("str", builtins::str);
+        self.define_native_function("ascii", builtins::ascii);
+        self.define_native_function("chr", builtins::chr);
+        self.define_native_function("ord", builtins::ord);
+        self.define_native_function("bin", builtins::bin);
+        self.define_native_function("hex", builtins::hex);
+        self.define_native_function("oct", builtins::oct);
+        self.define_native_function("callable", builtins::callable);
     }
 
     fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {

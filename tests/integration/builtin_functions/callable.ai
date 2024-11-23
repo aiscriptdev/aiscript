@@ -1,0 +1,23 @@
+// Test with functions
+fn test_fn() {
+    print("test");
+}
+print(callable(test_fn));  // expect: true
+print(callable(print));    // expect: true
+
+// Test with classes
+class TestClass {
+    fn init() {}
+}
+print(callable(TestClass));  // expect: true
+
+// Test with methods
+let instance = TestClass();
+print(callable(instance.init));  // expect: true
+
+// Test with non-callable types
+print(callable(1));           // expect: false
+print(callable("string"));    // expect: false
+print(callable(true));       // expect: false
+print(callable(nil));        // expect: false
+print(callable([1, 2, 3]));  // expect: false

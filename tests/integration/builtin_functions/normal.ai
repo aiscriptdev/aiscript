@@ -1,0 +1,71 @@
+// abs
+let a = -42;
+print(abs(a));  // expect: 42
+print(abs(-3.14));  // expect: 3.14
+print(abs(5));  // expect: 5
+print(abs(0));  // expect: 0
+print(abs(-0.0));  // expect: 0
+
+// len
+let arr = [1, 2, 3, 4, 5];
+print(len(arr));  // expect: 5
+print(len([]));  // expect: 0
+
+let str = "hello";
+print(len(str));  // expect: 5
+print(len(""));  // expect: 0
+
+let obj = {a: 1, b: 2, c: 3};
+print(len(obj));  // expect: 3
+print(len({}));  // expect: 0
+
+// any
+print(any([true, false, false]));  // expect: true
+print(any([false, false, false]));  // expect: false
+print(any([true, true, true]));  // expect: true
+print(any([]));  // expect: false
+
+// all
+print(all([true, true, true]));  // expect: true
+print(all([true, false, true]));  // expect: false
+print(all([false, false, false]));  // expect: false
+print(all([]));  // expect: true
+
+// min
+print(min(1, 2, 3));  // expect: 1
+print(min(3, 2, 1));  // expect: 1
+print(min(-1, -2, -3));  // expect: -3
+print(min(1.5, 2.5, 1.2));  // expect: 1.2
+
+let arr = [4, 2, 7, 1, 3];
+print(min(arr));  // expect: 1
+
+// max
+print(max(1, 2, 3));  // expect: 3
+print(max(3, 2, 1));  // expect: 3
+print(max(-1, -2, -3));  // expect: -1
+print(max(1.5, 2.5, 1.2));  // expect: 2.5
+
+let arr = [4, 2, 7, 1, 3];
+print(max(arr));  // expect: 7
+
+// round
+print(round(3.14));  // expect: 3
+print(round(3.5));  // expect: 4
+print(round(-3.14));  // expect: -3
+print(round(-3.5));  // expect: -4
+print(round(0));  // expect: 0
+
+// sum
+let arr1 = [1, 2, 3, 4, 5];
+print(sum(arr1));  // expect: 15
+
+let arr2 = [-1, 0, 1];
+print(sum(arr2));  // expect: 0
+
+let arr3 = [3.14, 2.5, -1.7];
+print(sum(arr3));  // expect: 3.9400000000000004
+
+let arr4 = [1.1, 2.2, 3.3];
+print(sum(arr4));  // expect: 6.6
+print(sum([]));  // expect: 0

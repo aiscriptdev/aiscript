@@ -1,0 +1,33 @@
+// Boolean values
+print(bool(true));     // expect: true
+print(bool(false));    // expect: false
+
+// Numbers
+print(bool(0));        // expect: false
+print(bool(0.0));      // expect: false
+print(bool(-0.0));     // expect: false
+print(bool(1));        // expect: true
+print(bool(-1));       // expect: true
+print(bool(0.1));      // expect: true
+print(bool(float(0))); // expect: false
+
+// Strings
+print(bool(""));       // expect: false
+print(bool("hello"));  // expect: true
+print(bool(" "));      // expect: true
+
+// Nil
+print(bool(nil));      // expect: false
+
+// Collections
+print(bool([]));       // expect: false
+print(bool([1, 2]));   // expect: true
+print(bool({}));       // expect: false
+print(bool({x: 1}));   // expect: true
+
+// Functions and classes
+fn test() {}
+print(bool(test));     // expect: true
+class Test {}
+print(bool(Test));     // expect: true
+print(bool(Test()));   // expect: true

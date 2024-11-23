@@ -1,0 +1,24 @@
+print(bin(0));     // expect: 0b0
+print(bin(1));     // expect: 0b1
+print(bin(2));     // expect: 0b10
+print(bin(10));    // expect: 0b1010
+print(bin(-1));    // expect: -0b1
+print(bin(-10));   // expect: -0b1010
+print(bin(255));   // expect: 0b11111111
+
+print(hex(0));     // expect: 0x0
+print(hex(1));     // expect: 0x1
+print(hex(10));    // expect: 0xa
+print(hex(16));    // expect: 0x10
+print(hex(-1));    // expect: -0x1
+print(hex(-16));   // expect: -0x10
+print(hex(255));   // expect: 0xff
+print(hex(4095));  // expect: 0xfff
+
+print(oct(0));     // expect: 0o0
+print(oct(1));     // expect: 0o1
+print(oct(8));     // expect: 0o10
+print(oct(9));     // expect: 0o11
+print(oct(-8));    // expect: -0o10
+print(oct(64));    // expect: 0o100
+print(oct(511));   // expect: 0o777

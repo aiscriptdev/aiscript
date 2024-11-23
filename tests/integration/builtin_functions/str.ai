@@ -1,0 +1,9 @@
+print(str(123));      // expect: 123
+print(str(-456));     // expect: -456
+print(str(1.5));      // expect: 1.5
+print(str(true));     // expect: true
+print(str(false));    // expect: false
+print(str(nil));      // expect: nil
+print(str("hello"));  // expect: hello
+let arr = [1, 2, 3];
+print(str(arr));      // expect: [1, 2, 3]
