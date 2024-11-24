@@ -184,7 +184,8 @@ impl<'gc> State<'gc> {
 
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 self.chunks.extend(chunks);
-                self.eval_function(imported_script_chunk_id, &[])?;
+                let function = self.get_chunk(imported_script_chunk_id)?;
+                self.eval_function(function, &[])?;
 
                 if let Some(ModuleKind::Script {
                     ref mut globals, ..
@@ -247,10 +248,9 @@ impl<'gc> State<'gc> {
     // Call function with params
     pub fn call_function(
         &mut self,
-        chunk_id: ChunkId,
+        function: Gc<'gc, Function<'gc>>,
         params: &[Value<'gc>],
     ) -> Result<(), VmError> {
-        let function = self.get_chunk(chunk_id)?;
         #[cfg(feature = "debug")]
         function.disassemble("script");
 
@@ -817,14 +817,23 @@ impl<'gc> State<'gc> {
         }
     }
 
-    pub fn eval_function(
+    pub(crate) fn eval_function_with_id(
         &mut self,
         chunk_id: ChunkId,
         params: &[Value<'gc>],
     ) -> Result<ReturnValue, VmError> {
+        let function = self.get_chunk(chunk_id)?;
+        self.eval_function(function, &params)
+    }
+
+    pub(crate) fn eval_function(
+        &mut self,
+        function: Gc<'gc, Function<'gc>>,
+        params: &[Value<'gc>],
+    ) -> Result<ReturnValue, VmError> {
         // Remember the current frame count in order to exit the loop at the correct frame.
         let frame_count = self.frame_count;
-        self.call_function(chunk_id, params)?;
+        self.call_function(function, params)?;
 
         loop {
             if let Some(result) = self.dispatch_next(frame_count)? {

@@ -223,7 +223,9 @@ impl<'gc> Agent<'gc> {
                     })
                     .flatten()
                     .collect::<Vec<_>>();
-                let result = state.eval_function(tool_def.chunk_id, &params).unwrap();
+                let result = state
+                    .eval_function_with_id(tool_def.chunk_id, &params)
+                    .unwrap();
                 let content = if let ReturnValue::Agent(agent_name) = &result {
                     let agent_name = state.intern(agent_name.as_bytes());
                     response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());
@@ -256,7 +258,7 @@ pub async fn _run_agent<'gc>(
     let message = args[0];
     let debug = args[1].as_boolean();
     println!("debug: {debug}");
-    return make_response_object(
+    make_response_object(
         state,
         agent,
         format!(

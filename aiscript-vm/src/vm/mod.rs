@@ -105,7 +105,8 @@ impl Vm {
             builtins::define_native_functions(state);
             // The script function's chunk id is always the highest chunk id.
             let script_chunk_id = state.chunks.keys().max().copied().unwrap();
-            state.call_function(script_chunk_id, &[])
+            let function = state.get_chunk(script_chunk_id)?;
+            state.call_function(function, &[])
         })
     }
 
@@ -119,7 +120,7 @@ impl Vm {
                 mutation: mc,
                 strings: state.strings,
             };
-            state.eval_function(
+            state.eval_function_with_id(
                 chunk_id,
                 &params
                     .iter()

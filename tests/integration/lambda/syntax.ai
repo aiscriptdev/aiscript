@@ -1,4 +1,5 @@
 let x = |x x + 1; // Error at 'x': Expect '|' after lambda parameters.
 
-let y = |x| { return x; // Error at end: Expect '}' after lambda body.
-
+let y = |x| { 
+    return x;
+// Error at end: Expect '}' after lambda body.
