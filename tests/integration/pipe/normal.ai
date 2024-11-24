@@ -3,6 +3,10 @@ let arr = [1, 2, 3, 4];
 let doubled = arr |> map(|x| x * 2);
 print(doubled); // expect: [2, 4, 6, 8]
 
+let double = |x| x * 2;
+let doubled = arr |> map(double);
+print(doubled); // expect: [2, 4, 6, 8]
+
 // Chained pipe operators
 let result = arr |> map(|x| x + 1) |> filter(|x| x % 2 == 0);
 print(result); // expect: [2, 4]

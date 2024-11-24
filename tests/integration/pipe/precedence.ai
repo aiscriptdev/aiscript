@@ -1,0 +1,17 @@
+fn add_one(x) {
+    return x + 1;
+}
+let v = 1;
+print(v |> add_one()); // expect: 2
+print(2 |> add_one()); // expect: 3
+print(5 + 2 |> add_one()); // expect: 8
+print((5 + 2) |> add_one()); // expect: 8
+print(5 - 2 |> add_one()); // expect: 4
+print((5 - 2) |> add_one()); // expect: 4
+print(5 * 2 |> add_one()); // expect: 11
+print((5 * 2) |> add_one()); // expect: 11
+print(5 / 2 |> add_one()); // expect: 3.5
+print((5 / 2) |> add_one()); // expect: 3.5
+print(5 % 2 |> add_one()); // expect: 2
+print((5 % 2) |> add_one()); // expect: 2
+print(1 + 2 * 3 / 6 - 1 |> add_one()); // expect: 2

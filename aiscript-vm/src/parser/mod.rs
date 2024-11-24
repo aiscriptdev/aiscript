@@ -1306,6 +1306,7 @@ impl<'gc> Parser<'gc> {
 enum Precedence {
     None,
     Assignment, // =
+    Pipe,       // |>
     Or,         // or
     And,        // and
     Equality,   // == !=
@@ -1357,7 +1358,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
         }
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
-        TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Term),
+        TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Pipe),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)
