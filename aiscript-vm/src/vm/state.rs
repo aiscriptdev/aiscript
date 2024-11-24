@@ -301,7 +301,7 @@ impl<'gc> State<'gc> {
     pub fn dispatch_next(
         &mut self,
         stop_at_frame_count: usize,
-    ) -> Result<Option<ReturnValue>, VmError> {
+    ) -> Result<Option<Value<'gc>>, VmError> {
         // Debug stack info
         #[cfg(feature = "debug")]
         self.print_stack();
@@ -367,14 +367,14 @@ impl<'gc> State<'gc> {
             }
             OpCode::Return => {
                 let frame_slot_start = frame.slot_start;
-                let return_value: Value<'_> = self.pop_stack();
+                let return_value = self.pop_stack();
                 self.close_upvalues(frame_slot_start);
                 // Must pop the frame from vec when returning
                 self.frames.pop();
                 self.frame_count -= 1;
                 if self.frame_count == stop_at_frame_count {
                     self.pop_stack();
-                    return Ok(Some(return_value.into()));
+                    return Ok(Some(return_value));
                 }
                 self.stack_top = frame_slot_start;
                 self.push_stack(return_value);
@@ -821,16 +821,16 @@ impl<'gc> State<'gc> {
         &mut self,
         chunk_id: ChunkId,
         params: &[Value<'gc>],
-    ) -> Result<ReturnValue, VmError> {
+    ) -> Result<Value<'gc>, VmError> {
         let function = self.get_chunk(chunk_id)?;
-        self.eval_function(function, &params)
+        self.eval_function(function, params)
     }
 
     pub(crate) fn eval_function(
         &mut self,
         function: Gc<'gc, Function<'gc>>,
         params: &[Value<'gc>],
-    ) -> Result<ReturnValue, VmError> {
+    ) -> Result<Value<'gc>, VmError> {
         // Remember the current frame count in order to exit the loop at the correct frame.
         let frame_count = self.frame_count;
         self.call_function(function, params)?;
@@ -851,7 +851,7 @@ impl<'gc> State<'gc> {
     pub(super) fn step(&mut self, fuel: &mut Fuel) -> Result<Option<ReturnValue>, VmError> {
         loop {
             if let Some(result) = self.dispatch_next(0)? {
-                return Ok(Some(result));
+                return Ok(Some(ReturnValue::from(result)));
             }
             const FUEL_PER_STEP: i32 = 1;
             fuel.consume(FUEL_PER_STEP);

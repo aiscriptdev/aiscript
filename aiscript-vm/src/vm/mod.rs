@@ -120,13 +120,14 @@ impl Vm {
                 mutation: mc,
                 strings: state.strings,
             };
-            state.eval_function_with_id(
+            let return_value = state.eval_function_with_id(
                 chunk_id,
                 &params
                     .iter()
                     .map(|v| Value::from_serde_value(ctx, v))
                     .collect::<Vec<_>>(),
-            )
+            )?;
+            Ok(ReturnValue::from(return_value))
         })
     }
 

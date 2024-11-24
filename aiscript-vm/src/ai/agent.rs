@@ -226,7 +226,7 @@ impl<'gc> Agent<'gc> {
                 let result = state
                     .eval_function_with_id(tool_def.chunk_id, &params)
                     .unwrap();
-                let content = if let ReturnValue::Agent(agent_name) = &result {
+                let content = if let ReturnValue::Agent(agent_name) = ReturnValue::from(result) {
                     let agent_name = state.intern(agent_name.as_bytes());
                     response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());
                     format!("{{\"assistant\": {}}}", agent_name)
