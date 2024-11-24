@@ -564,11 +564,7 @@ impl<'gc> Parser<'gc> {
             })
         };
 
-        Some(Expr::Lambda {
-            params,
-            body,
-            line,
-        })
+        Some(Expr::Lambda { params, body, line })
     }
 
     fn const_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {

@@ -20,12 +20,12 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 pub(crate) use chunk::{Chunk, OpCode};
-use gc_arena::Mutation;
 pub use value::Value;
+use vm::State;
 pub use vm::Vm;
 pub use vm::VmError;
 
-pub type NativeFn<'gc> = fn(&'gc Mutation<'gc>, Vec<Value<'gc>>) -> Result<Value<'gc>, VmError>;
+pub type NativeFn<'gc> = fn(&mut State<'gc>, Vec<Value<'gc>>) -> Result<Value<'gc>, VmError>;
 
 #[derive(Debug, PartialEq)]
 pub enum ReturnValue {

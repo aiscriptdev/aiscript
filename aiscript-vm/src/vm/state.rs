@@ -3,7 +3,7 @@ use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
     hash::BuildHasherDefault,
-    mem,
+    mem, ops,
 };
 
 use ahash::AHasher;
@@ -85,7 +85,7 @@ impl<'gc> CallFrame<'gc> {
 }
 
 pub struct State<'gc> {
-    mc: &'gc Mutation<'gc>,
+    pub(super) mc: &'gc Mutation<'gc>,
     pub(super) chunks: BTreeMap<ChunkId, Gc<'gc, Function<'gc>>>,
     frames: Vec<CallFrame<'gc>>,
     frame_count: usize,
@@ -1005,7 +1005,8 @@ impl<'gc> State<'gc> {
             Value::NativeFunction(function) => {
                 // Calculate total arguments slots (positional + keyword pairs)
                 let total_args = args_count + keyword_args_count * 2;
-                let result = function(self.mc, self.pop_stack_n(total_args as usize))?;
+                let args = self.pop_stack_n(total_args as usize);
+                let result = { function(self, args)? };
                 self.stack_top -= 1; // Remove the function
                 self.push_stack(result);
                 Ok(())
@@ -1246,5 +1247,13 @@ impl<'gc> State<'gc> {
             print!(" ]")
         }
         println!();
+    }
+}
+
+impl<'gc> ops::Deref for State<'gc> {
+    type Target = Mutation<'gc>;
+
+    fn deref(&self) -> &Self::Target {
+        self.mc
     }
 }

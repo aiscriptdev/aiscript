@@ -1,5 +1,4 @@
-use crate::{Value, VmError};
-use gc_arena::Mutation;
+use crate::{vm::State, Value, VmError};
 use std::fmt::Write;
 
 /// Print objects to the text stream file, separated by sep and followed by end.
@@ -13,7 +12,7 @@ use std::fmt::Write;
 ///
 /// fn print(*objects, sep=" ", end="\n", file=nil, flush=false) {}
 pub(super) fn print<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     // Extract keyword arguments with defaults

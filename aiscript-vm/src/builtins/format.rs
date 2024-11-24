@@ -1,10 +1,10 @@
-use crate::{Value, VmError};
-use gc_arena::{Gc, Mutation};
+use crate::{vm::State, Value, VmError};
+use gc_arena::Gc;
 use std::fmt::Write;
 
 /// Format function that implements Python-like string formatting
 pub(super) fn format<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
@@ -17,7 +17,7 @@ pub(super) fn format<'gc>(
     let format_args = &args[1..];
 
     let result = format_string(template, format_args)?;
-    Ok(Value::IoString(Gc::new(mc, result)))
+    Ok(Value::IoString(Gc::new(state, result)))
 }
 
 #[derive(Debug, Default)]

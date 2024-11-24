@@ -1,5 +1,5 @@
 use crate::{vm::State, Value, VmError};
-use gc_arena::{Gc, Mutation};
+use gc_arena::Gc;
 use std::io::{self, Write};
 
 mod convert;
@@ -35,7 +35,7 @@ pub(crate) fn define_native_functions(state: &mut State) {
     state.define_native_function("format", format);
 }
 
-fn abs<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn abs<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "abs() takes exactly one argument".into(),
@@ -50,7 +50,7 @@ fn abs<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn len<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn len<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "len() takes exactly one argument".into(),
@@ -68,7 +68,7 @@ fn len<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn any<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn any<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "any() takes exactly one argument".into(),
@@ -86,7 +86,7 @@ fn any<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn all<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn all<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "all() takes exactly one argument".into(),
@@ -104,7 +104,7 @@ fn all<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn min<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn min<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
         return Err(VmError::RuntimeError(
             "min() takes at least one argument".into(),
@@ -149,7 +149,7 @@ fn min<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn max<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn max<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
         return Err(VmError::RuntimeError(
             "max() takes at least one argument".into(),
@@ -194,7 +194,7 @@ fn max<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn round<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn round<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "round() takes exactly one argument".into(),
@@ -209,7 +209,7 @@ fn round<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
     }
 }
 
-fn sum<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn sum<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "sum() takes exactly one argument".into(),
@@ -237,7 +237,7 @@ fn sum<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 }
 
-fn input<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn input<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     // If a prompt is provided, print it without a newline
     if let Some(prompt) = args.first() {
         match prompt {
@@ -260,10 +260,10 @@ fn input<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc
     // Trim the trailing newline
     input = input.trim_end().to_string();
 
-    Ok(Value::IoString(Gc::new(mc, input)))
+    Ok(Value::IoString(Gc::new(state, input)))
 }
 
-fn callable<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn callable<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
             "callable() takes exactly one argument".into(),

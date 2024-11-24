@@ -1,7 +1,13 @@
-use gc_arena::{Gc, Mutation};
+use gc_arena::Gc;
 use regex::Regex;
 
-use crate::{float_arg, module::ModuleKind, string_arg, vm::Context, Value, VmError};
+use crate::{
+    float_arg,
+    module::ModuleKind,
+    string_arg,
+    vm::{Context, State},
+    Value, VmError,
+};
 
 pub fn create_str_module(ctx: Context) -> ModuleKind {
     let name = ctx.intern(b"std.str");
@@ -71,13 +77,13 @@ pub fn create_str_module(ctx: Context) -> ModuleKind {
 }
 
 // Length and checks
-fn str_len<'gc>(_mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_len<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "len")?;
     Ok(Value::Number(s.len() as f64))
 }
 
 fn str_is_empty<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "is_empty")?;
@@ -86,53 +92,53 @@ fn str_is_empty<'gc>(
 
 // Case conversion
 fn str_to_uppercase<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "to_uppercase")?;
     let upper = s.to_str().unwrap().to_uppercase();
     // Ok(Value::String(_mc.intern(upper.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, upper)))
+    Ok(Value::IoString(Gc::new(state, upper)))
 }
 
 fn str_to_lowercase<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "to_lowercase")?;
     let lower = s.to_str().unwrap().to_lowercase();
     // Ok(Value::String(_mc.intern(lower.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, lower)))
+    Ok(Value::IoString(Gc::new(state, lower)))
 }
 
 // Trim functions
-fn str_trim<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_trim<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "trim")?;
     let trimmed = s.to_str().unwrap().trim();
     // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
+    Ok(Value::IoString(Gc::new(state, trimmed.to_owned())))
 }
 
 fn str_trim_start<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "trim_start")?;
     let trimmed = s.to_str().unwrap().trim_start();
     // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
+    Ok(Value::IoString(Gc::new(state, trimmed.to_owned())))
 }
 
-fn str_trim_end<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_trim_end<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "trim_end")?;
     let trimmed = s.to_str().unwrap().trim_end();
     // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
+    Ok(Value::IoString(Gc::new(state, trimmed.to_owned())))
 }
 
 // Contains and position functions
 fn str_contains<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "contains")?;
@@ -143,7 +149,7 @@ fn str_contains<'gc>(
 }
 
 fn str_starts_with<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "starts_with")?;
@@ -154,7 +160,7 @@ fn str_starts_with<'gc>(
 }
 
 fn str_ends_with<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "ends_with")?;
@@ -166,7 +172,7 @@ fn str_ends_with<'gc>(
 
 // Find and position functions
 fn str_index_of<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "index_of")?;
@@ -193,7 +199,7 @@ fn str_index_of<'gc>(
 }
 
 fn str_last_index_of<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "last_index_of")?;
@@ -210,7 +216,7 @@ fn str_last_index_of<'gc>(
 
 // Substring and slicing
 fn str_substring<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "substring")?;
@@ -230,10 +236,10 @@ fn str_substring<'gc>(
     let start = start.min(end); // Ensure start <= end
 
     // Ok(Value::String(_mc.intern(s[start..end].as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, s[start..end].to_owned())))
+    Ok(Value::IoString(Gc::new(state, s[start..end].to_owned())))
 }
 
-fn str_slice<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_slice<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "slice")?;
     let start = float_arg!(&args, 1, "slice")? as isize;
 
@@ -260,11 +266,11 @@ fn str_slice<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value
     let start = start.min(end); // Ensure start <= end
 
     // Ok(Value::String(_mc.intern(s[start..end].as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, s[start..end].to_owned())))
+    Ok(Value::IoString(Gc::new(state, s[start..end].to_owned())))
 }
 
 // Split and join
-// fn str_split<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+// fn str_split<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
 //     let s = string_arg!(&args, 0, "split")?;
 //     let delimiter = string_arg!(&args, 1, "split")?;
 
@@ -279,7 +285,7 @@ fn str_slice<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value
 //     Ok(Value::String(_mc.intern(format!("{:?}", parts).as_bytes())))
 // }
 
-fn str_join<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_join<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let separator = string_arg!(&args, 0, "join")?;
 
     if args.len() < 2 {
@@ -304,12 +310,12 @@ fn str_join<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
         }
     }
 
-    Ok(Value::IoString(Gc::new(mc, result)))
+    Ok(Value::IoString(Gc::new(state, result)))
 }
 
 // Regex operations
 fn str_regex_match<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "regex_match")?;
@@ -322,7 +328,7 @@ fn str_regex_match<'gc>(
 }
 
 fn str_regex_replace<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "regex_replace")?;
@@ -337,27 +343,27 @@ fn str_regex_replace<'gc>(
         .into_owned();
 
     // Ok(Value::String(_mc.intern(result.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, result)))
+    Ok(Value::IoString(Gc::new(state, result)))
 }
 
 // Misc string operations
-fn str_repeat<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_repeat<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "repeat")?;
     let count = float_arg!(&args, 1, "repeat")? as usize;
 
     let repeated = s.to_str().unwrap().repeat(count);
     // Ok(Value::String(_mc.intern(repeated.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, repeated)))
+    Ok(Value::IoString(Gc::new(state, repeated)))
 }
 
-fn str_reverse<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_reverse<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "reverse")?;
     let reversed: String = s.to_str().unwrap().chars().rev().collect();
     // Ok(Value::String(_mc.intern(reversed.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, reversed)))
+    Ok(Value::IoString(Gc::new(state, reversed)))
 }
 
-fn str_replace<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+fn str_replace<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     let s = string_arg!(&args, 0, "replace")?;
     let from = string_arg!(&args, 1, "replace")?;
     let to = string_arg!(&args, 2, "replace")?;
@@ -367,5 +373,5 @@ fn str_replace<'gc>(mc: &'gc Mutation<'gc>, args: Vec<Value<'gc>>) -> Result<Val
         .unwrap()
         .replace(from.to_str().unwrap(), to.to_str().unwrap());
     // Ok(Value::String(_mc.intern(result.as_bytes())))
-    Ok(Value::IoString(Gc::new(mc, result)))
+    Ok(Value::IoString(Gc::new(state, result)))
 }

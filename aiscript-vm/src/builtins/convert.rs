@@ -1,8 +1,8 @@
-use crate::{Value, VmError};
-use gc_arena::{Gc, Mutation};
+use crate::{vm::State, Value, VmError};
+use gc_arena::Gc;
 
 pub(super) fn bool<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -30,7 +30,7 @@ pub(super) fn bool<'gc>(
 }
 
 pub(super) fn float<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -61,7 +61,7 @@ pub(super) fn float<'gc>(
 }
 
 pub(super) fn int<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -92,7 +92,7 @@ pub(super) fn int<'gc>(
 }
 
 pub(super) fn ascii<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -116,11 +116,11 @@ pub(super) fn ascii<'gc>(
             result.push_str(&format!("\\x{:02x}", c as u32));
         }
     }
-    Ok(Value::IoString(Gc::new(mc, result)))
+    Ok(Value::IoString(Gc::new(state, result)))
 }
 
 pub(super) fn chr<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -145,7 +145,7 @@ pub(super) fn chr<'gc>(
     }
 
     match char::from_u32(num) {
-        Some(c) => Ok(Value::IoString(Gc::new(mc, c.to_string()))),
+        Some(c) => Ok(Value::IoString(Gc::new(state, c.to_string()))),
         None => Err(VmError::RuntimeError(
             "chr() arg not in range(0x110000)".to_string(),
         )),
@@ -153,7 +153,7 @@ pub(super) fn chr<'gc>(
 }
 
 pub(super) fn ord<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    _state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -184,7 +184,7 @@ pub(super) fn ord<'gc>(
 }
 
 pub(super) fn str<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -194,11 +194,11 @@ pub(super) fn str<'gc>(
     }
 
     let s = args[0].to_string();
-    Ok(Value::IoString(Gc::new(mc, s)))
+    Ok(Value::IoString(Gc::new(state, s)))
 }
 
 pub(super) fn bin<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -218,14 +218,17 @@ pub(super) fn bin<'gc>(
 
     // Handle negative numbers like Python does
     if num < 0 {
-        Ok(Value::IoString(Gc::new(mc, format!("-0b{:b}", num.abs()))))
+        Ok(Value::IoString(Gc::new(
+            state,
+            format!("-0b{:b}", num.abs()),
+        )))
     } else {
-        Ok(Value::IoString(Gc::new(mc, format!("0b{:b}", num))))
+        Ok(Value::IoString(Gc::new(state, format!("0b{:b}", num))))
     }
 }
 
 pub(super) fn hex<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -245,14 +248,17 @@ pub(super) fn hex<'gc>(
 
     // Handle negative numbers like Python does
     if num < 0 {
-        Ok(Value::IoString(Gc::new(mc, format!("-0x{:x}", num.abs()))))
+        Ok(Value::IoString(Gc::new(
+            state,
+            format!("-0x{:x}", num.abs()),
+        )))
     } else {
-        Ok(Value::IoString(Gc::new(mc, format!("0x{:x}", num))))
+        Ok(Value::IoString(Gc::new(state, format!("0x{:x}", num))))
     }
 }
 
 pub(super) fn oct<'gc>(
-    mc: &'gc Mutation<'gc>,
+    state: &mut State<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
@@ -272,8 +278,11 @@ pub(super) fn oct<'gc>(
 
     // Handle negative numbers like Python does
     if num < 0 {
-        Ok(Value::IoString(Gc::new(mc, format!("-0o{:o}", num.abs()))))
+        Ok(Value::IoString(Gc::new(
+            state,
+            format!("-0o{:o}", num.abs()),
+        )))
     } else {
-        Ok(Value::IoString(Gc::new(mc, format!("0o{:o}", num))))
+        Ok(Value::IoString(Gc::new(state, format!("0o{:o}", num))))
     }
 }
