@@ -1,0 +1,20 @@
+let nums = [1, 2, 3, 4, 5, 6];
+print(filter(nums, |x| x % 2 == 0));  // expect: [2, 4, 6]
+fn is_even(x) {
+    return x % 2 == 0;
+}
+print(filter(nums, is_even));  // expect: [2, 4, 6]
+
+let mixed = [-2, -1, 0, 1, 2];
+print(filter(mixed, |x| x > 0));  // expect: [1, 2]
+let is_positive = |x| x > 0;
+print(filter(mixed, is_positive));  // expect: [1, 2]
+
+let nums2 = [1, 2, 3];
+print(filter(nums2, |x| x > 10));  // expect: []
+
+let empty = [];
+print(filter(empty, |x| true));  // expect: []
+
+let words = ["hello", "", "world", "", "!"];
+print(filter(words, |s| s != ""));  // expect: [hello, world, !]

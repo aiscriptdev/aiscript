@@ -1,0 +1,27 @@
+let nums = [1, 2, 3];
+print(map(nums, |x| x + 1));  // expect: [2, 3, 4]
+fn add_one(x) {
+    return x + 1;
+}
+print(map(nums, add_one)); // expect: [2, 3, 4]
+
+let nums2 = [1, 2, 3, 4];
+print(map(nums2, |x| x * 2));  // expect: [2, 4, 6, 8]
+let double = |x| x * 2;
+print(map(nums2, double));  // expect: [2, 4, 6, 8]
+print(map(nums2, |x| {
+    // long body lambda
+    print("x =", x);
+    return x * 2;
+}));
+// expect: x = 1
+// expect: x = 2
+// expect: x = 3
+// expect: x = 4
+// expect: [2, 4, 6, 8]
+
+let words = ["hello", "world"];
+print(map(words, |s| s + "!"));  // expect: [hello!, world!]
+
+let empty = [];
+print(map(empty, |x| x + 1));  // expect: []

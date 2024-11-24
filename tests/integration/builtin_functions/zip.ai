@@ -1,0 +1,22 @@
+let a = [1, 2, 3];
+let b = ["a", "b", "c"];
+print(zip(a, b));  // expect: [[1, a], [2, b], [3, c]]
+
+let short = [1, 2];
+let long = ["a", "b", "c", "d"];
+print(zip(short, long));  // expect: [[1, a], [2, b]]
+print(zip(long, short));  // expect: [[a, 1], [b, 2]]
+
+let x = [1, 2, 3];
+let y = ["a", "b", "c"];
+let z = [true, false, true];
+print(zip(x, y, z));  // expect: [[1, a, true], [2, b, false], [3, c, true]]
+
+let nums = [1, 2, 3];
+let empty = [];
+print(zip(nums, empty));  // expect: []
+print(zip(empty, nums));  // expect: []
+
+let has_nil = [1, nil, 3];
+let other = ["a", "b", "c"];
+print(zip(has_nil, other));  // expect: [[1, a], [nil, b], [3, c]]

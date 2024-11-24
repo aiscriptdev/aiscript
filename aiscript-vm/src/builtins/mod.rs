@@ -4,35 +4,40 @@ use std::io::{self, Write};
 
 mod convert;
 mod format;
+mod function;
 mod print;
 
 use convert::*;
 use format::format;
+use function::*;
 use print::print;
 
 pub(crate) fn define_native_functions(state: &mut State) {
     state.define_native_function("abs", abs);
-    state.define_native_function("len", len);
-    state.define_native_function("any", any);
     state.define_native_function("all", all);
-    state.define_native_function("min", min);
-    state.define_native_function("max", max);
-    state.define_native_function("round", round);
-    state.define_native_function("sum", sum);
-    state.define_native_function("input", input);
-    state.define_native_function("print", print);
-    state.define_native_function("bool", bool);
-    state.define_native_function("float", float);
-    state.define_native_function("int", int);
-    state.define_native_function("str", str);
+    state.define_native_function("any", any);
     state.define_native_function("ascii", ascii);
-    state.define_native_function("chr", chr);
-    state.define_native_function("ord", ord);
     state.define_native_function("bin", bin);
-    state.define_native_function("hex", hex);
-    state.define_native_function("oct", oct);
+    state.define_native_function("bool", bool);
     state.define_native_function("callable", callable);
+    state.define_native_function("chr", chr);
+    state.define_native_function("filter", filter);
+    state.define_native_function("float", float);
     state.define_native_function("format", format);
+    state.define_native_function("hex", hex);
+    state.define_native_function("input", input);
+    state.define_native_function("int", int);
+    state.define_native_function("len", len);
+    state.define_native_function("map", map);
+    state.define_native_function("max", max);
+    state.define_native_function("min", min);
+    state.define_native_function("oct", oct);
+    state.define_native_function("ord", ord);
+    state.define_native_function("print", print);
+    state.define_native_function("round", round);
+    state.define_native_function("str", str);
+    state.define_native_function("sum", sum);
+    state.define_native_function("zip", zip);
 }
 
 fn abs<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
