@@ -567,6 +567,42 @@ impl<'gc> Parser<'gc> {
         Some(Expr::Lambda { params, body, line })
     }
 
+    fn pipe(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        // Save the left side of the pipe
+        let left = Box::new(self.previous_expr.take()?);
+
+        // Parse the function name as an identifier
+        self.consume(TokenType::Identifier, "Expect function name after |>.");
+        let callee_name = self.previous;
+        let callee = Box::new(Expr::Variable {
+            name: callee_name,
+            line: callee_name.line,
+        });
+
+        // Now expect the function call parentheses
+        self.consume(TokenType::OpenParen, "Expect '(' after function name.");
+
+        let mut arguments = Vec::new();
+        let mut keyword_args = HashMap::new();
+
+        // Parse arguments if any
+        if !self.check(TokenType::CloseParen) {
+            let (args, kw_args) = self.argument_list()?;
+            arguments = args;
+            keyword_args = kw_args;
+        }
+
+        self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
+
+        // Create call expression with left being first argument
+        Some(Expr::Call {
+            callee,
+            arguments: std::iter::once(*left).chain(arguments).collect(),
+            keyword_args,
+            line: callee_name.line,
+        })
+    }
+
     fn const_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect constant name.");
         let name = self.previous;
@@ -1321,6 +1357,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
         }
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
+        TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Term),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)

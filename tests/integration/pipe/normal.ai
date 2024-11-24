@@ -1,0 +1,53 @@
+// Basic pipe operator test
+let arr = [1, 2, 3, 4];
+let doubled = arr |> map(|x| x * 2);
+print(doubled); // expect: [2, 4, 6, 8]
+
+// Chained pipe operators
+let result = arr |> map(|x| x + 1) |> filter(|x| x % 2 == 0);
+print(result); // expect: [2, 4]
+
+// Pipe with multiple arguments
+let arr2 = [1, 2, 3];
+let arr3 = arr2 |> map(|x| x + 1);
+print(arr3); // expect: [2, 3, 4]
+
+// Test complex lambda expressions in pipe
+let result = arr |> filter(|x| x > 2) |> map(|x| x * x);
+print(result); // expect: [9, 16]
+
+// Test pipe with nested expressions
+let result = [1, 2, 3, 4, 5, 6] 
+    |> filter(|x| x % 2 == 0) 
+    |> map(|x| x * 2) 
+    |> filter(|x| x > 5);
+print(result); // expect: [8, 12]
+
+// Test empty array handling
+let empty = [] |> map(|x| x + 1);
+print(empty); // expect: []
+
+// Test single element
+let single = [42] |> map(|x| x + 1) |> map(|x| x * 2);
+print(single); // expect: [86]
+
+// Test pipe with different function types
+let nums = [1.5, 2.5, 3.5];
+let result = nums 
+    |> map(|x| round(x)) 
+    |> map(|x| float(x));
+print(result); // expect: [2, 3, 4]
+
+// Test order of operations
+let arr = [1, 2, 3];
+let result = arr 
+    |> map(|x| x + 1)    // [2, 3, 4]
+    |> map(|x| x * 2)    // [4, 6, 8]
+    |> filter(|x| x > 5); // [6, 8]
+print(result); // expect: [6, 8]
+
+// Test with zip
+let arr1 = [1, 2, 3];
+let arr2 = [4, 5, 6];
+let zipped = arr1 |> zip(arr2);
+print(zipped); // expect: [[1, 4], [2, 5], [3, 6]]

@@ -36,6 +36,7 @@ pub enum TokenType {
     Less,         // <
     LessEqual,    // <=
     Arrow,        // ->
+    PipeArrow,    // |>
     StarStar,     // **
 
     // Compound assignment
@@ -364,7 +365,15 @@ impl<'a> Scanner<'a> {
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
-            '|' => self.make_token(TokenType::Pipe),
+            '|' => {
+                let kind = if self.peek() == Some('>') {
+                    self.advance();
+                    TokenType::PipeArrow
+                } else {
+                    TokenType::Pipe
+                };
+                self.make_token(kind)
+            }
             '-' => {
                 let p = self.peek();
                 let kind = if p == Some('>') {

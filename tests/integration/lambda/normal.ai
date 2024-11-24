@@ -1,3 +1,6 @@
+let identity = |x| x;
+print(identity(1)); // expect: 1
+
 // Empty parameter list
 let get_five = || 5;
 print(get_five()); // expect: 5
