@@ -29,10 +29,13 @@ pub struct Parser<'gc> {
     scopes: Vec<String>,
     // track if we're inside a loop
     loop_depth: usize,
-    // track if we're in a flow condition, the flag is help to avoid brace confict,
-    // for example in if / else if / while condition, since we omit the paren around
-    // the condition, it is hard to handle the '{' conflict without this flag.
-    in_flow_condition: bool,
+    // the flag is help to avoid brace confict, for example in:
+    // - for's increment
+    // - if / else if condition
+    // - while condition
+    // since we omit the paren around,
+    // it is hard to handle the '{' conflict without this flag.
+    stop_at_brace: bool,
     had_error: bool,
     panic_mode: bool,
 }
@@ -55,7 +58,7 @@ impl<'gc> Parser<'gc> {
             class_compiler: None,
             scopes: Vec::new(),
             loop_depth: 0,
-            in_flow_condition: false,
+            stop_at_brace: false,
             had_error: false,
             panic_mode: false,
         }
@@ -653,9 +656,9 @@ impl<'gc> Parser<'gc> {
 
     fn while_statement(&mut self) -> Option<Stmt<'gc>> {
         // Set flag before parsing condition
-        self.in_flow_condition = true;
+        self.stop_at_brace = true;
         let condition = self.expression()?;
-        self.in_flow_condition = false;
+        self.stop_at_brace = false;
 
         self.consume(TokenType::OpenBrace, "Expect '{' before loop body.");
         self.loop_depth += 1;
@@ -692,9 +695,9 @@ impl<'gc> Parser<'gc> {
 
         // Parse increment - optional
         let increment = if !self.check(TokenType::OpenBrace) {
-            self.in_flow_condition = true;
+            self.stop_at_brace = true;
             let expr = self.parse_precedence(Precedence::Assignment)?;
-            self.in_flow_condition = false;
+            self.stop_at_brace = false;
             Some(expr)
         } else {
             // Peek ahead to check for empty object literal
@@ -723,10 +726,10 @@ impl<'gc> Parser<'gc> {
 
     fn if_statement(&mut self) -> Option<Stmt<'gc>> {
         // Set the flag before parsing condition
-        self.in_flow_condition = true;
+        self.stop_at_brace = true;
         let condition = self.expression()?;
         // Clear the flag after parsing condition
-        self.in_flow_condition = false;
+        self.stop_at_brace = false;
 
         self.consume(TokenType::OpenBrace, "Expect '{' before then branch.");
         let then_branch = Box::new(self.block_statement()?);
@@ -836,7 +839,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn object(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        if self.in_flow_condition {
+        if self.stop_at_brace {
             self.error("Cannot use object literals in flow control conditions");
             return None;
         }
@@ -1230,7 +1233,7 @@ impl<'gc> Parser<'gc> {
         while precedence <= get_rule(self.current.kind).precedence {
             // If we're in a flow condition and see a '{', stop here
             // to let the statement parser handle the block
-            if self.in_flow_condition && self.current.kind == TokenType::OpenBrace {
+            if self.stop_at_brace && self.current.kind == TokenType::OpenBrace {
                 break;
             }
 
