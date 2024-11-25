@@ -4,7 +4,7 @@
 
 {
   let a = "a";
-  if (false) {
+  if false {
     fn foo() { a; }
   }
 }

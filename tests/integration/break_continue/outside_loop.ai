@@ -1,10 +1,10 @@
-if (true) {
+if true {
     break; // Error at 'break': Can't use 'break' outside of a loop.
 }
 
 break; // Error at 'break': Can't use 'break' outside of a loop.
 
-if (true) {
+if true {
     continue; // Error at 'continue': Can't use 'continue' outside of a loop.
 }
 

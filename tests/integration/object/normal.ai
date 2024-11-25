@@ -17,7 +17,7 @@ print(point["invalid_key"]); // expect: nil
 print(point.invalid_key); // expect: nil
 print(point.key); // expect: nil
 
-if (point.x > 1 and point["y"] < 100) {
+if point.x > 1 and point["y"] < 100 {
     print("Bingo!"); // expect: Bingo!
 }
 

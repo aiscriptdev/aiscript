@@ -31,7 +31,7 @@ for (; i < 2; i = i + 1) print(i);
 fn bar() {
   for (let i = 0;; i = i + 1) {
     print(i);
-    if (i >= 2) return;
+    if i >= 2 { return; }
   }
 }
 bar();
@@ -48,6 +48,6 @@ for (let i = 0; i < 2;) {
 // expect: 1
 
 // Statement bodies.
-for (; false;) if (true) 1; else 2;
+for (; false;) if true { 1; } else { 2; }
 for (; false;) while (true) 1;
 for (; false;) for (;;) 1;

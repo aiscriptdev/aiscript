@@ -202,6 +202,7 @@ impl<'gc> State<'gc> {
             }
         }
     }
+
     pub fn get_global(&self, name: InternedString<'gc>) -> Option<Value<'gc>> {
         // First check if it's a module name
         if let Some(module) = self.module_manager.get_module(name) {

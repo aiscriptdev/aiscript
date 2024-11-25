@@ -64,7 +64,7 @@ print(doubled); // expect: [2, 4, 6, 8]
 
 // Lambda with early return
 let find_positive = |x| {
-    if (x <= 0) {
+    if x <= 0 {
         return 0;
     }
     return x;
@@ -87,7 +87,7 @@ print(apply(|x| x * x, 3)); // expect: 9
 
 // Recursive lambda using let binding
 let fib = |n| {
-    if (n <= 1) {
+    if n <= 1 {
         return n;
     }
     return fib(n - 1) + fib(n - 2);
