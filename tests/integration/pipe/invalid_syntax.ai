@@ -2,13 +2,7 @@ let arr = [1, 2, 3];
 let result = arr |>; // Error at ';': Expect function name after |>.
 
 let arr = [1, 2, 3];
-let result = arr |> map; // Error at ';': Expect '(' after function name.
-
-let arr = [1, 2, 3];
 let result = arr |> map(|x| x + 1; // Error at ';': Expect ')' after arguments.
-
-let arr = [1, 2, 3];
-let result = arr |> x + 1; // Error at '+': Expect '(' after function name.
 
 let arr = [1, 2, 3];
 let result = arr |>; // Error at ';': Expect function name after |>.
@@ -18,6 +12,3 @@ let result = arr |> |> map(|x| x + 1); // Error at '|>': Expect function name af
 
 let arr = [1, 2, 3];
 let result = arr |> 123; // Error at '123': Expect function name after |>.
-
-let arr = [1, 2, 3];
-let result = arr |> map |> filter; // Error at '|>': Expect '(' after function name.

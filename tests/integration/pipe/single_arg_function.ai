@@ -1,0 +1,14 @@
+fn double(x) {
+    return x * 2;
+}
+
+let v = 42;
+print(v |> double);  // expect: 84
+print(v |> double()); // expect: 84
+
+print(v |> double |> double);  // expect: 168
+print(v |> double() |> double); // expect: 168
+print(v |> double |> double()); // expect: 168
+
+let add_one = |x| x + 1;
+print(v |> add_one); // expect: 43

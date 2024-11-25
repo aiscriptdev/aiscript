@@ -1,0 +1,19 @@
+let add_one = |x| x + 1;
+let multiply_two = |x| x * 2;
+let add_n = |x, n| x + n;
+
+let v = 1;
+print(v |> add_one); // expect: 2
+print(v |> add_one + 1); // expect: 3
+
+print(v |> multiply_two); // expect: 2
+print(v |> multiply_two + 1); // expect: 3
+print(v |> multiply_two |> multiply_two + 1); // expect: 5
+
+print(v |> add_one |> multiply_two + 1); // expect: 5
+print(v |> multiply_two |> add_one * 2); // expect: 6
+
+print(v |> add_n(10)); // expect: 11
+print(v |> add_n(10) + 1); // expect: 12
+print(1 + v |> add_n(10)); // expect: 12
+print(1 + (v |> add_n(10))); // expect: 12

@@ -1,0 +1,5 @@
+fn add_n(x, n) {
+    return x + n;
+}
+let arr = [1, 2, 3];
+let result = arr |> add_n; // expect runtime error: Expected 2 arguments but got 1.
