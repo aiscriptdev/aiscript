@@ -52,7 +52,7 @@ print(count(3)); // expect: 6
 // Using lambda with array map
 fn map(arr, f) {
     let result = [];
-    for (let i = 0; i < len(arr); i += 1) {
+    for let i = 0; i < len(arr); i += 1 {
         result[i] = f(arr[i]);
     }
     return result;

@@ -672,8 +672,6 @@ impl<'gc> Parser<'gc> {
     }
 
     fn for_statement(&mut self) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::OpenParen, "Expect '(' after 'for'.");
-
         let initializer = if self.match_token(TokenType::Semicolon) {
             None
         } else if self.match_token(TokenType::Let) {
@@ -692,15 +690,19 @@ impl<'gc> Parser<'gc> {
         };
         self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
-        let increment = if !self.check(TokenType::CloseParen) {
-            Some(self.expression()?)
+        // Parse increment - optional
+        let increment = if !self.check(TokenType::OpenBrace) {
+            self.in_flow_condition = true; // Set flag to handle brace properly
+            let expr = self.parse_precedence(Precedence::Assignment)?;
+            self.in_flow_condition = false; // Reset flag
+            Some(expr)
         } else {
             None
         };
-        self.consume(TokenType::CloseParen, "Expect ')' after for clauses.");
 
+        self.consume(TokenType::OpenBrace, "Expect '{' before loop body.");
         self.loop_depth += 1;
-        let body = Box::new(self.statement()?);
+        let body = Box::new(self.block_statement()?);
         self.loop_depth -= 1;
 
         Some(Stmt::Loop {

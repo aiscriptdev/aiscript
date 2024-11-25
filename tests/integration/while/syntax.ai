@@ -32,5 +32,7 @@ while false {
     }
 }
 while false {
-    for (;;) 1;
+    for ;; {
+        1;
+    }
 }

@@ -1,5 +1,5 @@
 // Single-expression body.
-for (let c = 0; c < 3;) {
+for let c = 0; c < 3; {
     c += 1;
     print(c);
 }
@@ -8,7 +8,7 @@ for (let c = 0; c < 3;) {
 // expect: 3
 
 // Block body.
-for (let a = 0; a < 3; a = a + 1) {
+for let a = 0; a < 3; a = a + 1 {
   print(a);
 }
 // expect: 0
@@ -17,19 +17,23 @@ for (let a = 0; a < 3; a = a + 1) {
 
 // No clauses.
 fn foo() {
-  for (;;) return "done";
+  for ;; {
+    return "done";
+  }
 }
 print(foo()); // expect: done
 
 // No variable.
 let i = 0;
-for (; i < 2; i = i + 1) print(i);
+for ; i < 2; i = i + 1 {
+    print(i);
+}
 // expect: 0
 // expect: 1
 
 // No condition.
 fn bar() {
-  for (let i = 0;; i = i + 1) {
+  for let i = 0;; i = i + 1 {
     print(i);
     if i >= 2 { return; }
   }
@@ -40,7 +44,7 @@ bar();
 // expect: 2
 
 // No increment.
-for (let i = 0; i < 2;) {
+for let i = 0; i < 2; {
   print(i);
   i = i + 1;
 }
@@ -48,6 +52,14 @@ for (let i = 0; i < 2;) {
 // expect: 1
 
 // Statement bodies.
-for (; false;) if true { 1; } else { 2; }
-for (; false;) while true { 1; }
-for (; false;) for (;;) 1;
+for ; false; {
+    if true { 1; } else { 2; }
+}
+for ; false; {
+    while true { 1; }
+}
+for ; false; {
+    for ;; {
+        1;
+    }
+}

@@ -1,0 +1,1 @@
+if true print("block"); } // Error at 'print': Expect '{' before then branch.

@@ -1,0 +1,1 @@
+if true { print("block"); // [line 2] Error at end: Expect '}' after block.

@@ -1,0 +1,1 @@
+while true print("block"); } // Error at 'print': Expect '{' before loop body.
