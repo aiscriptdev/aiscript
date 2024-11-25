@@ -34,7 +34,7 @@ struct Expected {
     runtime_err: Option<RuntimeError>,
 }
 
-fn parse_comments(path: &PathBuf) -> Expected {
+fn parse_comments(path: &PathBuf) -> Option<Expected> {
     let output_re = Regex::new(r"// expect: ?(.*)").unwrap();
     let error_re = Regex::new(r"// (Error.*)").unwrap();
     let error_line_re = Regex::new(r"// \[(?:c )?line (\d+)\] (Error.*)").unwrap();
@@ -48,6 +48,9 @@ fn parse_comments(path: &PathBuf) -> Expected {
 
     println!("{}", path.display());
     let content = fs::read_to_string(path).unwrap();
+    if content.starts_with("// ignore") {
+        return None;
+    }
     for (i, line) in content.lines().enumerate() {
         if let Some(m) = output_re.captures(line) {
             let s = m.get(1).unwrap().as_str().trim_matches('"').to_owned();
@@ -73,7 +76,7 @@ fn parse_comments(path: &PathBuf) -> Expected {
             });
         }
     }
-    expected
+    Some(expected)
 }
 
 // NOTICE: this attribute procedure will cache the test file list,
@@ -83,6 +86,11 @@ fn run_file_test(filename: &str) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.set_file_name(filename);
     let expected = parse_comments(&path);
+    if expected.is_none() {
+        println!("File ignored: {filename}");
+        return;
+    }
+    let expected = expected.unwrap();
 
     let output = test_command().arg(path).output().unwrap();
 
