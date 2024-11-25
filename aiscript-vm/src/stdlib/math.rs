@@ -2,7 +2,7 @@ use crate::{
     float_arg,
     module::ModuleKind,
     vm::{Context, State},
-    Value, VmError,
+    NativeFn, Value, VmError,
 };
 
 pub fn create_math_module(ctx: Context) -> ModuleKind {
@@ -10,44 +10,39 @@ pub fn create_math_module(ctx: Context) -> ModuleKind {
 
     let exports = [
         // Constants
-        (ctx.intern(b"PI"), Value::Number(std::f64::consts::PI)),
-        (ctx.intern(b"E"), Value::Number(std::f64::consts::E)),
-        (ctx.intern(b"TAU"), Value::Number(std::f64::consts::TAU)),
-        (ctx.intern(b"INFINITY"), Value::Number(f64::INFINITY)),
-        (
-            ctx.intern(b"NEG_INFINITY"),
-            Value::Number(f64::NEG_INFINITY),
-        ),
-        (ctx.intern(b"NAN"), Value::Number(f64::NAN)),
+        ("PI", Value::Number(std::f64::consts::PI)),
+        ("E", Value::Number(std::f64::consts::E)),
+        ("TAU", Value::Number(std::f64::consts::TAU)),
+        ("INFINITY", Value::Number(f64::INFINITY)),
+        ("NEG_INFINITY", Value::Number(f64::NEG_INFINITY)),
+        ("NAN", Value::Number(f64::NAN)),
         // Functions
-        (ctx.intern(b"add"), Value::NativeFunction(math_add)),
-        (ctx.intern(b"sub"), Value::NativeFunction(math_sub)),
-        (ctx.intern(b"mul"), Value::NativeFunction(math_mul)),
-        (ctx.intern(b"div"), Value::NativeFunction(math_div)),
-        (
-            ctx.intern(b"floo_div"),
-            Value::NativeFunction(math_floor_div),
-        ),
+        ("add", Value::NativeFunction(NativeFn(math_add))),
+        ("sub", Value::NativeFunction(NativeFn(math_sub))),
+        ("mul", Value::NativeFunction(NativeFn(math_mul))),
+        ("div", Value::NativeFunction(NativeFn(math_div))),
+        ("floo_div", Value::NativeFunction(NativeFn(math_floor_div))),
         // Advanced functions
-        (ctx.intern(b"sqrt"), Value::NativeFunction(math_sqrt)),
-        (ctx.intern(b"pow"), Value::NativeFunction(math_pow)),
-        (ctx.intern(b"log"), Value::NativeFunction(math_log)),
+        ("sqrt", Value::NativeFunction(NativeFn(math_sqrt))),
+        ("pow", Value::NativeFunction(NativeFn(math_pow))),
+        ("log", Value::NativeFunction(NativeFn(math_log))),
         // Trigonometric functions
-        (ctx.intern(b"sin"), Value::NativeFunction(math_sin)),
-        (ctx.intern(b"cos"), Value::NativeFunction(math_cos)),
-        (ctx.intern(b"tan"), Value::NativeFunction(math_tan)),
-        (ctx.intern(b"asin"), Value::NativeFunction(math_asin)),
-        (ctx.intern(b"acos"), Value::NativeFunction(math_acos)),
+        ("sin", Value::NativeFunction(NativeFn(math_sin))),
+        ("cos", Value::NativeFunction(NativeFn(math_cos))),
+        ("tan", Value::NativeFunction(NativeFn(math_tan))),
+        ("asin", Value::NativeFunction(NativeFn(math_asin))),
+        ("acos", Value::NativeFunction(NativeFn(math_acos))),
         // Rounding functions
-        (ctx.intern(b"floor"), Value::NativeFunction(math_floor)),
-        (ctx.intern(b"ceil"), Value::NativeFunction(math_ceil)),
-        (ctx.intern(b"round"), Value::NativeFunction(math_round)),
+        ("floor", Value::NativeFunction(NativeFn(math_floor))),
+        ("ceil", Value::NativeFunction(NativeFn(math_ceil))),
+        ("round", Value::NativeFunction(NativeFn(math_round))),
         // Utility functions
-        (ctx.intern(b"abs"), Value::NativeFunction(math_abs)),
-        (ctx.intern(b"min"), Value::NativeFunction(math_min)),
-        (ctx.intern(b"max"), Value::NativeFunction(math_max)),
+        ("abs", Value::NativeFunction(NativeFn(math_abs))),
+        ("min", Value::NativeFunction(NativeFn(math_min))),
+        ("max", Value::NativeFunction(NativeFn(math_max))),
     ]
     .into_iter()
+    .map(|(name, f)| (ctx.intern_static(name), f))
     .collect();
     ModuleKind::Native { name, exports }
 }

@@ -6,71 +6,66 @@ use crate::{
     module::ModuleKind,
     string_arg,
     vm::{Context, State},
-    Value, VmError,
+    NativeFn, Value, VmError,
 };
 
 pub fn create_str_module(ctx: Context) -> ModuleKind {
-    let name = ctx.intern(b"std.str");
+    let name = ctx.intern_static("std.str");
 
     let exports = [
         // Length and checks
-        (ctx.intern(b"len"), Value::NativeFunction(str_len)),
-        (ctx.intern(b"is_empty"), Value::NativeFunction(str_is_empty)),
+        ("len", Value::NativeFunction(NativeFn(str_len))),
+        ("is_empty", Value::NativeFunction(NativeFn(str_is_empty))),
         // Case conversion
         (
-            ctx.intern(b"to_uppercase"),
-            Value::NativeFunction(str_to_uppercase),
+            "to_uppercase",
+            Value::NativeFunction(NativeFn(str_to_uppercase)),
         ),
         (
-            ctx.intern(b"to_lowercase"),
-            Value::NativeFunction(str_to_lowercase),
+            "to_lowercase",
+            Value::NativeFunction(NativeFn(str_to_lowercase)),
         ),
         // Trim functions
-        (ctx.intern(b"trim"), Value::NativeFunction(str_trim)),
+        ("trim", Value::NativeFunction(NativeFn(str_trim))),
         (
-            ctx.intern(b"trim_start"),
-            Value::NativeFunction(str_trim_start),
+            "trim_start",
+            Value::NativeFunction(NativeFn(str_trim_start)),
         ),
-        (ctx.intern(b"trim_end"), Value::NativeFunction(str_trim_end)),
+        ("trim_end", Value::NativeFunction(NativeFn(str_trim_end))),
         // Contains and position
-        (ctx.intern(b"contains"), Value::NativeFunction(str_contains)),
+        ("contains", Value::NativeFunction(NativeFn(str_contains))),
         (
-            ctx.intern(b"starts_with"),
-            Value::NativeFunction(str_starts_with),
+            "starts_with",
+            Value::NativeFunction(NativeFn(str_starts_with)),
         ),
+        ("ends_with", Value::NativeFunction(NativeFn(str_ends_with))),
+        ("index_of", Value::NativeFunction(NativeFn(str_index_of))),
         (
-            ctx.intern(b"ends_with"),
-            Value::NativeFunction(str_ends_with),
-        ),
-        (ctx.intern(b"index_of"), Value::NativeFunction(str_index_of)),
-        (
-            ctx.intern(b"last_index_of"),
-            Value::NativeFunction(str_last_index_of),
+            "last_index_of",
+            Value::NativeFunction(NativeFn(str_last_index_of)),
         ),
         // Substring and slicing
-        (
-            ctx.intern(b"substring"),
-            Value::NativeFunction(str_substring),
-        ),
-        (ctx.intern(b"slice"), Value::NativeFunction(str_slice)),
+        ("substring", Value::NativeFunction(NativeFn(str_substring))),
+        ("slice", Value::NativeFunction(NativeFn(str_slice))),
         // Split and join
-        // (ctx.intern(b"split"), Value::NativeFunction(str_split)),
-        (ctx.intern(b"join"), Value::NativeFunction(str_join)),
+        // ("split", Value::NativeFunction(NativeFn(str_split))),
+        ("join", Value::NativeFunction(NativeFn(str_join))),
         // Regex operations
         (
-            ctx.intern(b"regex_match"),
-            Value::NativeFunction(str_regex_match),
+            "regex_match",
+            Value::NativeFunction(NativeFn(str_regex_match)),
         ),
         (
-            ctx.intern(b"regex_replace"),
-            Value::NativeFunction(str_regex_replace),
+            "regex_replace",
+            Value::NativeFunction(NativeFn(str_regex_replace)),
         ),
         // Misc string operations
-        (ctx.intern(b"repeat"), Value::NativeFunction(str_repeat)),
-        (ctx.intern(b"reverse"), Value::NativeFunction(str_reverse)),
-        (ctx.intern(b"replace"), Value::NativeFunction(str_replace)),
+        ("repeat", Value::NativeFunction(NativeFn(str_repeat))),
+        ("reverse", Value::NativeFunction(NativeFn(str_reverse))),
+        ("replace", Value::NativeFunction(NativeFn(str_replace))),
     ]
     .into_iter()
+    .map(|(name, f)| (ctx.intern_static(name), f))
     .collect();
 
     ModuleKind::Native { name, exports }

@@ -10,7 +10,8 @@ use crate::{
     NativeFn, ReturnValue,
 };
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Collect)]
+#[collect(no_drop)]
 pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
@@ -29,31 +30,6 @@ pub enum Value<'gc> {
     Agent(Gc<'gc, Agent<'gc>>),
     #[default]
     Nil,
-}
-
-unsafe impl<'gc> Collect for Value<'gc> {
-    fn needs_trace() -> bool
-    where
-        Self: Sized,
-    {
-        true
-    }
-
-    fn trace(&self, cc: &gc_arena::Collection) {
-        match self {
-            Value::String(s) => s.trace(cc),
-            Value::IoString(s) => s.trace(cc),
-            Value::Closure(closure) => closure.trace(cc),
-            Value::Array(array) => array.trace(cc),
-            Value::Object(obj) => obj.trace(cc),
-            Value::Class(class) => class.trace(cc),
-            Value::Instance(instance) => instance.trace(cc),
-            Value::BoundMethod(bound) => bound.trace(cc),
-            Value::Module(module) => module.trace(cc),
-            Value::Agent(agent) => agent.trace(cc),
-            _ => {}
-        }
-    }
 }
 
 impl<'gc> PartialEq for Value<'gc> {

@@ -10,43 +10,41 @@ use crate::{
     module::ModuleKind,
     string_arg,
     vm::{Context, State},
-    Value, VmError,
+    NativeFn, Value, VmError,
 };
 
 pub fn create_time_module(ctx: Context) -> ModuleKind {
-    let name = ctx.intern(b"std.time");
+    let name = ctx.intern_static("std.time");
 
     let exports = [
         // Constants
-        (ctx.intern(b"UNIX_EPOCH"), Value::Number(0.0)),
+        ("UNIX_EPOCH", Value::Number(0.0)),
         // Core time functions
-        (ctx.intern(b"now"), Value::NativeFunction(time_now)),
+        ("now", Value::NativeFunction(NativeFn(time_now))),
         (
-            ctx.intern(b"unix_timestamp"),
-            Value::NativeFunction(time_unix_timestamp),
+            "unix_timestamp",
+            Value::NativeFunction(NativeFn(time_unix_timestamp)),
         ),
-        (ctx.intern(b"sleep"), Value::NativeFunction(time_sleep)),
+        ("sleep", Value::NativeFunction(NativeFn(time_sleep))),
         // Time conversion functions
-        (ctx.intern(b"to_utc"), Value::NativeFunction(time_to_utc)),
+        ("to_utc", Value::NativeFunction(NativeFn(time_to_utc))),
+        ("to_local", Value::NativeFunction(NativeFn(time_to_local))),
         (
-            ctx.intern(b"to_local"),
-            Value::NativeFunction(time_to_local),
+            "format_datetime",
+            Value::NativeFunction(NativeFn(time_format_datetime)),
         ),
         (
-            ctx.intern(b"format_datetime"),
-            Value::NativeFunction(time_format_datetime),
-        ),
-        (
-            ctx.intern(b"parse_datetime"),
-            Value::NativeFunction(time_parse_datetime),
+            "parse_datetime",
+            Value::NativeFunction(NativeFn(time_parse_datetime)),
         ),
         // Duration functions
-        (ctx.intern(b"seconds"), Value::NativeFunction(time_seconds)),
-        (ctx.intern(b"minutes"), Value::NativeFunction(time_minutes)),
-        (ctx.intern(b"hours"), Value::NativeFunction(time_hours)),
-        (ctx.intern(b"days"), Value::NativeFunction(time_days)),
+        ("seconds", Value::NativeFunction(NativeFn(time_seconds))),
+        ("minutes", Value::NativeFunction(NativeFn(time_minutes))),
+        ("hours", Value::NativeFunction(NativeFn(time_hours))),
+        ("days", Value::NativeFunction(NativeFn(time_days))),
     ]
     .into_iter()
+    .map(|(name, f)| (ctx.intern_static(name), f))
     .collect();
 
     ModuleKind::Native { name, exports }

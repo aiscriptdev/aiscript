@@ -18,14 +18,38 @@ mod vm;
 
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::ops::Deref;
 
 pub(crate) use chunk::{Chunk, OpCode};
+use gc_arena::Collect;
 pub use value::Value;
 use vm::State;
 pub use vm::Vm;
 pub use vm::VmError;
 
-pub type NativeFn<'gc> = fn(&mut State<'gc>, Vec<Value<'gc>>) -> Result<Value<'gc>, VmError>;
+type NativeFnInner<'gc> = fn(&mut State<'gc>, Vec<Value<'gc>>) -> Result<Value<'gc>, VmError>;
+
+#[derive(Debug, Clone, Copy)]
+pub struct NativeFn<'gc>(NativeFnInner<'gc>);
+
+impl<'gc> Deref for NativeFn<'gc> {
+    type Target = NativeFnInner<'gc>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+unsafe impl<'gc> Collect for NativeFn<'gc> {
+    fn needs_trace() -> bool
+    where
+        Self: Sized,
+    {
+        false
+    }
+
+    fn trace(&self, _cc: &gc_arena::Collection) {}
+}
 
 #[derive(Debug, PartialEq)]
 pub enum ReturnValue {

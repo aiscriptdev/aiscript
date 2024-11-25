@@ -7,7 +7,7 @@ pub(super) fn bool<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "bool() takes exactly one argument".into(),
+            "bool() takes exactly one argument.".into(),
         ));
     }
 
@@ -35,7 +35,7 @@ pub(super) fn float<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "float() takes exactly one argument".into(),
+            "float() takes exactly one argument.".into(),
         ));
     }
 
@@ -66,7 +66,7 @@ pub(super) fn int<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "int() takes exactly one argument".into(),
+            "int() takes exactly one argument.".into(),
         ));
     }
 
@@ -97,7 +97,7 @@ pub(super) fn ascii<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "ascii() takes exactly one argument".into(),
+            "ascii() takes exactly one argument.".into(),
         ));
     }
 
@@ -125,7 +125,7 @@ pub(super) fn chr<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "chr() takes exactly one argument".into(),
+            "chr() takes exactly one argument.".into(),
         ));
     }
 
@@ -133,7 +133,7 @@ pub(super) fn chr<'gc>(
         Value::Number(n) => n as u32,
         _ => {
             return Err(VmError::RuntimeError(
-                "chr() argument must be an integer".into(),
+                "chr() argument must be an integer.".into(),
             ))
         }
     };
@@ -158,7 +158,7 @@ pub(super) fn ord<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "ord() takes exactly one argument".into(),
+            "ord() takes exactly one argument.".into(),
         ));
     }
 
@@ -166,7 +166,7 @@ pub(super) fn ord<'gc>(
         Value::String(s) /*| Value::IoString(s)*/ => s.to_string(),
         _ => {
             return Err(VmError::RuntimeError(
-                "ord() argument must be a string".into(),
+                "ord() argument must be a string.".into(),
             ))
         }
     };
@@ -175,10 +175,10 @@ pub(super) fn ord<'gc>(
     match (chars.next(), chars.next()) {
         (Some(c), None) => Ok(Value::Number(c as u32 as f64)),
         (None, _) => Err(VmError::RuntimeError(
-            "ord() argument must be a string of length 1".into(),
+            "ord() argument must be a string of length 1.".into(),
         )),
         (Some(_), Some(_)) => Err(VmError::RuntimeError(
-            "ord() argument must be a string of length 1".into(),
+            "ord() argument must be a string of length 1.".into(),
         )),
     }
 }
@@ -189,7 +189,7 @@ pub(super) fn str<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "str() takes exactly one argument".into(),
+            "str() takes exactly one argument.".into(),
         ));
     }
 
@@ -203,7 +203,7 @@ pub(super) fn bin<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "bin() takes exactly one argument".into(),
+            "bin() takes exactly one argument.".into(),
         ));
     }
 
@@ -211,7 +211,7 @@ pub(super) fn bin<'gc>(
         Value::Number(n) => n as i64,
         _ => {
             return Err(VmError::RuntimeError(
-                "bin() argument must be an integer".into(),
+                "bin() argument must be an integer.".into(),
             ))
         }
     };
@@ -233,7 +233,7 @@ pub(super) fn hex<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "hex() takes exactly one argument".into(),
+            "hex() takes exactly one argument.".into(),
         ));
     }
 
@@ -241,7 +241,7 @@ pub(super) fn hex<'gc>(
         Value::Number(n) => n as i64,
         _ => {
             return Err(VmError::RuntimeError(
-                "hex() argument must be an integer".into(),
+                "hex() argument must be an integer.".into(),
             ))
         }
     };
@@ -263,7 +263,7 @@ pub(super) fn oct<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "oct() takes exactly one argument".into(),
+            "oct() takes exactly one argument.".into(),
         ));
     }
 
@@ -271,7 +271,7 @@ pub(super) fn oct<'gc>(
         Value::Number(n) => n as i64,
         _ => {
             return Err(VmError::RuntimeError(
-                "oct() argument must be an integer".into(),
+                "oct() argument must be an integer.".into(),
             ))
         }
     };

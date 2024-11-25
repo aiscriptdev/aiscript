@@ -7,7 +7,7 @@ pub(super) fn map<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 2 {
         return Err(VmError::RuntimeError(
-            "map() takes exactly 2 arguments".into(),
+            "map() takes exactly 2 arguments.".into(),
         ));
     }
 
@@ -16,7 +16,7 @@ pub(super) fn map<'gc>(
         Value::Array(arr) => arr,
         _ => {
             return Err(VmError::RuntimeError(
-                "map() first argument must be an array".into(),
+                "map() first argument must be an array.".into(),
             ))
         }
     };
@@ -26,12 +26,12 @@ pub(super) fn map<'gc>(
         Value::Closure(ref f) => f.function,
         Value::NativeFunction(_) => {
             return Err(VmError::RuntimeError(
-                "map() doesn't support native functions yet".into(),
+                "map() doesn't support native functions yet.".into(),
             ))
         }
         _ => {
             return Err(VmError::RuntimeError(
-                "map() second argument must be a function".into(),
+                "map() second argument must be a function.".into(),
             ))
         }
     };
@@ -64,7 +64,7 @@ pub(super) fn filter<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() != 2 {
         return Err(VmError::RuntimeError(
-            "filter() takes exactly 2 arguments".into(),
+            "filter() takes exactly 2 arguments.".into(),
         ));
     }
 
@@ -73,7 +73,7 @@ pub(super) fn filter<'gc>(
         Value::Array(arr) => arr,
         _ => {
             return Err(VmError::RuntimeError(
-                "filter() first argument must be an array".into(),
+                "filter() first argument must be an array.".into(),
             ))
         }
     };
@@ -83,12 +83,12 @@ pub(super) fn filter<'gc>(
         Value::Closure(ref f) => f.function,
         Value::NativeFunction(_) => {
             return Err(VmError::RuntimeError(
-                "filter() doesn't support native functions yet".into(),
+                "filter() doesn't support native functions yet.".into(),
             ))
         }
         _ => {
             return Err(VmError::RuntimeError(
-                "filter() second argument must be a function".into(),
+                "filter() second argument must be a function.".into(),
             ))
         }
     };
@@ -107,7 +107,7 @@ pub(super) fn filter<'gc>(
             ReturnValue::Boolean(false) => {}
             _ => {
                 return Err(VmError::RuntimeError(
-                    "filter() function must return a boolean".into(),
+                    "filter() function must return a boolean.".into(),
                 ))
             }
         }
@@ -122,7 +122,7 @@ pub(super) fn zip<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.len() < 2 {
         return Err(VmError::RuntimeError(
-            "zip() takes at least 2 arguments".into(),
+            "zip() takes at least 2 arguments.".into(),
         ));
     }
 
@@ -133,7 +133,7 @@ pub(super) fn zip<'gc>(
             Value::Array(arr) => arrays.push(arr),
             _ => {
                 return Err(VmError::RuntimeError(
-                    "zip() arguments must be arrays".into(),
+                    "zip() arguments must be arrays.".into(),
                 ))
             }
         }

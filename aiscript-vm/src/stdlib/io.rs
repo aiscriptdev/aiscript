@@ -11,56 +11,38 @@ use crate::{
     string_arg,
     value::Value,
     vm::{Context, State, VmError},
+    NativeFn,
 };
 
 pub fn create_io_module(ctx: Context) -> ModuleKind {
-    let name = ctx.intern(b"std.io");
+    let name = ctx.intern_static("std.io");
 
     let exports = [
         // File reading/writing
+        ("read_file", Value::NativeFunction(NativeFn(io_read_file))),
+        // ("read_bytes", Value::NativeFunction(NativeFn(io_read_bytes))),
+        ("read_lines", Value::NativeFunction(NativeFn(io_read_lines))),
+        ("write_file", Value::NativeFunction(NativeFn(io_write_file))),
         (
-            ctx.intern(b"read_file"),
-            Value::NativeFunction(io_read_file),
-        ),
-        // (
-        //     ctx.intern(b"read_bytes"),
-        //     Value::NativeFunction(io_read_bytes),
-        // ),
-        (
-            ctx.intern(b"read_lines"),
-            Value::NativeFunction(io_read_lines),
-        ),
-        (
-            ctx.intern(b"write_file"),
-            Value::NativeFunction(io_write_file),
-        ),
-        (
-            ctx.intern(b"append_file"),
-            Value::NativeFunction(io_append_file),
+            "append_file",
+            Value::NativeFunction(NativeFn(io_append_file)),
         ),
         // Standard IO
-        (ctx.intern(b"print"), Value::NativeFunction(io_print)),
-        (ctx.intern(b"println"), Value::NativeFunction(io_println)),
-        (ctx.intern(b"input"), Value::NativeFunction(io_input)),
+        ("input", Value::NativeFunction(NativeFn(io_input))),
         // File/directory operations
-        (ctx.intern(b"exists"), Value::NativeFunction(io_exists)),
-        (ctx.intern(b"is_file"), Value::NativeFunction(io_is_file)),
-        (ctx.intern(b"is_dir"), Value::NativeFunction(io_is_dir)),
+        ("exists", Value::NativeFunction(NativeFn(io_exists))),
+        ("is_file", Value::NativeFunction(NativeFn(io_is_file))),
+        ("is_dir", Value::NativeFunction(NativeFn(io_is_dir))),
+        ("create_dir", Value::NativeFunction(NativeFn(io_create_dir))),
         (
-            ctx.intern(b"create_dir"),
-            Value::NativeFunction(io_create_dir),
+            "remove_file",
+            Value::NativeFunction(NativeFn(io_remove_file)),
         ),
-        (
-            ctx.intern(b"remove_file"),
-            Value::NativeFunction(io_remove_file),
-        ),
-        (
-            ctx.intern(b"remove_dir"),
-            Value::NativeFunction(io_remove_dir),
-        ),
-        (ctx.intern(b"rename"), Value::NativeFunction(io_rename)),
+        ("remove_dir", Value::NativeFunction(NativeFn(io_remove_dir))),
+        ("rename", Value::NativeFunction(NativeFn(io_rename))),
     ]
     .into_iter()
+    .map(|(name, f)| (ctx.intern_static(name), f))
     .collect();
     ModuleKind::Native { name, exports }
 }
@@ -149,22 +131,6 @@ fn io_append_file<'gc>(
         VmError::RuntimeError(format!("Failed to append to file '{}': {}", path, e))
     })?;
 
-    Ok(Value::Boolean(true))
-}
-
-// Standard input/output functions
-fn io_print<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let text = string_arg!(args, 0, "print")?.to_string();
-    print!("{}", text);
-    io::stdout()
-        .flush()
-        .map_err(|e| VmError::RuntimeError(format!("Failed to flush stdout: {}", e)))?;
-    Ok(Value::Boolean(true))
-}
-
-fn io_println<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let text = string_arg!(args, 0, "println")?.to_string();
-    println!("{}", text);
     Ok(Value::Boolean(true))
 }
 

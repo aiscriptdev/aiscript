@@ -579,20 +579,19 @@ impl<'gc> Parser<'gc> {
             line: callee_name.line,
         });
 
-        // Now expect the function call parentheses
-        self.consume(TokenType::OpenParen, "Expect '(' after function name.");
-
         let mut arguments = Vec::new();
         let mut keyword_args = HashMap::new();
 
-        // Parse arguments if any
-        if !self.check(TokenType::CloseParen) {
-            let (args, kw_args) = self.argument_list()?;
-            arguments = args;
-            keyword_args = kw_args;
+        // Check if we have explicit parentheses
+        if self.match_token(TokenType::OpenParen) {
+            // Parse arguments if any
+            if !self.check(TokenType::CloseParen) {
+                let (args, kw_args) = self.argument_list()?;
+                arguments = args;
+                keyword_args = kw_args;
+            }
+            self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
         }
-
-        self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
         // Create call expression with left being first argument
         Some(Expr::Call {

@@ -9,7 +9,7 @@ pub(super) fn format<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
         return Err(VmError::RuntimeError(
-            "format() missing required argument".into(),
+            "format() missing required argument.".into(),
         ));
     }
 
@@ -216,7 +216,7 @@ fn format_string(template: &str, args: &[Value]) -> Result<String, VmError> {
 
             if nested != 0 {
                 return Err(VmError::RuntimeError(
-                    "Unmatched brace in format string".into(),
+                    "Unmatched brace in format string.".into(),
                 ));
             }
 
@@ -224,7 +224,7 @@ fn format_string(template: &str, args: &[Value]) -> Result<String, VmError> {
 
             if arg_index >= args.len() {
                 return Err(VmError::RuntimeError(
-                    "Not enough arguments for format string".into(),
+                    "Not enough arguments for format string.".into(),
                 ));
             }
 
@@ -237,7 +237,7 @@ fn format_string(template: &str, args: &[Value]) -> Result<String, VmError> {
                 result.push('}');
             } else {
                 return Err(VmError::RuntimeError(
-                    "Single '}' encountered in format string".into(),
+                    "Single '}' encountered in format string.".into(),
                 ));
             }
         } else {
