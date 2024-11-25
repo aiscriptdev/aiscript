@@ -1,4 +1,4 @@
-// ignore
-// [line 3] Error at '{': Expect expression.
-// [line 3] Error at ')': Expect ';' after expression.
-for let a = 1; {}; a = a + 1 {}
+for let a = 1; {}; a = a + 1 {
+    print(a); // expect: 1
+    break;
+}

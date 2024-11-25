@@ -63,3 +63,9 @@ for ; false; {
         1;
     }
 }
+
+// Object literals are fine in initializer and condition parts
+for let obj = {a:1}; len(obj) > 0; {  // This is OK - semicolons make it unambiguous
+    print("hi"); // expect: hi
+    break;
+}

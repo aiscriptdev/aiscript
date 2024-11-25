@@ -692,11 +692,18 @@ impl<'gc> Parser<'gc> {
 
         // Parse increment - optional
         let increment = if !self.check(TokenType::OpenBrace) {
-            self.in_flow_condition = true; // Set flag to handle brace properly
+            self.in_flow_condition = true;
             let expr = self.parse_precedence(Precedence::Assignment)?;
-            self.in_flow_condition = false; // Reset flag
+            self.in_flow_condition = false;
             Some(expr)
         } else {
+            // Peek ahead to check for empty object literal
+            if self.check(TokenType::OpenBrace)
+                && matches!(self.peek_next(), Some(t) if t.kind == TokenType::CloseBrace)
+            {
+                self.error_at_current("Empty object literal not allowed in for loop increment");
+                return None;
+            }
             None
         };
 

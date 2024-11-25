@@ -1,0 +1,10 @@
+// Object literal in increment part should error
+for let i = 0; i < 3; {a:1} { // Error at ':': Expect ';' after expression.
+    print(i);
+    i += 1;
+}
+
+for let i = 0; i < 3; {} { // Error at '{': Empty object literal not allowed in for loop increment
+    print(i);
+    i += 1;
+}
