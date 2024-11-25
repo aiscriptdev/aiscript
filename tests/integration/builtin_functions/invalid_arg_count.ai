@@ -1,0 +1,1 @@
+map(); // expect runtime error: map() takes exactly 2 arguments.

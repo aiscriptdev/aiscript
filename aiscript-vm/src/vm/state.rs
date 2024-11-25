@@ -1006,7 +1006,10 @@ impl<'gc> State<'gc> {
                 // Calculate total arguments slots (positional + keyword pairs)
                 let total_args = args_count + keyword_args_count * 2;
                 let args = self.pop_stack_n(total_args as usize);
-                let result = { function(self, args)? };
+                let result = function(self, args).map_err(|err| match err {
+                    VmError::CompileError => err,
+                    VmError::RuntimeError(message) => self.runtime_error(message.into()),
+                })?;
                 self.stack_top -= 1; // Remove the function
                 self.push_stack(result);
                 Ok(())
