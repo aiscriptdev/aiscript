@@ -804,6 +804,21 @@ impl<'gc> Parser<'gc> {
         self.parse_precedence(Precedence::Assignment)
     }
 
+    fn inline_if(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let then_expr = Box::new(self.previous_expr.take()?);
+        let condition = Box::new(self.expression()?);
+
+        self.consume(TokenType::Else, "Expect 'else' after inline if condition.");
+        let else_expr = Box::new(self.expression()?);
+
+        Some(Expr::InlineIf {
+            condition,
+            then_branch: then_expr,
+            else_branch: else_expr,
+            line: self.previous.line,
+        })
+    }
+
     fn number(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let value = self.previous.lexeme.parse::<f64>().unwrap();
         Some(Expr::Literal {
@@ -1355,6 +1370,7 @@ enum Precedence {
     None,
     Assignment, // =
     Pipe,       // |>
+    If,         // inline if/else
     Or,         // or
     And,        // and
     Equality,   // == !=
@@ -1443,6 +1459,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::True | TokenType::False | TokenType::Nil => {
             ParseRule::new(Some(Parser::literal), None, Precedence::None)
         }
+        TokenType::If => ParseRule::new(None, Some(Parser::inline_if), Precedence::If),
         TokenType::In => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         TokenType::Prompt => ParseRule::new(Some(Parser::prompt), None, Precedence::None),
         _ => ParseRule::new(None, None, Precedence::None),

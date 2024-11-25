@@ -755,6 +755,25 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::GetIndex);
                 }
             }
+            Expr::InlineIf {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                self.generate_expr(condition)?;
+                let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+                self.emit(OpCode::Pop(1));
+
+                self.generate_expr(then_branch)?;
+                let else_jump = self.emit_jump(OpCode::Jump(0));
+
+                self.patch_jump(then_jump);
+                self.emit(OpCode::Pop(1));
+
+                self.generate_expr(else_branch)?;
+                self.patch_jump(else_jump);
+            }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
                 let name_constant = self.identifier_constant(name.lexeme);

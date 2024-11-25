@@ -1,0 +1,20 @@
+// Missing else
+let x = true if 1 > 0; // Error at ';': Expect 'else' after inline if condition.
+
+// Missing condition
+let x = 1 if else 2; // Error at 'else': Expect expression.
+
+// Empty branches
+let x = if true else; // Error at 'if': Expect expression.
+
+// Invalid order
+let x = if true 1 else 2; // Error at 'if': Expect expression.
+
+// Incomplete
+let x = true if; // Error at ';': Expect expression.
+
+// Missing then branch
+let x = if true else 1; // Error at 'if': Expect expression.
+
+// Double else
+let x = 1 if true else 2 else 3; // Error at 'else': Expect ';' after variable declaration.

@@ -215,6 +215,12 @@ pub enum Expr<'gc> {
         keyword_args: HashMap<String, Expr<'gc>>,
         line: u32,
     },
+    InlineIf {
+        condition: Box<Expr<'gc>>,
+        then_branch: Box<Expr<'gc>>,
+        else_branch: Box<Expr<'gc>>,
+        line: u32,
+    },
     Get {
         object: Box<Expr<'gc>>,
         name: Token<'gc>,
@@ -256,6 +262,7 @@ impl<'gc> Expr<'gc> {
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }
             | Self::Index { line, .. }
+            | Self::InlineIf { line, .. }
             | Self::Assign { line, .. }
             | Self::And { line, .. }
             | Self::Or { line, .. }

@@ -1,0 +1,43 @@
+// Basic test
+let x = 1;
+let y = true if x > 0 else false;
+print(y); // expect: true
+
+let a = -1;
+let b = "positive" if a > 0 else "negative";
+print(b); // expect: negative
+
+// Nested inline if
+let score = 75;
+let grade = "A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70 else "F";
+print(grade); // expect: C
+
+// With expressions
+let n1 = 5;
+let n2 = 10;
+let max = n1 if n1 > n2 else n2;
+print(max); // expect: 10
+
+// With function calls
+fn get_num() { return 42; }
+let result = "big" if get_num() > 40 else "small";
+print(result); // expect: big
+
+// With arithmetic
+let val = 2 + 3 if true else 5 + 5;
+print(val); // expect: 5
+
+// Test precedence
+let x = 1 + 2 if true else 3 + 4;
+print(x); // expect: 3
+
+// Test with boolean operations
+let a = true;
+let b = false;
+let result = "yes" if a and b else "no";
+print(result); // expect: no
+
+// Test with string comparison
+let name = "Bob";
+let greeting = "Hello, Bob" if name == "Bob" else "Hello, stranger";
+print(greeting); // expect: Hello, Bob
