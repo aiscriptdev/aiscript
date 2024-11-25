@@ -1,0 +1,3 @@
+while len({}) > 0 {  // Error at '{': Cannot use object literals in flow control conditions
+    // ...
+}

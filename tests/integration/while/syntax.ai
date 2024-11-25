@@ -1,6 +1,6 @@
 // Single-expression body.
 let c = 0;
-while (c < 3) {
+while c < 3 {
     c += 1;
     print(c);
 }
@@ -10,7 +10,7 @@ while (c < 3) {
 
 // Block body.
 let a = 0;
-while (a < 3) {
+while a < 3 {
   print(a);
   a = a + 1;
 }
@@ -19,6 +19,18 @@ while (a < 3) {
 // expect: 2
 
 // Statement bodies.
-while (false) if true { 1; } else { 2; }
-while (false) while (true) 1;
-while (false) for (;;) 1;
+while false {
+    if true {
+        1;
+    } else {
+        2; 
+    }
+}
+while false {
+    while true {
+        1;
+    }
+}
+while false {
+    for (;;) 1;
+}

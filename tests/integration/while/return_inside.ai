@@ -1,5 +1,5 @@
 fn f() {
-  while (true) {
+  while true {
     let i = "i";
     return i;
   }

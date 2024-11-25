@@ -49,5 +49,5 @@ for (let i = 0; i < 2;) {
 
 // Statement bodies.
 for (; false;) if true { 1; } else { 2; }
-for (; false;) while (true) 1;
+for (; false;) while true { 1; }
 for (; false;) for (;;) 1;

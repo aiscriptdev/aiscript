@@ -652,12 +652,16 @@ impl<'gc> Parser<'gc> {
     }
 
     fn while_statement(&mut self) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::OpenParen, "Expect '(' after 'while'.");
+        // Set flag before parsing condition
+        self.in_flow_condition = true;
         let condition = self.expression()?;
-        self.consume(TokenType::CloseParen, "Expect ')' after condition.");
+        self.in_flow_condition = false;
+
+        self.consume(TokenType::OpenBrace, "Expect '{' before loop body.");
         self.loop_depth += 1;
-        let body = Box::new(self.statement()?);
+        let body = Box::new(self.block_statement()?);
         self.loop_depth -= 1;
+
         Some(Stmt::Loop {
             initializer: None,
             condition,
