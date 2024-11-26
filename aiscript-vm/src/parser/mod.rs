@@ -424,7 +424,7 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, "Expect variant name after '::'.");
         let variant = self.previous;
 
-        Some(Expr::EnumAccess {
+        Some(Expr::EnumVariant {
             enum_name,
             variant,
             line: variant.line,

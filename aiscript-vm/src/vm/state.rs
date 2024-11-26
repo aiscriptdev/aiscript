@@ -563,25 +563,51 @@ impl<'gc> State<'gc> {
                     RefLock::new(Class::new(name)),
                 )));
             }
-            OpCode::GetProperty(byte) => {
+            OpCode::EnumVariantAccess(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
-                    Value::Enum(def) => {
+                    Value::Enum(enum_) => {
                         // Check if it's a variant access
-                        if let Some(value) = def.borrow().variants.get(&name) {
+                        if let Some(value) = enum_.borrow().variants.get(&name) {
                             self.pop_stack(); // Pop enum
                             self.push_stack(Value::EnumVariant(Gc::new(
                                 self.mc,
                                 EnumVariant {
-                                    enum_: def,
+                                    enum_,
                                     name,
                                     value: *value,
                                 },
                             )));
-                        } else if let Some(method) = def.borrow().methods.get(&name) {
-                            // Handle method access
+                        } else {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Undefined variant '{}' of enum '{}'",
+                                    name,
+                                    enum_.borrow().name,
+                                )
+                                .into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(self.runtime_error(
+                            format!(
+                                "Only enum has variant, make sure the '{}' is an enum.",
+                                name
+                            )
+                            .into(),
+                        ));
+                    }
+                }
+            }
+            OpCode::GetProperty(byte) => {
+                let name = frame.read_constant(byte).as_string().unwrap();
+                match *self.peek(0) {
+                    Value::Enum(enum_) => {
+                        // Check if it's a variant access
+                        if let Some(value) = enum_.borrow().variants.get(&name) {
                             self.pop_stack(); // Pop enum
-                                              // self.bind_method(def, name)?;
+                            self.push_stack(*value);
                         } else {
                             return Err(
                                 self.runtime_error(format!("Undefined property '{}'", name).into())

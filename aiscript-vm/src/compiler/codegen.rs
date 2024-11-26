@@ -631,15 +631,13 @@ impl<'gc> CodeGen<'gc> {
                 }
                 self.emit(OpCode::MakeArray(elements.len() as u8));
             }
-            Expr::EnumAccess {
+            Expr::EnumVariant {
                 enum_name, variant, ..
             } => {
-                // Get the enum (like a class)
                 self.named_variable(enum_name, false)?;
 
-                // Get the variant (similar to GetProperty)
                 let name_constant = self.identifier_constant(variant.lexeme);
-                self.emit(OpCode::GetProperty(name_constant as u8));
+                self.emit(OpCode::EnumVariantAccess(name_constant as u8));
             }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack

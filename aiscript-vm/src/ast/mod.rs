@@ -160,7 +160,7 @@ pub enum Expr<'gc> {
         properties: Vec<ObjectProperty<'gc>>,
         line: u32,
     },
-    EnumAccess {
+    EnumVariant {
         enum_name: Token<'gc>,
         variant: Token<'gc>,
         line: u32,
@@ -275,7 +275,7 @@ impl<'gc> Expr<'gc> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Object { line, .. }
-            | Self::EnumAccess { line, .. }
+            | Self::EnumVariant { line, .. }
             | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
             | Self::Array { line, .. }
