@@ -1436,16 +1436,10 @@ impl<'gc> Parser<'gc> {
                 return;
             }
 
-            match self.current.kind {
-                TokenType::Class
-                | TokenType::Fn
-                | TokenType::Let
-                | TokenType::For
-                | TokenType::If
-                | TokenType::While
-                | TokenType::Return => return,
-                _ => self.advance(),
+            if self.current.is_synchronize_keyword() {
+                return;
             }
+            self.advance();
         }
     }
 }

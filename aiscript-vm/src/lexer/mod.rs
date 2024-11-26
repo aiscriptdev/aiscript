@@ -118,6 +118,29 @@ impl<'a> Token<'a> {
         }
     }
 
+    // Whether current token is synchronize keyword,
+    // this mainly used in `synchronize()`.
+    // When reporing error and encounter a new synchronized keyword,
+    // we should keep going to parse the next declaration.
+    pub fn is_synchronize_keyword(&self) -> bool {
+        matches!(
+            self.kind,
+            TokenType::Agent
+                | TokenType::AI
+                | TokenType::Class
+                | TokenType::Const
+                | TokenType::Enum
+                | TokenType::Fn
+                | TokenType::For
+                | TokenType::If
+                | TokenType::Let
+                | TokenType::Pub
+                | TokenType::Return
+                | TokenType::Use
+                | TokenType::While
+        )
+    }
+
     /// Creates a new identifier token (available with v1 feature)
     #[cfg(feature = "v1")]
     pub fn identifier(name: &'a str) -> Self {
