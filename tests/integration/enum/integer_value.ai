@@ -1,0 +1,37 @@
+enum Number1 {
+    One,
+    Two,
+    Three = 3,
+}
+
+print(Number1.One); // expect: nil
+print(Number1.Two); // expect: nil
+print(Number1.Three); // expect: 3
+
+enum Number2 {
+    One = 1,
+    Two,
+}
+
+print(Number2.One); // expect: 1
+print(Number2.Two); // expect: 2
+
+enum Number3 {
+    One = 1,
+    Two = 3,
+}
+
+print(Number3.One); // expect: 1
+print(Number3.Two); // expect: 3
+
+enum E1 {
+    A = 1,
+    B,
+    C = 10,
+    D,
+}
+
+print(E1.A); // expect: 1
+print(E1.B); // expect: 2
+print(E1.C); // expect: 10
+print(E1.D); // expect: 11

@@ -592,7 +592,7 @@ impl<'gc> State<'gc> {
                     _ => {
                         return Err(self.runtime_error(
                             format!(
-                                "Only enum has variant, make sure the '{}' is an enum.",
+                                "Only enum has variant, make sure the '{}' is an enum variant.",
                                 name
                             )
                             .into(),

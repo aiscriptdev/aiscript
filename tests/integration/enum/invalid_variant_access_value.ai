@@ -1,0 +1,3 @@
+enum Empty {}
+
+print(Empty.InvalidVariant); // expect runtime error: Undefined property 'InvalidVariant'

@@ -1,0 +1,37 @@
+enum Invalid {
+    A = "string",
+    B = true      // Error at 'B': Enum variant 'B' must be of type string
+}
+
+enum Invalid2 {
+    A = "text",
+    B             // Error at 'B': Must specify value for non-integer enum variants
+}
+
+enum Invalid3 {
+    A = 5,
+    B = 3,        // Error at 'B': Enum variant 'B' value 3 must be greater than or equal to 6 (next auto-increment value)
+}
+
+enum Invalid4 {
+    A = 3,
+    B = 3,        // Error at 'B': Enum variant 'B' value 3 must be greater than or equal to 4 (next auto-increment value)
+}
+
+enum Status {
+    Pending = 0,
+    Active = 1,
+    Failed = false,  // Error at 'Failed': Enum variant 'Failed' must be of type integer
+}
+
+enum Config {
+    Debug = true,
+    Log = false,
+    Mode = 1,       // Error at 'Mode': Enum variant 'Mode' must be of type boolean
+}
+
+enum FileType {
+    Text = "text/plain",
+    Html = "text/html",
+    Json = true,           // Error at 'Json': Enum variant 'Json' must be of type string
+}

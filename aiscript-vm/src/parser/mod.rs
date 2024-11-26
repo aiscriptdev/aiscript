@@ -398,7 +398,11 @@ impl<'gc> Parser<'gc> {
             }
 
             // Parse variant
-            self.consume(TokenType::Identifier, "Expect variant name.");
+            if !self.check(TokenType::Identifier) {
+                self.error_at_current("Expect variant name.");
+            }
+            // Consume the variant identifier
+            self.advance();
             let variant_name = self.previous;
 
             let value = if self.match_token(TokenType::Equal) {

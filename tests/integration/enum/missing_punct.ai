@@ -1,0 +1,14 @@
+enum Either1 // {
+    A, // Error at 'A': Expect '{' before enum body.
+    B,
+}
+
+enum Either2 {
+    A
+    B, // Error at 'B': Expect ',' after variant.
+}
+
+enum Either3 {
+    A,
+    B,
+// Error at end: Expect '}' after enum body.

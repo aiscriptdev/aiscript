@@ -1,0 +1,34 @@
+enum Empty {} // Empty enum
+
+enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    ServerError = 500,
+
+    pub ai fn as_str() {
+        print("as_str");
+    }
+    pub fn as_str2() {
+        print("as_str2");
+    }
+    ai fn as_str3() {
+        print("as_str3");
+    }
+    fn as_str4() {
+        print("as_str4");
+    }
+}
+
+let status = HttpStatus::Ok;
+print(status); // expect: HttpStatus::Ok(200)
+let status = HttpStatus.Ok;
+print(status); // expect: 200
+
+print(HttpStatus::NotFound); // expect: HttpStatus::NotFound(404)
+print(HttpStatus.NotFound); // expect: 404
+
+let status = HttpStatus::ServerError;
+status.as_str(); // expect: as_str
+HttpStatus::Ok.as_str2(); // expect: as_str2
+HttpStatus::NotFound.as_str3(); // expect: as_str3
+HttpStatus::ServerError.as_str4(); // expect: as_str4
