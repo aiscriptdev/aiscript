@@ -372,12 +372,43 @@ impl<'gc> Stmt<'gc> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Literal<'gc> {
     Number(f64),
     String(InternedString<'gc>),
     Boolean(bool),
     Nil,
+}
+
+// Implement PartialEq manually to handle float comparison
+impl<'gc> PartialEq for Literal<'gc> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Literal::Number(a), Literal::Number(b)) => (a - b).abs() < f64::EPSILON,
+            (Literal::String(a), Literal::String(b)) => a == b,
+            (Literal::Boolean(a), Literal::Boolean(b)) => a == b,
+            (Literal::Nil, Literal::Nil) => true,
+            _ => false,
+        }
+    }
+}
+
+// Implement Eq after ensuring PartialEq handles float comparison correctly
+impl<'gc> Eq for Literal<'gc> {}
+
+// Implement Hash to match our Eq implementation
+impl<'gc> std::hash::Hash for Literal<'gc> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::Number(n) => {
+                // Hash the bits of the float to be consistent with our Eq implementation
+                n.to_bits().hash(state);
+            }
+            Literal::String(s) => s.hash(state),
+            Literal::Boolean(b) => b.hash(state),
+            Literal::Nil => 0.hash(state),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

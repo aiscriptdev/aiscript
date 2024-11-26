@@ -13,6 +13,7 @@ use crate::{
         Visibility,
     },
     object::FunctionType,
+    ty::EnumVariantChecker,
     vm::Context,
     VmError,
 };
@@ -353,6 +354,32 @@ impl<'gc> Parser<'gc> {
         Some((key, value))
     }
 
+    fn parse_enum_variant_value(&mut self) -> Option<Expr<'gc>> {
+        let token = self.previous;
+        match token.kind {
+            TokenType::Number => Some(Expr::Literal {
+                value: Literal::Number(token.lexeme.parse().unwrap()),
+                line: token.line,
+            }),
+            TokenType::String => Some(Expr::Literal {
+                value: Literal::String(self.ctx.intern(token.lexeme.trim_matches('"').as_bytes())),
+                line: token.line,
+            }),
+            TokenType::True => Some(Expr::Literal {
+                value: Literal::Boolean(true),
+                line: token.line,
+            }),
+            TokenType::False => Some(Expr::Literal {
+                value: Literal::Boolean(false),
+                line: token.line,
+            }),
+            _ => {
+                self.error_at_current("Invalid enum variant value");
+                None
+            }
+        }
+    }
+
     fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect enum name.");
         let name = self.previous;
@@ -360,6 +387,8 @@ impl<'gc> Parser<'gc> {
 
         let mut variants = Vec::new();
         let mut methods = Vec::new();
+        let mut checker = EnumVariantChecker::new();
+
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             if self.check(TokenType::Fn) || self.check(TokenType::AI) || self.check(TokenType::Pub)
             {
@@ -373,21 +402,45 @@ impl<'gc> Parser<'gc> {
             let variant_name = self.previous;
 
             let value = if self.match_token(TokenType::Equal) {
-                // Parse any literal value
+                // Check for valid literal tokens
                 if !self.check(TokenType::Number)
                     && !self.check(TokenType::String)
                     && !self.check(TokenType::True)
                     && !self.check(TokenType::False)
-                    && !self.check(TokenType::OpenBracket)
                 {
                     self.error_at_current(
-                        "Enum variant value must be a literal (number, string, boolean, or array).",
+                        "Enum variant value must be a literal (number, string, or boolean)",
                     );
                     return None;
                 }
-                Some(self.expression()?)
+
+                self.advance();
+                if let Some(literal) = self.parse_enum_variant_value() {
+                    if let Expr::Literal { value, .. } = literal {
+                        if let Err(msg) = checker.check_value(variant_name, &value) {
+                            self.error_at(variant_name, &msg);
+                            return None;
+                        }
+                        Some(literal)
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    None
+                }
             } else {
-                None
+                // Auto-increment check
+                if !checker.is_auto_increment_supported() {
+                    self.error_at(
+                        variant_name,
+                        "Must specify value for non-integer enum variants",
+                    );
+                    return None;
+                }
+                checker.next_value().map(|value| Expr::Literal {
+                    value,
+                    line: variant_name.line,
+                })
             };
 
             variants.push(EnumVariant {
