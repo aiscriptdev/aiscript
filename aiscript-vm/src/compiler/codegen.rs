@@ -6,7 +6,10 @@ use std::{
 
 use crate::{
     ai::Agent,
-    ast::{AgentDecl, ChunkId, ClassDecl, FunctionDecl, Mutability, ObjectProperty, VariableDecl},
+    ast::{
+        AgentDecl, ChunkId, ClassDecl, EnumDecl, FunctionDecl, Mutability, ObjectProperty,
+        VariableDecl,
+    },
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -173,6 +176,11 @@ impl<'gc> CodeGen<'gc> {
 
                 for stmt in body {
                     self.declare_functions(stmt)?;
+                }
+            }
+            Stmt::Enum(EnumDecl { methods, .. }) => {
+                for methods in methods {
+                    self.declare_functions(methods)?;
                 }
             }
             Stmt::Class(ClassDecl { methods, .. }) => {
@@ -397,6 +405,67 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::Return);
                 }
             }
+            Stmt::Enum(EnumDecl {
+                name,
+                variants,
+                methods,
+                visibility,
+                ..
+            }) => {
+                // Emit enum declaration (similar to Class opcode)
+                let name_constant = self.identifier_constant(name.lexeme);
+                self.emit(OpCode::Enum(name_constant as u8));
+
+                // Define globally right away
+                self.emit(OpCode::DefineGlobal {
+                    name_constant: name_constant as u8,
+                    visibility: *visibility,
+                });
+
+                // Load enum again for method definitions
+                self.emit(OpCode::GetGlobal(name_constant as u8));
+
+                // Define variants
+                for variant in variants {
+                    // Emit variant value if present
+                    if let Some(value) = &variant.value {
+                        self.generate_expr(value)?;
+                    } else {
+                        self.emit(OpCode::Nil);
+                    }
+
+                    // Emit variant name and creation opcode
+                    let variant_constant = self.identifier_constant(variant.name.lexeme);
+                    self.emit(OpCode::EnumVariant(variant_constant as u8));
+                }
+
+                for method in methods {
+                    if let Stmt::Function(FunctionDecl {
+                        name: method_name,
+                        mangled_name,
+                        params,
+                        return_type,
+                        body,
+                        fn_type,
+                        ..
+                    }) = method
+                    {
+                        self.generate_function(
+                            method_name.lexeme,
+                            mangled_name.to_owned(),
+                            params,
+                            return_type,
+                            body,
+                            *fn_type,
+                        )?;
+                        let method_constant = self.identifier_constant(method_name.lexeme);
+                        self.emit(OpCode::Method(method_constant as u8));
+                    }
+                }
+
+                // Pop the enum (like we do with Class)
+                self.emit(OpCode::Pop(1));
+            }
             Stmt::Class(ClassDecl {
                 name,
                 superclass,
@@ -446,13 +515,12 @@ impl<'gc> CodeGen<'gc> {
                         params,
                         return_type,
                         body,
+                        mut fn_type,
                         ..
                     }) = method
                     {
-                        let fn_type = if method_name.lexeme == "init" {
-                            FunctionType::Constructor
-                        } else {
-                            FunctionType::Method
+                        if method_name.lexeme == "init" {
+                            fn_type = FunctionType::Constructor
                         };
                         self.generate_function(
                             method_name.lexeme,
@@ -562,6 +630,14 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(element)?;
                 }
                 self.emit(OpCode::MakeArray(elements.len() as u8));
+            }
+            Expr::EnumVariant {
+                enum_name, variant, ..
+            } => {
+                self.named_variable(enum_name, false)?;
+
+                let name_constant = self.identifier_constant(variant.lexeme);
+                self.emit(OpCode::EnumVariantAccess(name_constant as u8));
             }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack

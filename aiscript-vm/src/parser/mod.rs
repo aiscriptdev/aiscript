@@ -8,8 +8,12 @@ use super::{
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{
-    ast::{AgentDecl, ClassDecl, FunctionDecl, ObjectProperty, VariableDecl, Visibility},
+    ast::{
+        AgentDecl, ClassDecl, EnumDecl, EnumVariant, FunctionDecl, ObjectProperty, VariableDecl,
+        Visibility,
+    },
     object::FunctionType,
+    ty::EnumVariantChecker,
     vm::Context,
     VmError,
 };
@@ -154,6 +158,8 @@ impl<'gc> Parser<'gc> {
             } else {
                 self.use_declaration()
             }
+        } else if self.match_token(TokenType::Enum) {
+            self.enum_declaration(visibility)
         } else if self.match_token(TokenType::Class) {
             self.class_declaration(visibility)
         } else if self.match_token(TokenType::AI) {
@@ -348,6 +354,140 @@ impl<'gc> Parser<'gc> {
         Some((key, value))
     }
 
+    fn parse_enum_variant_value(&mut self) -> Option<Expr<'gc>> {
+        let token = self.previous;
+        match token.kind {
+            TokenType::Number => Some(Expr::Literal {
+                value: Literal::Number(token.lexeme.parse().unwrap()),
+                line: token.line,
+            }),
+            TokenType::String => Some(Expr::Literal {
+                value: Literal::String(self.ctx.intern(token.lexeme.trim_matches('"').as_bytes())),
+                line: token.line,
+            }),
+            TokenType::True => Some(Expr::Literal {
+                value: Literal::Boolean(true),
+                line: token.line,
+            }),
+            TokenType::False => Some(Expr::Literal {
+                value: Literal::Boolean(false),
+                line: token.line,
+            }),
+            _ => {
+                self.error_at_current("Invalid enum variant value");
+                None
+            }
+        }
+    }
+
+    fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect enum name.");
+        let name = self.previous;
+        self.consume(TokenType::OpenBrace, "Expect '{' before enum body.");
+
+        let mut variants = Vec::new();
+        let mut methods = Vec::new();
+        let mut checker = EnumVariantChecker::new();
+
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            if self.check(TokenType::Fn) || self.check(TokenType::AI) || self.check(TokenType::Pub)
+            {
+                // Parse method
+                methods.push(self.method_declaration()?);
+                continue;
+            }
+
+            // Parse variant
+            if !self.check(TokenType::Identifier) {
+                self.error_at_current("Expect variant name.");
+            }
+            // Consume the variant identifier
+            self.advance();
+            let variant_name = self.previous;
+
+            let value = if self.match_token(TokenType::Equal) {
+                // Check for valid literal tokens
+                if !self.check(TokenType::Number)
+                    && !self.check(TokenType::String)
+                    && !self.check(TokenType::True)
+                    && !self.check(TokenType::False)
+                {
+                    self.error_at_current(
+                        "Enum variant value must be a literal (number, string, or boolean)",
+                    );
+                    return None;
+                }
+
+                self.advance();
+                if let Some(literal) = self.parse_enum_variant_value() {
+                    if let Expr::Literal { value, .. } = literal {
+                        if let Err(msg) = checker.check_value(variant_name, &value) {
+                            self.error_at(variant_name, &msg);
+                            return None;
+                        }
+                        Some(literal)
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    None
+                }
+            } else {
+                // Auto-increment check
+                if !checker.is_auto_increment_supported() {
+                    self.error_at(
+                        variant_name,
+                        "Must specify value for non-integer enum variants",
+                    );
+                    return None;
+                }
+                checker.next_value().map(|value| Expr::Literal {
+                    value,
+                    line: variant_name.line,
+                })
+            };
+
+            variants.push(EnumVariant {
+                name: variant_name,
+                value,
+            });
+
+            if !self.check(TokenType::CloseBrace) {
+                self.consume(TokenType::Comma, "Expect ',' after variant.");
+            }
+        }
+
+        self.consume(TokenType::CloseBrace, "Expect '}' after enum body.");
+
+        Some(Stmt::Enum(EnumDecl {
+            name,
+            variants,
+            methods,
+            visibility,
+            line: name.line,
+        }))
+    }
+
+    fn enum_access(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        // The enum name is in previous_expr since this is an infix operator
+        let enum_name = match &self.previous_expr.take()? {
+            Expr::Variable { name, .. } => *name,
+            _ => {
+                self.error("Expected enum name before '::'.");
+                return None;
+            }
+        };
+
+        self.consume(TokenType::Identifier, "Expect variant name after '::'.");
+        let variant = self.previous;
+
+        Some(Expr::EnumVariant {
+            enum_name,
+            variant,
+            line: variant.line,
+        })
+    }
+
     fn class_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect class name.");
         let name = self.previous;
@@ -377,21 +517,7 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            let method_vis = if self.match_token(TokenType::Pub) {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            };
-            let method = if self.match_token(TokenType::AI) {
-                self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-                self.func_declaration(FunctionType::AiMethod, method_vis)?
-            } else if self.match_token(TokenType::Fn) {
-                self.func_declaration(FunctionType::Method, method_vis)?
-            } else {
-                self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
-                return None;
-            };
-            methods.push(method);
+            methods.push(self.method_declaration()?);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -406,6 +532,24 @@ impl<'gc> Parser<'gc> {
             visibility,
             line: name.line,
         }))
+    }
+
+    fn method_declaration(&mut self) -> Option<Stmt<'gc>> {
+        let method_vis = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        let method = if self.match_token(TokenType::AI) {
+            self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
+            self.func_declaration(FunctionType::AiMethod, method_vis)?
+        } else if self.match_token(TokenType::Fn) {
+            self.func_declaration(FunctionType::Method, method_vis)?
+        } else {
+            self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
+            return None;
+        };
+        Some(method)
     }
 
     fn func_declaration(
@@ -1349,16 +1493,10 @@ impl<'gc> Parser<'gc> {
                 return;
             }
 
-            match self.current.kind {
-                TokenType::Class
-                | TokenType::Fn
-                | TokenType::Let
-                | TokenType::For
-                | TokenType::If
-                | TokenType::While
-                | TokenType::Return => return,
-                _ => self.advance(),
+            if self.current.is_synchronize_keyword() {
+                return;
             }
+            self.advance();
         }
     }
 }
@@ -1421,6 +1559,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenBracket => {
             ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
         }
+        TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_access), Precedence::Call),
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
         TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Pipe),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),

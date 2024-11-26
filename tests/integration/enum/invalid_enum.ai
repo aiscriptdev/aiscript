@@ -1,0 +1,3 @@
+class A {}
+
+let a = A::Pending; // expect runtime error: Only enum has variant, make sure the 'Pending' is an enum variant.

@@ -4,7 +4,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
 
 use crate::{
     ai::Agent,
-    object::{BoundMethod, Class, Closure, Instance, Object},
+    object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, Object},
     string::InternedString,
     vm::{Context, VmError},
     NativeFn, ReturnValue,
@@ -23,6 +23,8 @@ pub enum Value<'gc> {
     NativeFunction(NativeFn<'gc>),
     Array(GcRefLock<'gc, Vec<Value<'gc>>>),
     Object(GcRefLock<'gc, Object<'gc>>),
+    Enum(GcRefLock<'gc, Enum<'gc>>),
+    EnumVariant(Gc<'gc, EnumVariant<'gc>>),
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
@@ -76,6 +78,15 @@ impl<'gc> Display for Value<'gc> {
                 }
                 write!(f, "}}")
             }
+            Value::Enum(enum_) => write!(f, "enum {}", enum_.borrow().name),
+            Value::EnumVariant(variant) => {
+                write!(f, "{}::{}", variant.enum_.borrow().name, variant.name)?;
+                if !variant.value.is_nil() {
+                    write!(f, "({})", variant.value)
+                } else {
+                    Ok(())
+                }
+            }
             Value::Class(class) => write!(f, "{}", class.borrow().name),
             Value::Instance(instance) => {
                 let mut s = format!("{} {{", instance.borrow().class.borrow().name);
@@ -108,6 +119,12 @@ impl<'gc> Value<'gc> {
             (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
             (Value::Array(a), Value::Array(b)) => Gc::ptr_eq(*a, *b),
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Enum(a), Value::Enum(b)) => Gc::ptr_eq(*a, *b),
+            (Value::EnumVariant(a), Value::EnumVariant(b)) => {
+                // We only need to compare the enum type name and variant name, not the underlying value.
+                // The value is just for initialization and access, but doesn't affect the variant's identity.
+                Gc::ptr_eq(a.enum_, b.enum_) && a.name == b.name
+            }
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
             (Value::Instance(a), Value::Instance(b)) => Gc::ptr_eq(*a, *b),
@@ -147,15 +164,6 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_io_string(self) -> Result<Gc<'gc, String>, VmError> {
-        match self {
-            Value::IoString(value) => Ok(value),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to string, the value is {v}"
-            ))),
-        }
-    }
-
     pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, VmError> {
         match self {
             Value::Closure(closure) => Ok(closure),
@@ -177,41 +185,6 @@ impl<'gc> Value<'gc> {
             Value::Class(class) => Ok(class),
             v => Err(VmError::RuntimeError(format!(
                 "cannot convert to class, the value is {v}"
-            ))),
-        }
-    }
-
-    pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, VmError> {
-        match self {
-            Value::Instance(instance) => Ok(instance),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to instance, the value is {v}"
-            ))),
-        }
-    }
-
-    pub fn as_bound_method(self) -> Result<Gc<'gc, BoundMethod<'gc>>, VmError> {
-        match self {
-            Value::BoundMethod(bm) => Ok(bm),
-            _ => Err(VmError::RuntimeError(
-                "cannot convert to bound method".into(),
-            )),
-        }
-    }
-
-    pub fn as_module(&self) -> Option<InternedString<'gc>> {
-        match self {
-            Value::Module(name) => Some(*name),
-            _ => None,
-        }
-    }
-
-    pub fn as_object(self) -> Result<GcRefLock<'gc, Object<'gc>>, VmError> {
-        match self {
-            Value::Object(obj) => Ok(obj),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to object: {:?}",
-                v
             ))),
         }
     }
@@ -278,6 +251,17 @@ impl<'gc> Value<'gc> {
             }
             _ => Value::Nil,
         }
+    }
+}
+
+// Implementations for Enum and EnumVariant
+impl<'gc> Value<'gc> {
+    pub fn is_enum(&self) -> bool {
+        matches!(self, Value::Enum(_))
+    }
+
+    pub fn is_enum_variant(&self) -> bool {
+        matches!(self, Value::EnumVariant { .. })
     }
 }
 

@@ -15,16 +15,18 @@ pub enum TokenType {
     CloseBracket, // ]
 
     // Punctuation
-    Comma,     // ,
-    Dot,       // .
-    Minus,     // -
-    Plus,      // +
-    Semicolon, // ;
-    Slash,     // /
-    Star,      // *
-    Colon,     // :
-    Percent,   // %
-    Pipe,      // |
+    Comma,      // ,
+    Dot,        // .
+    Minus,      // -
+    Plus,       // +
+    Semicolon,  // ;
+    Slash,      // /
+    Star,       // *
+    Colon,      // :
+    Percent,    // %
+    Pipe,       // |
+    StarStar,   // **
+    ColonColon, // ::
 
     // Comparison and logical operators
     Bang,         // !
@@ -37,7 +39,6 @@ pub enum TokenType {
     LessEqual,    // <=
     Arrow,        // ->
     PipeArrow,    // |>
-    StarStar,     // **
 
     // Compound assignment
     PlusEqual,    // +=
@@ -59,6 +60,7 @@ pub enum TokenType {
     Const,
     Continue,
     Else,
+    Enum,
     False,
     For,
     Fn,
@@ -114,6 +116,29 @@ impl<'a> Token<'a> {
             lexeme: origin,
             line,
         }
+    }
+
+    // Whether current token is synchronize keyword,
+    // this mainly used in `synchronize()`.
+    // When reporing error and encounter a new synchronized keyword,
+    // we should keep going to parse the next declaration.
+    pub fn is_synchronize_keyword(&self) -> bool {
+        matches!(
+            self.kind,
+            TokenType::Agent
+                | TokenType::AI
+                | TokenType::Class
+                | TokenType::Const
+                | TokenType::Enum
+                | TokenType::Fn
+                | TokenType::For
+                | TokenType::If
+                | TokenType::Let
+                | TokenType::Pub
+                | TokenType::Return
+                | TokenType::Use
+                | TokenType::While
+        )
     }
 
     /// Creates a new identifier token (available with v1 feature)
@@ -322,6 +347,7 @@ impl<'a> Scanner<'a> {
             "const" => TokenType::Const,
             "continue" => TokenType::Continue,
             "else" => TokenType::Else,
+            "enum" => TokenType::Enum,
             "false" => TokenType::False,
             "for" => TokenType::For,
             "fn" => TokenType::Fn,
@@ -418,7 +444,15 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-            ':' => self.make_token(TokenType::Colon),
+            ':' => {
+                let kind = if self.peek() == Some(':') {
+                    self.advance();
+                    TokenType::ColonColon
+                } else {
+                    TokenType::Colon
+                };
+                self.make_token(kind)
+            }
             '%' => {
                 let kind = if self.peek() == Some('=') {
                     self.advance();

@@ -1,0 +1,95 @@
+enum Test {
+    A = 1,
+    B = 2,
+}
+
+enum Test2 {
+    A = 1,
+    B = 2,
+}
+
+print(Test::A == nil);          // expect: false
+print(Test::A == Test::A);      // expect: true
+print(Test::A == Test::B);      // expect: false
+print(Test::A == Test2::A);     // expect: false
+
+print(Test.A == 1);             // expect: true
+print(Test.A != 2);             // expect: true
+print(Test.A == Test.A);        // expect: true
+print(Test.A == Test2.A);       // expect: true
+print(Test.A == Test.B);        // expect: false
+print(Test.A == Test2.B);       // expect: false
+
+print(Test::A == Test.A);       // expect: false
+print(Test::A == Test.B);       // expect: false
+print(Test::A == Test2.A);      // expect: false
+print(Test::A == Test2.B);      // expect: false
+
+// String values
+enum Status {
+    Ok = "ok",
+    Error = "error"
+}
+
+enum Status2 {
+    Ok = "ok",      // Same string value
+    Error = "error" // Same string value
+}
+
+print(Status::Ok == Status::Ok);        // expect: true
+print(Status::Ok == Status::Error);     // expect: false
+print(Status::Ok == Status2::Ok);       // expect: false
+
+print(Status.Ok == "ok");               // expect: true
+print(Status.Ok != "ok!");              // expect: true
+print(Status.Ok == Status.Ok);          // expect: true
+print(Status.Ok == Status2.Ok);         // expect: true
+print(Status.Ok == Status.Error);       // expect: false
+print(Status.Ok == Status2.Error);      // expect: false
+
+// Test boolean values
+enum Flag {
+    Yes = true,
+    No = false
+}
+
+enum Flag2 {
+    Yes = true,    // Same boolean value
+    No = false     // Same boolean value
+}
+
+print(Flag::Yes == Flag::Yes);         // expect: true
+print(Flag::Yes == Flag::No);          // expect: false
+print(Flag::Yes == Flag2::Yes);        // expect: false
+
+print(Flag.Yes == true);               // expect: true
+print(Flag.Yes != false);              // expect: true
+print(Flag.Yes == Flag.Yes);           // expect: true
+print(Flag.Yes == Flag2.Yes);          // expect: true
+print(Flag.Yes == Flag.No);            // expect: false
+print(Flag.Yes == Flag2.No);           // expect: false
+
+
+enum Counter {
+    One,
+    Two,
+    Three
+}
+
+enum Counter2 {
+    One,
+    Two,
+    Three
+}
+
+print(Counter::One == Counter::One);    // expect: true
+print(Counter::One == Counter::Two);    // expect: false
+print(Counter::One == Counter2::One);   // expect: false
+
+print(Counter.One == nil);              // expect: true
+print(Counter.Two == nil);              // expect: true
+print(Counter.Three == nil);            // expect: true
+print(Counter.One == Counter.One);      // expect: true
+print(Counter.One == Counter.Two);      // expect: true
+print(Counter.One == Counter.Three);    // expect: true
+print(Counter.One == Counter2.One);    // expect: true

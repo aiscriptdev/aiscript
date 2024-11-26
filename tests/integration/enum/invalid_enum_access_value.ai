@@ -1,0 +1,3 @@
+class A {}
+
+let a = A.Pending; // expect runtime error: Only instances have properties.

@@ -29,6 +29,21 @@ pub enum Visibility {
 }
 
 #[derive(Debug, Clone)]
+pub struct EnumDecl<'gc> {
+    pub name: Token<'gc>,
+    pub variants: Vec<EnumVariant<'gc>>,
+    pub methods: Vec<Stmt<'gc>>,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant<'gc> {
+    pub name: Token<'gc>,
+    pub value: Option<Expr<'gc>>, // Can be any literal expression
+}
+
+#[derive(Debug, Clone)]
 pub struct FunctionDecl<'gc> {
     pub name: Token<'gc>,
     pub mangled_name: String,
@@ -145,6 +160,11 @@ pub enum Expr<'gc> {
         properties: Vec<ObjectProperty<'gc>>,
         line: u32,
     },
+    EnumVariant {
+        enum_name: Token<'gc>,
+        variant: Token<'gc>,
+        line: u32,
+    },
     Binary {
         left: Box<Expr<'gc>>,
         operator: Token<'gc>,
@@ -255,6 +275,7 @@ impl<'gc> Expr<'gc> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Object { line, .. }
+            | Self::EnumVariant { line, .. }
             | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
             | Self::Array { line, .. }
@@ -286,6 +307,7 @@ pub enum Stmt<'gc> {
         path: Token<'gc>,
         line: u32,
     },
+    Enum(EnumDecl<'gc>),
     Expression {
         expression: Expr<'gc>,
         line: u32,
@@ -333,6 +355,7 @@ impl<'gc> Stmt<'gc> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Use { line, .. }
+            | Self::Enum(EnumDecl { line, .. })
             | Self::Expression { line, .. }
             | Self::Let(VariableDecl { line, .. })
             | Self::Const { line, .. }
@@ -349,12 +372,43 @@ impl<'gc> Stmt<'gc> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Literal<'gc> {
     Number(f64),
     String(InternedString<'gc>),
     Boolean(bool),
     Nil,
+}
+
+// Implement PartialEq manually to handle float comparison
+impl<'gc> PartialEq for Literal<'gc> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Literal::Number(a), Literal::Number(b)) => (a - b).abs() < f64::EPSILON,
+            (Literal::String(a), Literal::String(b)) => a == b,
+            (Literal::Boolean(a), Literal::Boolean(b)) => a == b,
+            (Literal::Nil, Literal::Nil) => true,
+            _ => false,
+        }
+    }
+}
+
+// Implement Eq after ensuring PartialEq handles float comparison correctly
+impl<'gc> Eq for Literal<'gc> {}
+
+// Implement Hash to match our Eq implementation
+impl<'gc> std::hash::Hash for Literal<'gc> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::Number(n) => {
+                // Hash the bits of the float to be consistent with our Eq implementation
+                n.to_bits().hash(state);
+            }
+            Literal::String(s) => s.hash(state),
+            Literal::Boolean(b) => b.hash(state),
+            Literal::Nil => 0.hash(state),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

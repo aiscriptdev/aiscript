@@ -16,7 +16,10 @@ use crate::{
     ai,
     ast::{ChunkId, Visibility},
     module::{ModuleKind, ModuleManager, ModuleSource},
-    object::{BoundMethod, Class, Closure, Function, Instance, Object, Upvalue, UpvalueObj},
+    object::{
+        BoundMethod, Class, Closure, Enum, EnumVariant, Function, Instance, Object, Upvalue,
+        UpvalueObj,
+    },
     string::{InternedString, InternedStringSet},
     NativeFn, OpCode, ReturnValue, Value,
 };
@@ -528,6 +531,31 @@ impl<'gc> State<'gc> {
                 self.close_upvalues(self.stack_top - 1);
                 self.pop_stack();
             }
+            OpCode::Enum(constant) => {
+                let name = frame.read_constant(constant).as_string()?;
+                let enum_def = Enum {
+                    name,
+                    variants: HashMap::default(),
+                    methods: HashMap::default(),
+                };
+                self.push_stack(Value::Enum(Gc::new(self.mc, RefLock::new(enum_def))));
+            }
+            OpCode::EnumVariant(constant) => {
+                let name = frame.read_constant(constant).as_string()?;
+                let value = self.pop_stack(); // Get the variant value
+
+                // Get the enum definition
+                match self.peek(0) {
+                    Value::Enum(def) => {
+                        def.borrow_mut(self.mc).variants.insert(name, value);
+                    }
+                    _ => {
+                        return Err(
+                            self.runtime_error("Cannot add variant to non-enum value".into())
+                        )
+                    }
+                }
+            }
             OpCode::Class(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 self.push_stack(Value::from(Gc::new(
@@ -535,9 +563,57 @@ impl<'gc> State<'gc> {
                     RefLock::new(Class::new(name)),
                 )));
             }
+            OpCode::EnumVariantAccess(byte) => {
+                let name = frame.read_constant(byte).as_string().unwrap();
+                match *self.peek(0) {
+                    Value::Enum(enum_) => {
+                        // Check if it's a variant access
+                        if let Some(value) = enum_.borrow().variants.get(&name) {
+                            self.pop_stack(); // Pop enum
+                            self.push_stack(Value::EnumVariant(Gc::new(
+                                self.mc,
+                                EnumVariant {
+                                    enum_,
+                                    name,
+                                    value: *value,
+                                },
+                            )));
+                        } else {
+                            return Err(self.runtime_error(
+                                format!(
+                                    "Undefined variant '{}' of enum '{}'",
+                                    name,
+                                    enum_.borrow().name,
+                                )
+                                .into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(self.runtime_error(
+                            format!(
+                                "Only enum has variant, make sure the '{}' is an enum variant.",
+                                name
+                            )
+                            .into(),
+                        ));
+                    }
+                }
+            }
             OpCode::GetProperty(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
+                    Value::Enum(enum_) => {
+                        // Check if it's a variant access
+                        if let Some(value) = enum_.borrow().variants.get(&name) {
+                            self.pop_stack(); // Pop enum
+                            self.push_stack(*value);
+                        } else {
+                            return Err(
+                                self.runtime_error(format!("Undefined property '{}'", name).into())
+                            );
+                        }
+                    }
                     Value::Object(obj) => {
                         // Pop the target object first
                         self.pop_stack();
@@ -599,7 +675,7 @@ impl<'gc> State<'gc> {
             }
             OpCode::Method(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
-                self.define_method(name);
+                self.define_method(name)?;
             }
             OpCode::Invoke {
                 method_constant,
@@ -919,14 +995,27 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn define_method(&mut self, name: InternedString<'gc>) {
-        let class = self.peek(1).as_class().unwrap();
-        class
-            .borrow_mut(self.mc)
-            .methods
-            .insert(name, *self.peek(0));
+    fn define_method(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+        match *self.peek(1) {
+            Value::Class(class) => {
+                class
+                    .borrow_mut(self.mc)
+                    .methods
+                    .insert(name, *self.peek(0));
+            }
+            Value::Enum(enum_) => {
+                enum_
+                    .borrow_mut(self.mc)
+                    .methods
+                    .insert(name, *self.peek(0));
+            }
+            _ => {
+                return Err(self.runtime_error("Only class and enum support define method.".into()));
+            }
+        }
         // pop the closure since we’re done with it.
         self.pop_stack();
+        Ok(())
     }
 
     pub(crate) fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
@@ -1053,6 +1142,21 @@ impl<'gc> State<'gc> {
                         args_count,
                         keyword_args_count,
                     )
+                }
+            }
+            Value::EnumVariant(variant) => {
+                if let Some(value) = variant.enum_.borrow().methods.get(&name) {
+                    self.stack[self.stack_top - args_slot_count - 1] = *value;
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!(
+                            "Undefined method '{}' of enum '{}'.",
+                            name,
+                            variant.enum_.borrow().name,
+                        )
+                        .into(),
+                    ))
                 }
             }
             Value::Module(module_name) => {

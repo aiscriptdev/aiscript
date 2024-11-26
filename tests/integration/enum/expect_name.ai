@@ -1,0 +1,17 @@
+enum {} // Error at '{': Expect enum name.
+
+enum MissingVariant1 {
+    "abc" // Error at '"abc"': Expect variant name.
+}
+
+enum MissingVariant2 {
+    1 // Error at '1': Expect variant name.
+}
+
+enum MissingVariant3 {
+    true // Error at 'true': Expect variant name.
+}
+
+enum MissingVariant4 {
+    , // Error at ',': Expect variant name.
+}

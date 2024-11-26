@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::Type;
 
-pub struct TypeResolver<'gc> {
+pub(crate) struct TypeResolver<'gc> {
     // Keep track of defined types (classes) in the current scope
     defined_types: HashMap<&'gc str, Type<'gc>>,
 }
