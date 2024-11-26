@@ -121,7 +121,9 @@ impl<'gc> Value<'gc> {
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
             (Value::Enum(a), Value::Enum(b)) => Gc::ptr_eq(*a, *b),
             (Value::EnumVariant(a), Value::EnumVariant(b)) => {
-                Gc::ptr_eq(*a, *b) && a.name == b.name && a.value.equals(&b.value)
+                // We only need to compare the enum type name and variant name, not the underlying value.
+                // The value is just for initialization and access, but doesn't affect the variant's identity.
+                Gc::ptr_eq(a.enum_, b.enum_) && a.name == b.name
             }
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
