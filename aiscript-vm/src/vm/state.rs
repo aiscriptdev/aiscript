@@ -16,7 +16,10 @@ use crate::{
     ai,
     ast::{ChunkId, Visibility},
     module::{ModuleKind, ModuleManager, ModuleSource},
-    object::{BoundMethod, Class, Closure, Function, Instance, Object, Upvalue, UpvalueObj},
+    object::{
+        BoundMethod, Class, Closure, Enum, EnumVariant, Function, Instance, Object, Upvalue,
+        UpvalueObj,
+    },
     string::{InternedString, InternedStringSet},
     NativeFn, OpCode, ReturnValue, Value,
 };
@@ -528,6 +531,31 @@ impl<'gc> State<'gc> {
                 self.close_upvalues(self.stack_top - 1);
                 self.pop_stack();
             }
+            OpCode::Enum(constant) => {
+                let name = frame.read_constant(constant).as_string()?;
+                let enum_def = Enum {
+                    name,
+                    variants: HashMap::default(),
+                    methods: HashMap::default(),
+                };
+                self.push_stack(Value::Enum(Gc::new(self.mc, RefLock::new(enum_def))));
+            }
+            OpCode::EnumVariant(constant) => {
+                let name = frame.read_constant(constant).as_string()?;
+                let value = self.pop_stack(); // Get the variant value
+
+                // Get the enum definition
+                match self.peek(0) {
+                    Value::Enum(def) => {
+                        def.borrow_mut(self.mc).variants.insert(name, value);
+                    }
+                    _ => {
+                        return Err(
+                            self.runtime_error("Cannot add variant to non-enum value".into())
+                        )
+                    }
+                }
+            }
             OpCode::Class(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 self.push_stack(Value::from(Gc::new(
@@ -538,6 +566,28 @@ impl<'gc> State<'gc> {
             OpCode::GetProperty(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
+                    Value::Enum(def) => {
+                        // Check if it's a variant access
+                        if let Some(value) = def.borrow().variants.get(&name) {
+                            self.pop_stack(); // Pop enum
+                            self.push_stack(Value::EnumVariant(Gc::new(
+                                self.mc,
+                                EnumVariant {
+                                    enum_: def,
+                                    name,
+                                    value: *value,
+                                },
+                            )));
+                        } else if let Some(method) = def.borrow().methods.get(&name) {
+                            // Handle method access
+                            self.pop_stack(); // Pop enum
+                                              // self.bind_method(def, name)?;
+                        } else {
+                            return Err(
+                                self.runtime_error(format!("Undefined property '{}'", name).into())
+                            );
+                        }
+                    }
                     Value::Object(obj) => {
                         // Pop the target object first
                         self.pop_stack();

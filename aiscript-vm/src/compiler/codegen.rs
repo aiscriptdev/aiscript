@@ -6,7 +6,10 @@ use std::{
 
 use crate::{
     ai::Agent,
-    ast::{AgentDecl, ChunkId, ClassDecl, FunctionDecl, Mutability, ObjectProperty, VariableDecl},
+    ast::{
+        AgentDecl, ChunkId, ClassDecl, EnumDecl, FunctionDecl, Mutability, ObjectProperty,
+        VariableDecl,
+    },
     object::{Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
@@ -397,6 +400,55 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::Return);
                 }
             }
+            Stmt::Enum(EnumDecl {
+                name,
+                variants,
+                methods,
+                visibility,
+                ..
+            }) => {
+                // Emit enum declaration (similar to Class opcode)
+                let name_constant = self.identifier_constant(name.lexeme);
+                self.emit(OpCode::Enum(name_constant as u8));
+
+                // Define globally right away (like Class)
+                self.emit(OpCode::DefineGlobal {
+                    name_constant: name_constant as u8,
+                    visibility: *visibility,
+                });
+
+                // Load enum again for method definitions (like Class)
+                self.emit(OpCode::GetGlobal(name_constant as u8));
+
+                // Define variants
+                for variant in variants {
+                    // Emit variant value if present
+                    if let Some(value) = &variant.value {
+                        self.generate_expr(value)?;
+                    } else {
+                        self.emit(OpCode::Nil);
+                    }
+
+                    // Emit variant name and creation opcode
+                    let variant_constant = self.identifier_constant(variant.name.lexeme);
+                    self.emit(OpCode::EnumVariant(variant_constant as u8));
+                }
+
+                // Define methods (exactly like Class)
+                for method in methods {
+                    if let Stmt::Function(FunctionDecl {
+                        name: method_name, ..
+                    }) = method
+                    {
+                        self.generate_stmt(method)?;
+                        let method_constant = self.identifier_constant(method_name.lexeme);
+                        self.emit(OpCode::Method(method_constant as u8));
+                    }
+                }
+
+                // Pop the enum (like we do with Class)
+                self.emit(OpCode::Pop(1));
+            }
             Stmt::Class(ClassDecl {
                 name,
                 superclass,
@@ -562,6 +614,16 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(element)?;
                 }
                 self.emit(OpCode::MakeArray(elements.len() as u8));
+            }
+            Expr::EnumAccess {
+                enum_name, variant, ..
+            } => {
+                // Get the enum (like a class)
+                self.named_variable(enum_name, false)?;
+
+                // Get the variant (similar to GetProperty)
+                let name_constant = self.identifier_constant(variant.lexeme);
+                self.emit(OpCode::GetProperty(name_constant as u8));
             }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack

@@ -4,7 +4,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
 
 use crate::{
     ai::Agent,
-    object::{BoundMethod, Class, Closure, Instance, Object},
+    object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, Object},
     string::InternedString,
     vm::{Context, VmError},
     NativeFn, ReturnValue,
@@ -23,6 +23,8 @@ pub enum Value<'gc> {
     NativeFunction(NativeFn<'gc>),
     Array(GcRefLock<'gc, Vec<Value<'gc>>>),
     Object(GcRefLock<'gc, Object<'gc>>),
+    Enum(GcRefLock<'gc, Enum<'gc>>),
+    EnumVariant(Gc<'gc, EnumVariant<'gc>>),
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     BoundMethod(Gc<'gc, BoundMethod<'gc>>),
@@ -76,6 +78,15 @@ impl<'gc> Display for Value<'gc> {
                 }
                 write!(f, "}}")
             }
+            Value::Enum(enum_) => write!(f, "enum {}", enum_.borrow().name),
+            Value::EnumVariant(variant) => {
+                write!(f, "{}::{}", variant.enum_.borrow().name, variant.name)?;
+                if !variant.value.is_nil() {
+                    write!(f, "({})", variant.value)
+                } else {
+                    Ok(())
+                }
+            }
             Value::Class(class) => write!(f, "{}", class.borrow().name),
             Value::Instance(instance) => {
                 let mut s = format!("{} {{", instance.borrow().class.borrow().name);
@@ -108,6 +119,10 @@ impl<'gc> Value<'gc> {
             (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
             (Value::Array(a), Value::Array(b)) => Gc::ptr_eq(*a, *b),
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Enum(a), Value::Enum(b)) => Gc::ptr_eq(*a, *b),
+            (Value::EnumVariant(a), Value::EnumVariant(b)) => {
+                Gc::ptr_eq(*a, *b) && a.name == b.name && a.value.equals(&b.value)
+            }
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
             (Value::Instance(a), Value::Instance(b)) => Gc::ptr_eq(*a, *b),
@@ -277,6 +292,39 @@ impl<'gc> Value<'gc> {
                 Value::Object(Gc::new(&ctx, RefLock::new(Object { fields })))
             }
             _ => Value::Nil,
+        }
+    }
+}
+
+// Implementations for Enum and EnumVariant
+impl<'gc> Value<'gc> {
+    pub fn is_enum(&self) -> bool {
+        matches!(self, Value::Enum(_))
+    }
+
+    pub fn is_enum_variant(&self) -> bool {
+        matches!(self, Value::EnumVariant { .. })
+    }
+
+    pub fn get_variant_name(&self) -> Option<InternedString<'gc>> {
+        match self {
+            Value::EnumVariant(variant) => Some(variant.name),
+            _ => None,
+        }
+    }
+
+    pub fn get_variant_value(&self) -> Option<Value<'gc>> {
+        match self {
+            Value::EnumVariant(variant) => Some(variant.value),
+            _ => None,
+        }
+    }
+
+    pub fn get_enum(&self) -> Option<GcRefLock<'gc, Enum<'gc>>> {
+        match self {
+            Value::Enum(enum_) => Some(*enum_),
+            Value::EnumVariant(variant) => Some(variant.enum_),
+            _ => None,
         }
     }
 }

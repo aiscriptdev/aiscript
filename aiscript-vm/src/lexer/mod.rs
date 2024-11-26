@@ -15,16 +15,18 @@ pub enum TokenType {
     CloseBracket, // ]
 
     // Punctuation
-    Comma,     // ,
-    Dot,       // .
-    Minus,     // -
-    Plus,      // +
-    Semicolon, // ;
-    Slash,     // /
-    Star,      // *
-    Colon,     // :
-    Percent,   // %
-    Pipe,      // |
+    Comma,      // ,
+    Dot,        // .
+    Minus,      // -
+    Plus,       // +
+    Semicolon,  // ;
+    Slash,      // /
+    Star,       // *
+    Colon,      // :
+    Percent,    // %
+    Pipe,       // |
+    StarStar,   // **
+    ColonColon, // ::
 
     // Comparison and logical operators
     Bang,         // !
@@ -37,7 +39,6 @@ pub enum TokenType {
     LessEqual,    // <=
     Arrow,        // ->
     PipeArrow,    // |>
-    StarStar,     // **
 
     // Compound assignment
     PlusEqual,    // +=
@@ -59,6 +60,7 @@ pub enum TokenType {
     Const,
     Continue,
     Else,
+    Enum,
     False,
     For,
     Fn,
@@ -322,6 +324,7 @@ impl<'a> Scanner<'a> {
             "const" => TokenType::Const,
             "continue" => TokenType::Continue,
             "else" => TokenType::Else,
+            "enum" => TokenType::Enum,
             "false" => TokenType::False,
             "for" => TokenType::For,
             "fn" => TokenType::Fn,
@@ -418,7 +421,15 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(kind)
             }
-            ':' => self.make_token(TokenType::Colon),
+            ':' => {
+                let kind = if self.peek() == Some(':') {
+                    self.advance();
+                    TokenType::ColonColon
+                } else {
+                    TokenType::Colon
+                };
+                self.make_token(kind)
+            }
             '%' => {
                 let kind = if self.peek() == Some('=') {
                     self.advance();

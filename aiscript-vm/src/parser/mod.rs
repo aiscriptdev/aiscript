@@ -8,7 +8,10 @@ use super::{
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{
-    ast::{AgentDecl, ClassDecl, FunctionDecl, ObjectProperty, VariableDecl, Visibility},
+    ast::{
+        AgentDecl, ClassDecl, EnumDecl, EnumVariant, FunctionDecl, ObjectProperty, VariableDecl,
+        Visibility,
+    },
     object::FunctionType,
     vm::Context,
     VmError,
@@ -154,6 +157,8 @@ impl<'gc> Parser<'gc> {
             } else {
                 self.use_declaration()
             }
+        } else if self.match_token(TokenType::Enum) {
+            self.enum_declaration(visibility)
         } else if self.match_token(TokenType::Class) {
             self.class_declaration(visibility)
         } else if self.match_token(TokenType::AI) {
@@ -346,6 +351,88 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Colon, "Expect ':' after field name.");
         let value = self.expression()?;
         Some((key, value))
+    }
+
+    fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
+        self.consume(TokenType::Identifier, "Expect enum name.");
+        let name = self.previous;
+        self.consume(TokenType::OpenBrace, "Expect '{' before enum body.");
+
+        let mut variants = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            if self.match_token(TokenType::Fn) {
+                // Parse method
+                if let Some(method) =
+                    self.func_declaration(FunctionType::Method, Visibility::Private)
+                {
+                    methods.push(method);
+                    continue;
+                }
+            }
+
+            // Parse variant
+            self.consume(TokenType::Identifier, "Expect variant name.");
+            let variant_name = self.previous;
+
+            let value = if self.match_token(TokenType::Equal) {
+                // Parse any literal value
+                if !self.check(TokenType::Number)
+                    && !self.check(TokenType::String)
+                    && !self.check(TokenType::True)
+                    && !self.check(TokenType::False)
+                    && !self.check(TokenType::OpenBracket)
+                {
+                    self.error_at_current(
+                        "Enum variant value must be a literal (number, string, boolean, or array).",
+                    );
+                    return None;
+                }
+                Some(self.expression()?)
+            } else {
+                None
+            };
+
+            variants.push(EnumVariant {
+                name: variant_name,
+                value,
+            });
+
+            if !self.check(TokenType::CloseBrace) {
+                self.consume(TokenType::Comma, "Expect ',' after variant.");
+            }
+        }
+
+        self.consume(TokenType::CloseBrace, "Expect '}' after enum body.");
+
+        Some(Stmt::Enum(EnumDecl {
+            name,
+            variants,
+            methods,
+            visibility,
+            line: name.line,
+        }))
+    }
+
+    fn enum_access(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        // The enum name is in previous_expr since this is an infix operator
+        let enum_name = match &self.previous_expr.take()? {
+            Expr::Variable { name, .. } => *name,
+            _ => {
+                self.error("Expected enum name before '::'.");
+                return None;
+            }
+        };
+
+        self.consume(TokenType::Identifier, "Expect variant name after '::'.");
+        let variant = self.previous;
+
+        Some(Expr::EnumAccess {
+            enum_name,
+            variant,
+            line: variant.line,
+        })
     }
 
     fn class_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
@@ -1421,6 +1508,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenBracket => {
             ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
         }
+        TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_access), Precedence::Call),
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
         TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Pipe),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),

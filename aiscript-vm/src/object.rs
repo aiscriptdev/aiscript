@@ -116,6 +116,27 @@ pub struct Object<'gc> {
     pub fields: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct Enum<'gc> {
+    pub name: InternedString<'gc>,
+    // Variant name -> value mapping
+    pub variants: HashMap<InternedString<'gc>, Value<'gc>>,
+    // Method name -> function mapping
+    pub methods: HashMap<InternedString<'gc>, Value<'gc>>,
+}
+
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct EnumVariant<'gc> {
+    // Reference to enum definition
+    pub enum_: GcRefLock<'gc, Enum<'gc>>,
+    // Variant name
+    pub name: InternedString<'gc>,
+    // Variant value (can be any type)
+    pub value: Value<'gc>,
+}
+
 impl<'gc> Class<'gc> {
     pub fn new(name: InternedString<'gc>) -> Self {
         Self {

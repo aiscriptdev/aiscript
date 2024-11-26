@@ -29,6 +29,21 @@ pub enum Visibility {
 }
 
 #[derive(Debug, Clone)]
+pub struct EnumDecl<'gc> {
+    pub name: Token<'gc>,
+    pub variants: Vec<EnumVariant<'gc>>,
+    pub methods: Vec<Stmt<'gc>>,
+    pub visibility: Visibility,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant<'gc> {
+    pub name: Token<'gc>,
+    pub value: Option<Expr<'gc>>, // Can be any literal expression
+}
+
+#[derive(Debug, Clone)]
 pub struct FunctionDecl<'gc> {
     pub name: Token<'gc>,
     pub mangled_name: String,
@@ -145,6 +160,11 @@ pub enum Expr<'gc> {
         properties: Vec<ObjectProperty<'gc>>,
         line: u32,
     },
+    EnumAccess {
+        enum_name: Token<'gc>,
+        variant: Token<'gc>,
+        line: u32,
+    },
     Binary {
         left: Box<Expr<'gc>>,
         operator: Token<'gc>,
@@ -255,6 +275,7 @@ impl<'gc> Expr<'gc> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Object { line, .. }
+            | Self::EnumAccess { line, .. }
             | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
             | Self::Array { line, .. }
@@ -286,6 +307,7 @@ pub enum Stmt<'gc> {
         path: Token<'gc>,
         line: u32,
     },
+    Enum(EnumDecl<'gc>),
     Expression {
         expression: Expr<'gc>,
         line: u32,
@@ -333,6 +355,7 @@ impl<'gc> Stmt<'gc> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Use { line, .. }
+            | Self::Enum(EnumDecl { line, .. })
             | Self::Expression { line, .. }
             | Self::Let(VariableDecl { line, .. })
             | Self::Const { line, .. }

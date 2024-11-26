@@ -19,13 +19,7 @@ pub(super) fn bool<'gc>(
         Value::Nil => Ok(Value::Boolean(false)),
         Value::Array(arr) => Ok(Value::Boolean(!arr.borrow().is_empty())),
         Value::Object(obj) => Ok(Value::Boolean(!obj.borrow().fields.is_empty())),
-        Value::Class(_)
-        | Value::Instance(_)
-        | Value::Closure(_)
-        | Value::BoundMethod(_)
-        | Value::NativeFunction(_)
-        | Value::Module(_)
-        | Value::Agent(_) => Ok(Value::Boolean(true)),
+        _ => Ok(Value::Boolean(true)),
     }
 }
 

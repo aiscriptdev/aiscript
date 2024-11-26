@@ -1,0 +1,8 @@
+enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    ServerError = 500,
+}
+
+let status = HttpStatus::Ok;
+print(status); // expect: HttpStatus::Ok(200)
