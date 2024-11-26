@@ -162,15 +162,6 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_io_string(self) -> Result<Gc<'gc, String>, VmError> {
-        match self {
-            Value::IoString(value) => Ok(value),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to string, the value is {v}"
-            ))),
-        }
-    }
-
     pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, VmError> {
         match self {
             Value::Closure(closure) => Ok(closure),
@@ -192,41 +183,6 @@ impl<'gc> Value<'gc> {
             Value::Class(class) => Ok(class),
             v => Err(VmError::RuntimeError(format!(
                 "cannot convert to class, the value is {v}"
-            ))),
-        }
-    }
-
-    pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, VmError> {
-        match self {
-            Value::Instance(instance) => Ok(instance),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to instance, the value is {v}"
-            ))),
-        }
-    }
-
-    pub fn as_bound_method(self) -> Result<Gc<'gc, BoundMethod<'gc>>, VmError> {
-        match self {
-            Value::BoundMethod(bm) => Ok(bm),
-            _ => Err(VmError::RuntimeError(
-                "cannot convert to bound method".into(),
-            )),
-        }
-    }
-
-    pub fn as_module(&self) -> Option<InternedString<'gc>> {
-        match self {
-            Value::Module(name) => Some(*name),
-            _ => None,
-        }
-    }
-
-    pub fn as_object(self) -> Result<GcRefLock<'gc, Object<'gc>>, VmError> {
-        match self {
-            Value::Object(obj) => Ok(obj),
-            v => Err(VmError::RuntimeError(format!(
-                "cannot convert to object: {:?}",
-                v
             ))),
         }
     }
@@ -304,28 +260,6 @@ impl<'gc> Value<'gc> {
 
     pub fn is_enum_variant(&self) -> bool {
         matches!(self, Value::EnumVariant { .. })
-    }
-
-    pub fn get_variant_name(&self) -> Option<InternedString<'gc>> {
-        match self {
-            Value::EnumVariant(variant) => Some(variant.name),
-            _ => None,
-        }
-    }
-
-    pub fn get_variant_value(&self) -> Option<Value<'gc>> {
-        match self {
-            Value::EnumVariant(variant) => Some(variant.value),
-            _ => None,
-        }
-    }
-
-    pub fn get_enum(&self) -> Option<GcRefLock<'gc, Enum<'gc>>> {
-        match self {
-            Value::Enum(enum_) => Some(*enum_),
-            Value::EnumVariant(variant) => Some(variant.enum_),
-            _ => None,
-        }
     }
 }
 
