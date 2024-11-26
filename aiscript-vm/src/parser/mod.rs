@@ -360,16 +360,12 @@ impl<'gc> Parser<'gc> {
 
         let mut variants = Vec::new();
         let mut methods = Vec::new();
-
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            if self.match_token(TokenType::Fn) {
+            if self.check(TokenType::Fn) || self.check(TokenType::AI) || self.check(TokenType::Pub)
+            {
                 // Parse method
-                if let Some(method) =
-                    self.func_declaration(FunctionType::Method, Visibility::Private)
-                {
-                    methods.push(method);
-                    continue;
-                }
+                methods.push(self.method_declaration()?);
+                continue;
             }
 
             // Parse variant
@@ -464,21 +460,7 @@ impl<'gc> Parser<'gc> {
 
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            let method_vis = if self.match_token(TokenType::Pub) {
-                Visibility::Public
-            } else {
-                Visibility::Private
-            };
-            let method = if self.match_token(TokenType::AI) {
-                self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-                self.func_declaration(FunctionType::AiMethod, method_vis)?
-            } else if self.match_token(TokenType::Fn) {
-                self.func_declaration(FunctionType::Method, method_vis)?
-            } else {
-                self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
-                return None;
-            };
-            methods.push(method);
+            methods.push(self.method_declaration()?);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -493,6 +475,24 @@ impl<'gc> Parser<'gc> {
             visibility,
             line: name.line,
         }))
+    }
+
+    fn method_declaration(&mut self) -> Option<Stmt<'gc>> {
+        let method_vis = if self.match_token(TokenType::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        let method = if self.match_token(TokenType::AI) {
+            self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
+            self.func_declaration(FunctionType::AiMethod, method_vis)?
+        } else if self.match_token(TokenType::Fn) {
+            self.func_declaration(FunctionType::Method, method_vis)?
+        } else {
+            self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
+            return None;
+        };
+        Some(method)
     }
 
     fn func_declaration(

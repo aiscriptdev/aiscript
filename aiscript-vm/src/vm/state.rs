@@ -649,7 +649,7 @@ impl<'gc> State<'gc> {
             }
             OpCode::Method(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
-                self.define_method(name);
+                self.define_method(name)?;
             }
             OpCode::Invoke {
                 method_constant,
@@ -969,14 +969,27 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn define_method(&mut self, name: InternedString<'gc>) {
-        let class = self.peek(1).as_class().unwrap();
-        class
-            .borrow_mut(self.mc)
-            .methods
-            .insert(name, *self.peek(0));
+    fn define_method(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+        match *self.peek(1) {
+            Value::Class(class) => {
+                class
+                    .borrow_mut(self.mc)
+                    .methods
+                    .insert(name, *self.peek(0));
+            }
+            Value::Enum(enum_) => {
+                enum_
+                    .borrow_mut(self.mc)
+                    .methods
+                    .insert(name, *self.peek(0));
+            }
+            _ => {
+                return Err(self.runtime_error("Only class and enum support define method.".into()));
+            }
+        }
         // pop the closure since we’re done with it.
         self.pop_stack();
+        Ok(())
     }
 
     pub(crate) fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
@@ -1103,6 +1116,21 @@ impl<'gc> State<'gc> {
                         args_count,
                         keyword_args_count,
                     )
+                }
+            }
+            Value::EnumVariant(variant) => {
+                if let Some(value) = variant.enum_.borrow().methods.get(&name) {
+                    self.stack[self.stack_top - args_slot_count - 1] = *value;
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!(
+                            "Undefined method '{}' of enum '{}'.",
+                            name,
+                            variant.enum_.borrow().name,
+                        )
+                        .into(),
+                    ))
                 }
             }
             Value::Module(module_name) => {

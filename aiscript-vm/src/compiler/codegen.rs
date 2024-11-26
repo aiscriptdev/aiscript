@@ -178,6 +178,11 @@ impl<'gc> CodeGen<'gc> {
                     self.declare_functions(stmt)?;
                 }
             }
+            Stmt::Enum(EnumDecl { methods, .. }) => {
+                for methods in methods {
+                    self.declare_functions(methods)?;
+                }
+            }
             Stmt::Class(ClassDecl { methods, .. }) => {
                 for methods in methods {
                     self.declare_functions(methods)?;
@@ -411,13 +416,13 @@ impl<'gc> CodeGen<'gc> {
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::Enum(name_constant as u8));
 
-                // Define globally right away (like Class)
+                // Define globally right away
                 self.emit(OpCode::DefineGlobal {
                     name_constant: name_constant as u8,
                     visibility: *visibility,
                 });
 
-                // Load enum again for method definitions (like Class)
+                // Load enum again for method definitions
                 self.emit(OpCode::GetGlobal(name_constant as u8));
 
                 // Define variants
@@ -434,13 +439,25 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::EnumVariant(variant_constant as u8));
                 }
 
-                // Define methods (exactly like Class)
                 for method in methods {
                     if let Stmt::Function(FunctionDecl {
-                        name: method_name, ..
+                        name: method_name,
+                        mangled_name,
+                        params,
+                        return_type,
+                        body,
+                        fn_type,
+                        ..
                     }) = method
                     {
-                        self.generate_stmt(method)?;
+                        self.generate_function(
+                            method_name.lexeme,
+                            mangled_name.to_owned(),
+                            params,
+                            return_type,
+                            body,
+                            *fn_type,
+                        )?;
                         let method_constant = self.identifier_constant(method_name.lexeme);
                         self.emit(OpCode::Method(method_constant as u8));
                     }
@@ -498,13 +515,12 @@ impl<'gc> CodeGen<'gc> {
                         params,
                         return_type,
                         body,
+                        mut fn_type,
                         ..
                     }) = method
                     {
-                        let fn_type = if method_name.lexeme == "init" {
-                            FunctionType::Constructor
-                        } else {
-                            FunctionType::Method
+                        if method_name.lexeme == "init" {
+                            fn_type = FunctionType::Constructor
                         };
                         self.generate_function(
                             method_name.lexeme,
