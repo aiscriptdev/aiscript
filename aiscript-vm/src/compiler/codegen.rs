@@ -641,6 +641,22 @@ impl<'gc> CodeGen<'gc> {
             Expr::EnumVariant {
                 enum_name, variant, ..
             } => {
+                // Validate enums and variants
+                if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
+                    let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
+                    if enum_.borrow().get_variant_value(variant_name).is_none() {
+                        self.error_at(
+                            *variant,
+                            &format!(
+                                "No variant called '{}' in enum '{}'.",
+                                variant.lexeme, enum_name.lexeme
+                            ),
+                        );
+                    }
+                } else {
+                    self.error_at(*enum_name, &format!("Invalid enum '{}'.", enum_name.lexeme));
+                }
+
                 self.named_variable(enum_name, false)?;
 
                 let name_constant = self.identifier_constant(variant.lexeme);

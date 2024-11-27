@@ -1,0 +1,12 @@
+enum Either {
+    A,
+    B,
+}
+
+let x = Either::A;
+print(x);
+x = Either::B;
+print(x);
+
+Either::A = 1; // Error at '=': Invalid assignment target.
+Either::A = Either::B; // Error at '=': Invalid assignment target.

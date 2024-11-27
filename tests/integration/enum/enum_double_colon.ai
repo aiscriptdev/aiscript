@@ -1,0 +1,6 @@
+enum Result { Ok, Error }
+
+1::Ok; // Error at '::': Expected enum name before '::'.
+Result::; // Error at ';': Expect variant name after '::'.
+Result:::; // Error at ':': Expect variant name after '::'.
+Result:::Ok; // Error at ':': Expect variant name after '::'.
