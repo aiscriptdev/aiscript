@@ -18,6 +18,16 @@ enum Invalid4 {
     B = 3,        // Error at 'B': Enum variant 'B' value 3 must be greater than or equal to 4 (next auto-increment value)
 }
 
+enum Invalid5 {
+    A = "A",
+    B = "A",      // Error at 'B': Duplicate value "A" in enum variant 'B'.
+}
+
+enum Invalid6 {
+    A,
+    A = "A",      // Error at 'A': Duplicate variant 'A' in enum 'Invalid6'.
+}
+
 enum Status {
     Pending = 0,
     Active = 1,
@@ -33,5 +43,5 @@ enum Config {
 enum FileType {
     Text = "text/plain",
     Html = "text/html",
-    Json = true,           // Error at 'Json': Enum variant 'Json' must be of type string
+    Json = true,    // Error at 'Json': Enum variant 'Json' must be of type string
 }

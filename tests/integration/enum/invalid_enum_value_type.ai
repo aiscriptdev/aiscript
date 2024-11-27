@@ -1,0 +1,13 @@
+enum Invalid {
+    A = +, // Error at '+': Enum variant value must be a literal (number, string, or boolean)
+}
+
+let a = 1;
+enum Invalid1 {
+    A = a, // Error at 'a': Enum variant value must be a literal (number, string, or boolean)
+}
+
+enum Either { A, B }
+enum Invalid2 {
+    A = Either::A, // Error at 'Either': Enum variant value must be a literal (number, string, or boolean)
+}

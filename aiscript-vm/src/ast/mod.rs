@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use gc_arena::Collect;
 use indexmap::IndexMap;
@@ -35,6 +36,17 @@ pub enum Literal<'gc> {
     Boolean(bool),
     #[default]
     Nil,
+}
+
+impl<'gc> Display for Literal<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Number(n) => write!(f, "{n}"),
+            Literal::String(s) => write!(f, "\"{s}\""),
+            Literal::Boolean(b) => write!(f, "{b}"),
+            Literal::Nil => write!(f, "nil"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

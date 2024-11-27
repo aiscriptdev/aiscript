@@ -394,7 +394,7 @@ impl<'gc> Parser<'gc> {
 
         let mut variants = Vec::new();
         let mut methods = Vec::new();
-        let mut checker = EnumVariantChecker::new();
+        let mut checker = EnumVariantChecker::new(name.lexeme);
 
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             if self.check(TokenType::Fn) || self.check(TokenType::AI) || self.check(TokenType::Pub)
@@ -411,6 +411,9 @@ impl<'gc> Parser<'gc> {
             // Consume the variant identifier
             self.advance();
             let variant_name = self.previous;
+            if let Err(err) = checker.check_variant(variant_name) {
+                self.error_at(variant_name, &err);
+            }
 
             let value = if self.match_token(TokenType::Equal) {
                 // Check for valid literal tokens

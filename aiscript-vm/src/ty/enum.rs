@@ -10,18 +10,32 @@ enum EnumValueType {
 }
 
 pub(crate) struct EnumVariantChecker<'gc> {
+    enum_name: &'gc str,
+    variant_names: HashSet<&'gc str>,
     value_type: EnumValueType,
     used_values: HashSet<Literal<'gc>>,
     next_int_value: f64,
 }
 
 impl<'gc> EnumVariantChecker<'gc> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(enum_name: &'gc str) -> Self {
         Self {
+            enum_name,
+            variant_names: HashSet::default(),
             value_type: EnumValueType::Unset,
             used_values: HashSet::new(),
             next_int_value: 0.0,
         }
+    }
+
+    pub(crate) fn check_variant(&mut self, variant_name: Token<'gc>) -> Result<(), String> {
+        if !self.variant_names.insert(variant_name.lexeme) {
+            return Err(format!(
+                "Duplicate variant '{}' in enum '{}'.",
+                variant_name.lexeme, self.enum_name
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn check_value(
@@ -74,7 +88,7 @@ impl<'gc> EnumVariantChecker<'gc> {
         // Check for duplicates
         if self.used_values.contains(literal) {
             return Err(format!(
-                "Duplicate value {:?} in enum variant '{}'",
+                "Duplicate value {} in enum variant '{}'.",
                 literal, variant_name.lexeme
             ));
         }
