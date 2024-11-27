@@ -177,6 +177,11 @@ pub enum Expr<'gc> {
         variant: Token<'gc>,
         line: u32,
     },
+    // syntax: [Enum::Variant] to get the value
+    EvaluateVariant {
+        expr: Box<Expr<'gc>>,
+        line: u32,
+    },
     Binary {
         left: Box<Expr<'gc>>,
         operator: Token<'gc>,
@@ -288,6 +293,7 @@ impl<'gc> Expr<'gc> {
         match self {
             Self::Object { line, .. }
             | Self::EnumVariant { line, .. }
+            | Self::EvaluateVariant { line, .. }
             | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
             | Self::Array { line, .. }

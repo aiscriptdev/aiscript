@@ -1,0 +1,17 @@
+// Test single element array, since enum variant evaluate has the similar syntax
+print([1]);        // expect: [1]
+print([1,]);       // expect: [1]
+print([1 + 1]);    // expect: [2]
+print([(1)]);      // expect: [1]
+print([[1]]);      // expect: [[1]]
+print(["a"]);      // expect: [a]
+print(["a",]);     // expect: [a]
+print([true]);     // expect: [true]
+print([true,]);    // expect: [true]
+
+let x = "x";
+// must append , for variable element,
+// to avoid syntax conflict with variant evaluation
+print([x,]);       // expect: [x]
+print([(x)]);      // expect: [x]
+print([x + "y"]);  // expect: [xy]

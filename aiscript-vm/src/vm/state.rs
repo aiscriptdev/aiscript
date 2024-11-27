@@ -545,8 +545,35 @@ impl<'gc> State<'gc> {
                     RefLock::new(Class::new(name)),
                 )));
             }
-            OpCode::EnumVariant(byte) => {
-                let name = frame.read_constant(byte).as_string().unwrap();
+            OpCode::EnumVariant {
+                name_constant,
+                evaluate,
+            } => {
+                if evaluate {
+                    match self.pop_stack() {
+                        Value::Enum(enum_) => {
+                            let frame = self.current_frame();
+                            let name = frame.read_constant(name_constant).as_string().unwrap();
+                            if let Some(value) = enum_.borrow().variants.get(&name) {
+                                self.push_stack(*value);
+                            }
+                        }
+                        Value::EnumVariant(variant) => {
+                            self.push_stack(variant.value);
+                        }
+                        _ => {
+                            let frame = self.current_frame();
+                            let name = frame.read_constant(name_constant).as_string().unwrap();
+                            return Err(self.runtime_error(
+                                format!("'{}' is not an enum variant and is not evaluable.", name)
+                                    .into(),
+                            ));
+                        }
+                    }
+                    return Ok(None);
+                }
+
+                let name = frame.read_constant(name_constant).as_string().unwrap();
                 if let Value::Enum(enum_) = *self.peek(0) {
                     // Check if it's a variant access
                     if let Some(value) = enum_.borrow().variants.get(&name) {

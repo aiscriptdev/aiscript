@@ -1,0 +1,33 @@
+enum Either { A, B  }
+
+print([Either::A]);   // expect: nil
+print([Either::A,]);  // expect: [Either::A]
+print([(Either::A)]); // expect: [Either::A]
+
+let b = Either::B;
+print([b]);           // expect: nil
+print([(b)]);         // expect: [Either::B]
+print([b,]);          // expect: [Either::B]
+
+enum Num {
+    One = 1,
+    Two = 2,
+}
+print([Num::One]);       // expect: 1
+print([Num::Two]);       // expect: 2
+print([Num::Two] + 1);   // expect: 3
+print([Num::One,]);      // expect: [Num::One(1)]
+print([(Num::One)]);     // expect: [Num::One(1)]
+
+enum Str {
+    A = "a",
+    B = "b",
+}
+print([Str::A]);     // expect: "a"
+print([Str::B]);     // expect: "b"
+
+let x = Str::A;
+print([x]);          // expect: "a"
+print([x] + "b");    // expect: "ab"
+print([(x)]);        // expect: [Str::A(a)]
+print([x,]);         // expect: [Str::A(a)]

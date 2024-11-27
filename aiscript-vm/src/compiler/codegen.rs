@@ -641,26 +641,14 @@ impl<'gc> CodeGen<'gc> {
             Expr::EnumVariant {
                 enum_name, variant, ..
             } => {
-                // Validate enums and variants
-                if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
-                    let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
-                    if enum_.borrow().get_variant_value(variant_name).is_none() {
-                        self.error_at(
-                            *variant,
-                            &format!(
-                                "No variant called '{}' in enum '{}'.",
-                                variant.lexeme, enum_name.lexeme
-                            ),
-                        );
-                    }
-                } else {
-                    self.error_at(*enum_name, &format!("Invalid enum '{}'.", enum_name.lexeme));
-                }
-
+                self.validate_enum_variant(*enum_name, *variant);
                 self.named_variable(enum_name, false)?;
 
-                let name_constant = self.identifier_constant(variant.lexeme);
-                self.emit(OpCode::EnumVariant(name_constant as u8));
+                let name_constant = self.identifier_constant(variant.lexeme) as u8;
+                self.emit(OpCode::EnumVariant {
+                    name_constant,
+                    evaluate: false,
+                });
             }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack
@@ -872,6 +860,34 @@ impl<'gc> CodeGen<'gc> {
 
                 self.generate_expr(else_branch)?;
                 self.patch_jump(else_jump);
+            }
+            Expr::EvaluateVariant { expr, .. } => {
+                if let Expr::EnumVariant {
+                    enum_name, variant, ..
+                } = **expr
+                {
+                    // Evaluate enum variant directly:
+                    // enum E { A = 1 }
+                    // print([E::A]) get 1
+                    self.validate_enum_variant(enum_name, variant);
+
+                    self.named_variable(&enum_name, false)?;
+                    let name_constant = self.identifier_constant(variant.lexeme) as u8;
+                    self.emit(OpCode::EnumVariant {
+                        name_constant,
+                        evaluate: true,
+                    });
+                } else {
+                    // Evaluate variant variable:
+                    // enum E { A = 1 }
+                    // let x = E::A;
+                    // print([x]); get 1
+                    self.generate_expr(expr)?;
+                    self.emit(OpCode::EnumVariant {
+                        name_constant: 0,
+                        evaluate: true,
+                    });
+                }
             }
             Expr::Get { object, name, .. } => {
                 self.generate_expr(object)?;
@@ -1119,6 +1135,24 @@ impl<'gc> CodeGen<'gc> {
             self.emit(OpCode::Closure { chunk_id });
         }
         Ok(chunk_id)
+    }
+
+    fn validate_enum_variant(&mut self, enum_name: Token<'gc>, variant: Token<'gc>) {
+        // Validate enums and variants
+        if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
+            let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
+            if enum_.borrow().get_variant_value(variant_name).is_none() {
+                self.error_at(
+                    variant,
+                    &format!(
+                        "No variant called '{}' in enum '{}'.",
+                        variant.lexeme, enum_name.lexeme
+                    ),
+                );
+            }
+        } else {
+            self.error_at(enum_name, &format!("Invalid enum '{}'.", enum_name.lexeme));
+        }
     }
 
     // Bytecode emission methods

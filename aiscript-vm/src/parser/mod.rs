@@ -1,4 +1,9 @@
-use std::{collections::HashMap, iter::Peekable, mem, ops::Add};
+use std::{
+    collections::HashMap,
+    iter::{self, Peekable},
+    mem,
+    ops::Add,
+};
 
 use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -1164,14 +1169,28 @@ impl<'gc> Parser<'gc> {
         Some((arguments, keyword_args))
     }
 
-    fn array(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+    fn bracket(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let mut elements = Vec::new();
         let line = self.previous.line;
 
+        // A flag to only check CloseBucket once to determine the Expr::EvaluateVariant
+        let mut once = iter::once(1);
         if !self.check(TokenType::CloseBracket) {
             loop {
-                elements.push(self.expression()?);
+                let item = self.expression()?;
+                if once.next().is_some()
+                    // EvaluateVariant can only perform on those two Expr
+                    && matches!(item, Expr::EnumVariant { .. } | Expr::Variable { .. })
+                    && self.match_token(TokenType::CloseBracket)
+                {
+                    // Evaluate expression value
+                    return Some(Expr::EvaluateVariant {
+                        expr: Box::new(item),
+                        line,
+                    });
+                }
 
+                elements.push(item);
                 if !self.check(TokenType::Comma) && !self.check(TokenType::CloseBracket) {
                     self.error_at_current("Expect ',' after array element.");
                     return None;
@@ -1556,7 +1575,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             ParseRule::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
         }
         TokenType::OpenBracket => {
-            ParseRule::new(Some(Parser::array), Some(Parser::index), Precedence::Call)
+            ParseRule::new(Some(Parser::bracket), Some(Parser::index), Precedence::Call)
         }
         TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_access), Precedence::Call),
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
