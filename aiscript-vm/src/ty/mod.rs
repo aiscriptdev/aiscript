@@ -13,6 +13,7 @@ pub enum PrimitiveType {
     Str,
     Bool,
     Float,
+    Enum,
     NonPrimitive,
 }
 
@@ -24,10 +25,10 @@ pub enum Type<'gc> {
     Float,
     // Class type reference (holds the type name token for error reporting)
     Class(Token<'gc>),
-    // You can add more complex types here in the future
-    // Function(Vec<Type>, Box<Type>),  // For function types
-    // Array(Box<Type>),                // For array types
-    // Optional(Box<Type>),             // For optional types
+    Enum(Token<'gc>), // You can add more complex types here in the future
+                      // Function(Vec<Type>, Box<Type>),  // For function types
+                      // Array(Box<Type>),                // For array types
+                      // Optional(Box<Type>),             // For optional types
 }
 
 impl<'gc> Type<'gc> {
@@ -49,6 +50,7 @@ impl<'gc> Type<'gc> {
             Type::Str => "str".to_string(),
             Type::Bool => "bool".to_string(),
             Type::Float => "float".to_string(),
+            Type::Enum(token) => token.lexeme.to_string(),
             Type::Class(token) => token.lexeme.to_string(),
         }
     }

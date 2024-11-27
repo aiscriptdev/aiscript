@@ -99,47 +99,64 @@ impl<'gc> Parser<'gc> {
         self.previous
     }
 
-    fn parse_literal(&mut self) -> Option<Option<Expr<'gc>>> {
+    fn parse_parameter_default_value(&mut self) -> Option<Expr<'gc>> {
         let expr = match self.current.kind {
             TokenType::Number => {
                 self.match_token(TokenType::Number);
-                Some(Expr::Literal {
+                Expr::Literal {
                     value: Literal::Number(self.previous.lexeme.parse().unwrap()),
                     line: self.previous.line,
-                })
+                }
             }
             TokenType::String => {
                 self.match_token(TokenType::String);
-                Some(Expr::Literal {
+                Expr::Literal {
                     value: Literal::String(
                         self.ctx
                             .intern(self.previous.lexeme.trim_matches('"').as_bytes()),
                     ),
                     line: self.previous.line,
-                })
+                }
             }
             TokenType::True => {
                 self.match_token(TokenType::True);
-                Some(Expr::Literal {
+                Expr::Literal {
                     value: Literal::Boolean(true),
                     line: self.previous.line,
-                })
+                }
             }
             TokenType::False => {
                 self.match_token(TokenType::False);
-                Some(Expr::Literal {
+                Expr::Literal {
                     value: Literal::Boolean(false),
                     line: self.previous.line,
-                })
+                }
             }
             TokenType::Nil => {
                 self.match_token(TokenType::Nil);
-                Some(Expr::Literal {
+                Expr::Literal {
                     value: Literal::Nil,
                     line: self.previous.line,
-                })
+                }
             }
-            _ => None,
+            _ => {
+                if matches!(self.peek_next(), Some(token) if token.kind == TokenType::ColonColon) {
+                    // EnumVariant as the default value
+                    let enum_name = self.current;
+                    // Give this: Enum::Variant1
+                    self.advance(); // Consume token Enum
+                    self.advance(); // Consume token ::
+                    let variant = self.current;
+                    self.advance(); // Consume token Variant1
+                    Expr::EnumVariant {
+                        enum_name,
+                        variant,
+                        line: self.previous.line,
+                    }
+                } else {
+                    return None;
+                }
+            }
         };
         Some(expr)
     }
@@ -600,7 +617,7 @@ impl<'gc> Parser<'gc> {
 
             // Parse default value if present - must be a literal
             let default_value = if self.match_token(TokenType::Equal) {
-                match self.parse_literal()? {
+                match self.parse_parameter_default_value() {
                     Some(expr) => {
                         keyword_args_count += 1;
                         Some(expr)

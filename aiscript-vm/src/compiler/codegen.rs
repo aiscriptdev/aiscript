@@ -106,7 +106,7 @@ impl<'gc> CodeGen<'gc> {
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
 
         for stmt in &program.statements {
-            generator.declare_classes(stmt)?;
+            generator.declare_class_and_enum(stmt)?;
         }
 
         for stmt in &program.statements {
@@ -130,10 +130,17 @@ impl<'gc> CodeGen<'gc> {
         }
     }
 
-    fn declare_classes(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
-        if let Stmt::Class(ClassDecl { name, .. }) = stmt {
-            self.type_resolver
-                .register_type(name.lexeme, Type::Class(*name));
+    fn declare_class_and_enum(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
+        match stmt {
+            Stmt::Class(ClassDecl { name, .. }) => {
+                self.type_resolver
+                    .register_type(name.lexeme, Type::Class(*name));
+            }
+            Stmt::Enum(EnumDecl { name, .. }) => {
+                self.type_resolver
+                    .register_type(name.lexeme, Type::Enum(*name));
+            }
+            _ => (),
         }
         Ok(())
     }
