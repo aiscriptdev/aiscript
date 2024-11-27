@@ -1,0 +1,3 @@
+enum E { A = "a" }
+let x = E.A;
+[x]; // expect runtime error: The variable is not an enum variant and is not evaluable.

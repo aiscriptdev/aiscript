@@ -1,0 +1,2 @@
+let x = "x";
+[x]; // expect runtime error: The variable is not an enum variant and is not evaluable.

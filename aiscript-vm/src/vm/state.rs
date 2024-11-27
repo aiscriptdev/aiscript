@@ -562,11 +562,8 @@ impl<'gc> State<'gc> {
                             self.push_stack(variant.value);
                         }
                         _ => {
-                            let frame = self.current_frame();
-                            let name = frame.read_constant(name_constant).as_string().unwrap();
                             return Err(self.runtime_error(
-                                format!("'{}' is not an enum variant and is not evaluable.", name)
-                                    .into(),
+                                "The variable is not an enum variant and is not evaluable.".into(),
                             ));
                         }
                     }
