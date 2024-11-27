@@ -1,9 +1,16 @@
-use std::{fs, path::PathBuf, process::exit};
+use std::{
+    fs,
+    path::PathBuf,
+    process::{self, exit},
+};
 
 use aiscript_vm::{Vm, VmError};
 
 use clap::{Parser, Subcommand};
+use repr::Repl;
 use tokio::task;
+
+mod repr;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -50,7 +57,11 @@ async fn main() {
                 .unwrap();
             } else {
                 // Run the repl
-                println!("Welcome to the AIScript REPL!");
+                let mut repl = Repl::new();
+                if let Err(e) = repl.run() {
+                    eprintln!("Error: {}", e);
+                    process::exit(1);
+                }
             }
         }
     }
