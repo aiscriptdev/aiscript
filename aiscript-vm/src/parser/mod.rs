@@ -371,25 +371,15 @@ impl<'gc> Parser<'gc> {
         Some((key, value))
     }
 
-    fn parse_enum_variant_value(&mut self) -> Option<Expr<'gc>> {
+    fn parse_enum_variant_value(&mut self) -> Option<Literal<'gc>> {
         let token = self.previous;
         match token.kind {
-            TokenType::Number => Some(Expr::Literal {
-                value: Literal::Number(token.lexeme.parse().unwrap()),
-                line: token.line,
-            }),
-            TokenType::String => Some(Expr::Literal {
-                value: Literal::String(self.ctx.intern(token.lexeme.trim_matches('"').as_bytes())),
-                line: token.line,
-            }),
-            TokenType::True => Some(Expr::Literal {
-                value: Literal::Boolean(true),
-                line: token.line,
-            }),
-            TokenType::False => Some(Expr::Literal {
-                value: Literal::Boolean(false),
-                line: token.line,
-            }),
+            TokenType::Number => Some(Literal::Number(token.lexeme.parse().unwrap())),
+            TokenType::String => Some(Literal::String(
+                self.ctx.intern(token.lexeme.trim_matches('"').as_bytes()),
+            )),
+            TokenType::True => Some(Literal::Boolean(true)),
+            TokenType::False => Some(Literal::Boolean(false)),
             _ => {
                 self.error_at_current("Invalid enum variant value");
                 None
@@ -424,11 +414,7 @@ impl<'gc> Parser<'gc> {
 
             let value = if self.match_token(TokenType::Equal) {
                 // Check for valid literal tokens
-                if !self.check(TokenType::Number)
-                    && !self.check(TokenType::String)
-                    && !self.check(TokenType::True)
-                    && !self.check(TokenType::False)
-                {
+                if !self.current.is_literal_token() {
                     self.error_at_current(
                         "Enum variant value must be a literal (number, string, or boolean)",
                     );
@@ -437,15 +423,11 @@ impl<'gc> Parser<'gc> {
 
                 self.advance();
                 if let Some(literal) = self.parse_enum_variant_value() {
-                    if let Expr::Literal { value, .. } = literal {
-                        if let Err(msg) = checker.check_value(variant_name, &value) {
-                            self.error_at(variant_name, &msg);
-                            return None;
-                        }
-                        Some(literal)
-                    } else {
-                        unreachable!()
+                    if let Err(msg) = checker.check_value(variant_name, &literal) {
+                        self.error_at(variant_name, &msg);
+                        return None;
                     }
+                    Some(literal)
                 } else {
                     None
                 }
@@ -458,15 +440,12 @@ impl<'gc> Parser<'gc> {
                     );
                     return None;
                 }
-                checker.next_value().map(|value| Expr::Literal {
-                    value,
-                    line: variant_name.line,
-                })
+                checker.next_value()
             };
 
             variants.push(EnumVariant {
                 name: variant_name,
-                value,
+                value: value.unwrap_or_default(),
             });
 
             if !self.check(TokenType::CloseBrace) {

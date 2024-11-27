@@ -118,6 +118,17 @@ impl<'a> Token<'a> {
         }
     }
 
+    pub fn is_literal_token(&self) -> bool {
+        matches!(
+            self.kind,
+            TokenType::Number
+                | TokenType::String
+                | TokenType::True
+                | TokenType::False
+                | TokenType::Nil
+        )
+    }
+
     // Whether current token is synchronize keyword,
     // this mainly used in `synchronize()`.
     // When reporing error and encounter a new synchronized keyword,

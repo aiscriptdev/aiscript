@@ -54,9 +54,8 @@ pub enum OpCode {
     GetUpvalue(u8),
     SetUpvalue(u8),
     CloseUpvalue,
-    Enum(u8),              // enum name constant u8
-    EnumVariant(u8),       // enum variant name constant u8
-    EnumVariantAccess(u8), // enum variant name constant u8
+    Enum(u8),        // enum name constant u8
+    EnumVariant(u8), // enum variant name constant u8
     Class(u8),
     SetProperty(u8),
     GetProperty(u8),
@@ -269,7 +268,6 @@ impl<'gc> Chunk<'gc> {
                 OpCode::CloseUpvalue => simple_instruction("CLOSE_UPVALUE"),
                 OpCode::Enum(c) => self.constant_instruction("ENUM", c),
                 OpCode::EnumVariant(c) => self.constant_instruction("ENUM_VARIANT", c),
-                OpCode::EnumVariantAccess(c) => self.constant_instruction("ENUM_VARIANT_ACCESS", c),
                 OpCode::Class(c) => self.constant_instruction("CLASS", c),
                 OpCode::SetProperty(c) => self.constant_instruction("SET_PROPERTY", c),
                 OpCode::GetProperty(c) => self.constant_instruction("GET_PROPERTY", c),

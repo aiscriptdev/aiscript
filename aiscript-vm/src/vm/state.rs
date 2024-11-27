@@ -17,8 +17,7 @@ use crate::{
     ast::{ChunkId, Visibility},
     module::{ModuleKind, ModuleManager, ModuleSource},
     object::{
-        BoundMethod, Class, Closure, Enum, EnumVariant, Function, Instance, Object, Upvalue,
-        UpvalueObj,
+        BoundMethod, Class, Closure, EnumVariant, Function, Instance, Object, Upvalue, UpvalueObj,
     },
     string::{InternedString, InternedStringSet},
     NativeFn, OpCode, ReturnValue, Value,
@@ -532,28 +531,11 @@ impl<'gc> State<'gc> {
                 self.pop_stack();
             }
             OpCode::Enum(constant) => {
-                let name = frame.read_constant(constant).as_string()?;
-                let enum_def = Enum {
-                    name,
-                    variants: HashMap::default(),
-                    methods: HashMap::default(),
-                };
-                self.push_stack(Value::Enum(Gc::new(self.mc, RefLock::new(enum_def))));
-            }
-            OpCode::EnumVariant(constant) => {
-                let name = frame.read_constant(constant).as_string()?;
-                let value = self.pop_stack(); // Get the variant value
-
-                // Get the enum definition
-                match self.peek(0) {
-                    Value::Enum(def) => {
-                        def.borrow_mut(self.mc).variants.insert(name, value);
-                    }
-                    _ => {
-                        return Err(
-                            self.runtime_error("Cannot add variant to non-enum value".into())
-                        )
-                    }
+                let enum_ = frame.read_constant(constant);
+                if enum_.is_enum() {
+                    self.push_stack(enum_);
+                } else {
+                    unreachable!();
                 }
             }
             OpCode::Class(byte) => {
@@ -563,7 +545,7 @@ impl<'gc> State<'gc> {
                     RefLock::new(Class::new(name)),
                 )));
             }
-            OpCode::EnumVariantAccess(byte) => {
+            OpCode::EnumVariant(byte) => {
                 let name = frame.read_constant(byte).as_string().unwrap();
                 match *self.peek(0) {
                     Value::Enum(enum_) => {

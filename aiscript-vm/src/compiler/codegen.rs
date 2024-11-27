@@ -10,7 +10,7 @@ use crate::{
         AgentDecl, ChunkId, ClassDecl, EnumDecl, FunctionDecl, Mutability, ObjectProperty,
         VariableDecl,
     },
-    object::{Function, FunctionType, Upvalue},
+    object::{Enum, Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
 };
@@ -19,7 +19,7 @@ use crate::{
     lexer::{Token, TokenType},
     ty::{Type, TypeResolver},
 };
-use gc_arena::Gc;
+use gc_arena::{Gc, RefLock};
 use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
@@ -419,9 +419,27 @@ impl<'gc> CodeGen<'gc> {
                 visibility,
                 ..
             }) => {
-                // Emit enum declaration (similar to Class opcode)
+                // Emit enum declaration
+                let enum_ = Gc::new(
+                    &self.ctx,
+                    RefLock::new(Enum {
+                        name: self.ctx.intern(name.lexeme.as_bytes()),
+                        variants: variants
+                            .iter()
+                            .map(|v| {
+                                (
+                                    self.ctx.intern(v.name.lexeme.as_bytes()),
+                                    Value::from(&v.value),
+                                )
+                            })
+                            .collect(),
+                        methods: HashMap::default(),
+                    }),
+                );
+                let enum_constant = self.make_constant(Value::Enum(enum_));
+                self.emit(OpCode::Enum(enum_constant as u8));
+
                 let name_constant = self.identifier_constant(name.lexeme);
-                self.emit(OpCode::Enum(name_constant as u8));
 
                 // Define globally right away
                 self.emit(OpCode::DefineGlobal {
@@ -431,20 +449,6 @@ impl<'gc> CodeGen<'gc> {
 
                 // Load enum again for method definitions
                 self.emit(OpCode::GetGlobal(name_constant as u8));
-
-                // Define variants
-                for variant in variants {
-                    // Emit variant value if present
-                    if let Some(value) = &variant.value {
-                        self.generate_expr(value)?;
-                    } else {
-                        self.emit(OpCode::Nil);
-                    }
-
-                    // Emit variant name and creation opcode
-                    let variant_constant = self.identifier_constant(variant.name.lexeme);
-                    self.emit(OpCode::EnumVariant(variant_constant as u8));
-                }
 
                 for method in methods {
                     if let Stmt::Function(FunctionDecl {
@@ -469,8 +473,7 @@ impl<'gc> CodeGen<'gc> {
                         self.emit(OpCode::Method(method_constant as u8));
                     }
                 }
-
-                // Pop the enum (like we do with Class)
+                // Pop the enum
                 self.emit(OpCode::Pop(1));
             }
             Stmt::Class(ClassDecl {
@@ -644,7 +647,7 @@ impl<'gc> CodeGen<'gc> {
                 self.named_variable(enum_name, false)?;
 
                 let name_constant = self.identifier_constant(variant.lexeme);
-                self.emit(OpCode::EnumVariantAccess(name_constant as u8));
+                self.emit(OpCode::EnumVariant(name_constant as u8));
             }
             Expr::Object { properties, .. } => {
                 // For each property, first emit key and value onto stack
@@ -1024,10 +1027,24 @@ impl<'gc> CodeGen<'gc> {
 
             let name = self.ctx.intern(param.name.lexeme.as_bytes());
             // Store default value if present
-            if let Some(Expr::Literal { value, .. }) = &param.default_value {
+            if let Some(expr) = &param.default_value {
+                let default_value = match expr {
+                    Expr::Literal { value, .. } => Value::from(value),
+                    // Expr::EnumVariant {
+                    //     enum_name, variant, ..
+                    // } => Value::EnumVariant(Gc::new(
+                    //     &self.ctx,
+                    //     EnumVariant {
+                    //         enum_: todo!(),
+                    //         name,
+                    //         value: todo!(),
+                    //     },
+                    // )),
+                    _ => unreachable!(),
+                };
                 self.function
                     .params
-                    .insert(name, (index as u8, Value::from(value)));
+                    .insert(name, (index as u8, default_value));
             } else {
                 self.function.params.insert(name, (index as u8, Value::Nil));
             }

@@ -28,6 +28,15 @@ pub enum Visibility {
             // Package,    // Only accessible within the same package/directory
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub enum Literal<'gc> {
+    Number(f64),
+    String(InternedString<'gc>),
+    Boolean(bool),
+    #[default]
+    Nil,
+}
+
 #[derive(Debug, Clone)]
 pub struct EnumDecl<'gc> {
     pub name: Token<'gc>,
@@ -40,7 +49,8 @@ pub struct EnumDecl<'gc> {
 #[derive(Debug, Clone)]
 pub struct EnumVariant<'gc> {
     pub name: Token<'gc>,
-    pub value: Option<Expr<'gc>>, // Can be any literal expression
+    // Default is Literal::Nil
+    pub value: Literal<'gc>,
 }
 
 #[derive(Debug, Clone)]
@@ -370,14 +380,6 @@ impl<'gc> Stmt<'gc> {
             | Self::Agent(AgentDecl { line, .. }) => *line,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Literal<'gc> {
-    Number(f64),
-    String(InternedString<'gc>),
-    Boolean(bool),
-    Nil,
 }
 
 // Implement PartialEq manually to handle float comparison

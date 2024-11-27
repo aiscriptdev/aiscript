@@ -1,0 +1,11 @@
+class A {}
+
+enum B {}
+
+fn f1(a: A) {}
+fn f2() -> A {}
+fn f3(a: A) -> A {}
+
+fn f4(b: B) {}
+fn f5() -> B {}
+fn f6(b: B) -> B {}

@@ -120,7 +120,7 @@ pub struct Object<'gc> {
 #[collect(no_drop)]
 pub struct Enum<'gc> {
     pub name: InternedString<'gc>,
-    // Variant name -> value mapping
+    // Variant name -> value mapping, default value is Value::Nil
     pub variants: HashMap<InternedString<'gc>, Value<'gc>>,
     // Method name -> function mapping
     pub methods: HashMap<InternedString<'gc>, Value<'gc>>,
@@ -133,7 +133,7 @@ pub struct EnumVariant<'gc> {
     pub enum_: GcRefLock<'gc, Enum<'gc>>,
     // Variant name
     pub name: InternedString<'gc>,
-    // Variant value (can be any type)
+    // Variant value, default is Value::Nil
     pub value: Value<'gc>,
 }
 
