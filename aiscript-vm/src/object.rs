@@ -137,6 +137,12 @@ pub struct EnumVariant<'gc> {
     pub value: Value<'gc>,
 }
 
+impl<'gc> Enum<'gc> {
+    pub fn get_variant_value(&self, variant_name: InternedString<'gc>) -> Option<Value<'gc>> {
+        self.variants.get(&variant_name).copied()
+    }
+}
+
 impl<'gc> Class<'gc> {
     pub fn new(name: InternedString<'gc>) -> Self {
         Self {

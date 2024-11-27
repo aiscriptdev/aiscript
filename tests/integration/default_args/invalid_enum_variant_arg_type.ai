@@ -1,0 +1,2 @@
+enum Either { A, B }
+fn f(a = Either::C) {} // Error at 'C': No variant called 'C' in enum 'Either'.

@@ -10,7 +10,7 @@ use crate::{
         AgentDecl, ChunkId, ClassDecl, EnumDecl, FunctionDecl, Mutability, ObjectProperty,
         VariableDecl,
     },
-    object::{Enum, Function, FunctionType, Upvalue},
+    object::{Enum, EnumVariant, Function, FunctionType, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
 };
@@ -132,13 +132,9 @@ impl<'gc> CodeGen<'gc> {
 
     fn declare_class_and_enum(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
         match stmt {
-            Stmt::Class(ClassDecl { name, .. }) => {
+            Stmt::Class(ClassDecl { name, .. }) | Stmt::Enum(EnumDecl { name, .. }) => {
                 self.type_resolver
-                    .register_type(name.lexeme, Type::Class(*name));
-            }
-            Stmt::Enum(EnumDecl { name, .. }) => {
-                self.type_resolver
-                    .register_type(name.lexeme, Type::Enum(*name));
+                    .register_type(name.lexeme, Type::Custom(*name));
             }
             _ => (),
         }
@@ -436,6 +432,7 @@ impl<'gc> CodeGen<'gc> {
                         methods: HashMap::default(),
                     }),
                 );
+                self.type_resolver.register_enum(name.lexeme, enum_);
                 let enum_constant = self.make_constant(Value::Enum(enum_));
                 self.emit(OpCode::Enum(enum_constant as u8));
 
@@ -1007,6 +1004,7 @@ impl<'gc> CodeGen<'gc> {
         // Create a new compiler taking ownership of current one
         let mut enclosing = mem::replace(self, *compiler);
         self.named_id_map = mem::take(&mut enclosing.named_id_map);
+        self.type_resolver = mem::take(&mut enclosing.type_resolver);
         self.enclosing = Some(Box::new(enclosing));
 
         self.begin_scope();
@@ -1030,16 +1028,41 @@ impl<'gc> CodeGen<'gc> {
             if let Some(expr) = &param.default_value {
                 let default_value = match expr {
                     Expr::Literal { value, .. } => Value::from(value),
-                    // Expr::EnumVariant {
-                    //     enum_name, variant, ..
-                    // } => Value::EnumVariant(Gc::new(
-                    //     &self.ctx,
-                    //     EnumVariant {
-                    //         enum_: todo!(),
-                    //         name,
-                    //         value: todo!(),
-                    //     },
-                    // )),
+                    Expr::EnumVariant {
+                        enum_name, variant, ..
+                    } => {
+                        if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
+                            let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
+                            let variant_value = match enum_.borrow().get_variant_value(variant_name)
+                            {
+                                Some(value) => value,
+                                None => {
+                                    self.error_at(
+                                        *variant,
+                                        &format!(
+                                            "No variant called '{}' in enum '{}'.",
+                                            variant.lexeme, enum_name.lexeme
+                                        ),
+                                    );
+                                    Value::default()
+                                }
+                            };
+                            Value::EnumVariant(Gc::new(
+                                &self.ctx,
+                                EnumVariant {
+                                    enum_,
+                                    name: variant_name,
+                                    value: variant_value,
+                                },
+                            ))
+                        } else {
+                            self.error_at(
+                                *enum_name,
+                                &format!("Invalid enum '{}'.", enum_name.lexeme),
+                            );
+                            Value::default()
+                        }
+                    }
                     _ => unreachable!(),
                 };
                 self.function
@@ -1073,6 +1096,7 @@ impl<'gc> CodeGen<'gc> {
             // TODO: Duplicate function name?
             self.chunks.insert(chunk_id, function);
             enclosing.named_id_map = mem::take(&mut self.named_id_map);
+            enclosing.type_resolver = mem::take(&mut self.type_resolver);
             let chunks = mem::take(&mut self.chunks);
             *self = *enclosing;
             self.chunks.extend(chunks);

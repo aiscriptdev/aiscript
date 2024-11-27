@@ -108,16 +108,6 @@ impl<'gc> Parameter<'gc> {
             default_value: None,
         }
     }
-
-    pub fn with_type(mut self, type_hint: Token<'gc>) -> Self {
-        self.type_hint = Some(type_hint);
-        self
-    }
-
-    pub fn with_default(mut self, default_value: Expr<'gc>) -> Self {
-        self.default_value = Some(default_value);
-        self
-    }
 }
 
 #[derive(Debug, Clone, Collect)]

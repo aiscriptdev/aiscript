@@ -1,0 +1,15 @@
+enum Either { 
+    A = 1, 
+    B = 2,
+}
+
+fn choose(a = Either::A, b: Either = Either::B ) {
+    print(a, b);
+}
+
+choose(); // expect: Either::A(1) Either::B(2)
+choose(Either::B); // expect: Either::B(2) Either::B(2)
+choose(Either::B, Either::A); // expect: Either::B(2) Either::A(1)
+choose(Either::B, b=Either::A); // expect: Either::B(2) Either::A(1)
+choose(a=Either::B, b=Either::A); // expect: Either::B(2) Either::A(1)
+choose(b=Either::B, a=Either::A); // expect: Either::A(1) Either::B(2)
