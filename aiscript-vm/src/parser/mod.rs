@@ -584,12 +584,39 @@ impl<'gc> Parser<'gc> {
         // which is matter for function call
         let mut params = IndexMap::new();
         let mut keyword_args_count = 0;
+        let mut self_args_count = 0;
         loop {
             if self.check(TokenType::CloseParen) {
                 break;
             }
             if params.len() >= 255 {
                 self.error_at_current("Can't have more than 255 parameters.");
+            }
+
+            if self.check(TokenType::Self_) {
+                self.advance();
+                match self.fn_type {
+                    FunctionType::AiMethod | FunctionType::Method
+                        if (self_args_count > 0 || !params.is_empty()) =>
+                    {
+                        self.error("'self' only allow as the first paramater.");
+                    }
+                    FunctionType::AiFunction | FunctionType::Function | FunctionType::Tool => {
+                        self.error("'self' parameter is only allowed in class methods");
+                    }
+                    FunctionType::Constructor => {
+                        self.error("No need to declare 'self' parameter for class constructor.");
+                    }
+                    _ => {
+                        // unreachable
+                    }
+                }
+
+                self_args_count += 1;
+                if self.check(TokenType::Comma) {
+                    self.advance();
+                }
+                continue;
             }
 
             self.consume(TokenType::Identifier, "Expect parameter name.");
@@ -1415,6 +1442,7 @@ impl<'gc> Parser<'gc> {
             }
 
             self.advance();
+            // Do not reuse the previous rule since it may have changed.
             let infix_rule = get_rule(self.previous.kind).infix;
             if let Some(infix_fn) = infix_rule {
                 let expr = (infix_fn)(self, can_assign)?;

@@ -71,8 +71,14 @@ impl<'gc> CodeGen<'gc> {
             function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: std::array::from_fn(|i| {
+                // The compiler’s locals array keeps track of which stack slots
+                // are associated with which local variables or temporaries.
+                // From now on, the compiler implicitly claims stack slot zero for the VM’s own
+                // internal use. We give it an empty name so that the user can’t write an
+                // identifier that refers to it.
                 if i == 0 {
                     let name = if fn_type != FunctionType::Function {
+                        // Slot zero will store the instance in class methods.
                         Token::new(TokenType::Self_, "self", 0)
                     } else {
                         Token::default()
@@ -85,6 +91,8 @@ impl<'gc> CodeGen<'gc> {
                     Local::default()
                 }
             }),
+            // The initial value of the local_count starts at 1
+            // because we reserve slot zero for VM use.
             local_count: 1,
             scope_depth: 0,
             loop_scopes: Vec::new(),
@@ -231,6 +239,8 @@ impl<'gc> CodeGen<'gc> {
             }
             Stmt::Expression { expression, .. } => {
                 self.generate_expr(expression)?;
+                // an expression statement evaluates the expression and discards the result
+                // since the result already exists in the stack, we can just pop it
                 self.emit(OpCode::Pop(1));
             }
             Stmt::Let(VariableDecl {
@@ -496,7 +506,9 @@ impl<'gc> CodeGen<'gc> {
                     // First get the superclass
                     self.generate_expr(superclass)?;
 
-                    // Create local variable 'super'
+                    // Creating a new lexical scope ensures that if we declare two classes in the same scope,
+                    // each has a different local slot to store its superclass. Since we always name this
+                    // variable “super”, if we didn’t make a scope for each subclass, the variables would collide.
                     let super_token = Token::new(TokenType::Super, "super", name.line);
                     self.declare_variable(super_token, Mutability::Immutable);
                     self.mark_initialized();
@@ -906,6 +918,8 @@ impl<'gc> CodeGen<'gc> {
                 self.emit(OpCode::SetProperty(name_constant as u8));
             }
             Expr::Self_ { .. } => {
+                // we can’t assign to 'self', so we pass can_assign=false to disallow
+                // look for a following = operator in the expression
                 self.named_variable(&Token::new(TokenType::Self_, "self", 0), false)?;
             }
             Expr::Super { method, .. } => {
