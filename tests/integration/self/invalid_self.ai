@@ -1,0 +1,9 @@
+class A {
+    fn f(self="a", a) { // Error at '=': Expect parameter name.
+    }
+}
+
+class B {
+    fn f(self: A, a) { // Error at ':': Expect parameter name.
+    }
+}

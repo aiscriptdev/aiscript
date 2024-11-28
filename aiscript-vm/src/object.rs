@@ -66,18 +66,24 @@ impl<'gc> Display for Function<'gc> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum FunctionType {
     Lambda,
     // Regular functions
-    Function { is_ai: bool },
+    Function {
+        is_ai: bool,
+    },
     // Class methods
-    Method { is_ai: bool, is_static: bool },
+    Method {
+        is_ai: bool,
+        is_static: bool,
+    },
     // Class constructor
     Constructor,
     // Agent tool function
     Tool,
     // Root script function
+    #[default]
     Script,
 }
 

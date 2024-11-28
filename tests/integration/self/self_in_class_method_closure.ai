@@ -1,0 +1,8 @@
+class Foo {
+  fn getClosure(self) {
+    fn closure(self) { // Error at 'self': 'self' parameter is only allowed in class methods
+      return self.toString();
+    }
+    return closure;
+  }
+}

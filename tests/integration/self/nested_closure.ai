@@ -1,5 +1,5 @@
 class Foo {
-  fn getClosure() {
+  fn getClosure(self) {
     fn f() {
       fn g() {
         fn h() {

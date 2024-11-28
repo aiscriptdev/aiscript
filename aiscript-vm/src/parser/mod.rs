@@ -49,10 +49,11 @@ pub struct Parser<'gc> {
     panic_mode: bool,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct ClassCompiler {
     has_superclass: bool,
     enclosing: Option<Box<ClassCompiler>>,
+    current_method_type: FunctionType,
 }
 
 impl<'gc> Parser<'gc> {
@@ -514,6 +515,7 @@ impl<'gc> Parser<'gc> {
         let class_compiler = ClassCompiler {
             has_superclass: superclass.is_some(),
             enclosing: self.class_compiler.take(),
+            current_method_type: self.fn_type,
         };
         self.class_compiler = Some(Box::new(class_compiler));
 
@@ -680,6 +682,13 @@ impl<'gc> Parser<'gc> {
                     is_ai,
                     is_static: true,
                 };
+            }
+        }
+
+        if self.fn_type.is_method() {
+            // Update class compiler's current method type
+            if let Some(class_compiler) = self.class_compiler.as_mut() {
+                class_compiler.current_method_type = self.fn_type;
             }
         }
 
@@ -1418,12 +1427,14 @@ impl<'gc> Parser<'gc> {
     }
 
     fn self_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        if self.class_compiler.is_none() {
+        let is_in_static_method = if let Some(class_compiler) = self.class_compiler.as_ref() {
+            class_compiler.current_method_type.is_static_method() || self.fn_type.is_static_method()
+        } else {
             self.error("Can't use 'self' outside of a class.");
             return None;
-        }
+        };
 
-        if self.fn_type.is_static_method() {
+        if is_in_static_method {
             self.error("Can't use 'self' in static method.");
             return None;
         }

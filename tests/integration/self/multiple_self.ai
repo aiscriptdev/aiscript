@@ -1,0 +1,9 @@
+class A {
+    fn f(self, self) { // Error at 'self': 'self' only allow as the first paramater.
+    }
+}
+
+class B {
+    fn f(a, self) { // Error at 'self': 'self' only allow as the first paramater.
+    }
+}
