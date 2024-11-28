@@ -410,12 +410,7 @@ impl<'gc> CodeGen<'gc> {
                     self.generate_expr(expr)?;
                     self.emit(OpCode::Return);
                 } else {
-                    if self.fn_type == FunctionType::Constructor {
-                        self.emit(OpCode::GetLocal(0));
-                    } else {
-                        self.emit(OpCode::Nil);
-                    }
-                    self.emit(OpCode::Return);
+                    self.emit_return();
                 }
             }
             Stmt::Enum(EnumDecl {
