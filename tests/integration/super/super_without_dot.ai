@@ -1,7 +1,7 @@
 class A {}
 
 class B(A) {
-  fn method() {
+  fn method(self) {
     // [line 6] Error at ';': Expect '.' after 'super'.
     super;
   }

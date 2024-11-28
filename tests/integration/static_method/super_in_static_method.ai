@@ -1,0 +1,11 @@
+class Base {
+    fn hi() {
+        print("hi");
+    }
+}
+
+class Foo(Base) {
+    fn f() {
+        super.hi(); // Error at 'super': Can't use 'super' in static method.
+    }
+}

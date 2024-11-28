@@ -1,0 +1,5 @@
+enum Foo {
+   fn f(self) {
+        super.hi(); // Error at 'super': Can't use 'super' in an enum.
+    }
+}

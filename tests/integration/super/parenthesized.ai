@@ -1,9 +1,9 @@
 class A {
-  fn method() {}
+  fn method(self) {}
 }
 
 class B(A) {
-  fn method() {
+  fn method(self) {
     // [line 8] Error at ')': Expect '.' after 'super'.
     (super).method();
   }

@@ -1,0 +1,9 @@
+class Foo {
+    fn f(super) { // Error at 'super': Can't use 'super' as function paramter.
+    }
+}
+
+class Bar {
+    fn f(self, super) { // Error at 'super': Can't use 'super' as function paramter.
+    }
+}

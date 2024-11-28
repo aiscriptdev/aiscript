@@ -52,6 +52,7 @@ pub struct Parser<'gc> {
 #[derive(Default, Debug)]
 struct ClassCompiler {
     has_superclass: bool,
+    is_enum: bool,
     enclosing: Option<Box<ClassCompiler>>,
     current_method_type: FunctionType,
 }
@@ -403,6 +404,7 @@ impl<'gc> Parser<'gc> {
 
         let class_compiler = ClassCompiler {
             has_superclass: false,
+            is_enum: true,
             enclosing: self.class_compiler.take(),
             current_method_type: self.fn_type,
         };
@@ -527,6 +529,7 @@ impl<'gc> Parser<'gc> {
 
         let class_compiler = ClassCompiler {
             has_superclass: superclass.is_some(),
+            is_enum: false,
             enclosing: self.class_compiler.take(),
             current_method_type: self.fn_type,
         };
@@ -646,7 +649,12 @@ impl<'gc> Parser<'gc> {
                 continue;
             }
 
-            self.consume(TokenType::Identifier, "Expect parameter name.");
+            if self.check(TokenType::Super) {
+                self.advance();
+                self.error("Can't use 'super' as function paramter.");
+            } else {
+                self.consume(TokenType::Identifier, "Expect parameter name.");
+            }
             let param_name = self.previous;
 
             // Parse parameter type annotation
@@ -1414,10 +1422,23 @@ impl<'gc> Parser<'gc> {
     }
 
     fn super_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        if self.class_compiler.is_none() {
+        let is_in_static_method = if let Some(class_compiler) = self.class_compiler.as_ref() {
+            if !class_compiler.is_enum && !class_compiler.has_superclass {
+                self.error("Can't use 'super' in a class with no superclass.");
+                return None;
+            } else if class_compiler.is_enum {
+                self.error("Can't use 'super' in an enum.");
+                return None; 
+            }
+            class_compiler.current_method_type.is_static_method() || self.fn_type.is_static_method()
+        } else {
             self.error("Can't use 'super' outside of a class.");
-        } else if self.class_compiler.as_ref().map(|c| c.has_superclass) == Some(false) {
-            self.error("Can't use 'super' in a class with no superclass.");
+            return None;
+        };
+
+        if is_in_static_method {
+            self.error("Can't use 'super' in static method.");
+            return None;
         }
 
         let keyword = self.previous;
