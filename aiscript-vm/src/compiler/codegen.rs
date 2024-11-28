@@ -77,7 +77,7 @@ impl<'gc> CodeGen<'gc> {
                 // internal use. We give it an empty name so that the user can’t write an
                 // identifier that refers to it.
                 if i == 0 {
-                    let name = if fn_type != FunctionType::Function {
+                    let name = if fn_type.is_constructor() || fn_type.is_method() {
                         // Slot zero will store the instance in class methods.
                         Token::new(TokenType::Self_, "self", 0)
                     } else {

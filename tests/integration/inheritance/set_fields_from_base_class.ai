@@ -1,22 +1,22 @@
 class Foo {
-  fn foo(a, b) {
+  fn foo(self, a, b) {
     self.field1 = a;
     self.field2 = b;
   }
 
-  fn fooPrint() {
+  fn fooPrint(self) {
     print(self.field1);
     print(self.field2);
   }
 }
 
 class Bar(Foo) {
-  fn bar(a, b) {
+  fn bar(self, a, b) {
     self.field1 = a;
     self.field2 = b;
   }
 
-  fn barPrint() {
+  fn barPrint(self) {
     print(self.field1);
     print(self.field2);
   }

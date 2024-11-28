@@ -3,7 +3,7 @@ class A {
     self.field = param;
   }
 
-  fn test() {
+  fn test(self) {
     print(self.field);
   }
 }

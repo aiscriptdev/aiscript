@@ -186,9 +186,9 @@ impl<'gc> Parser<'gc> {
             self.class_declaration(visibility)
         } else if self.match_token(TokenType::AI) {
             self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-            self.func_declaration(FunctionType::AiFunction, visibility)
+            self.func_declaration(FunctionType::Function { is_ai: true }, visibility)
         } else if self.match_token(TokenType::Fn) {
-            self.func_declaration(FunctionType::Function, visibility)
+            self.func_declaration(FunctionType::Function { is_ai: false }, visibility)
         } else if self.match_token(TokenType::Let) {
             self.var_declaration(visibility)
         } else if self.match_token(TokenType::Const) {
@@ -546,9 +546,21 @@ impl<'gc> Parser<'gc> {
         };
         let method = if self.match_token(TokenType::AI) {
             self.consume(TokenType::Fn, "Expect 'fn' after 'ai'.");
-            self.func_declaration(FunctionType::AiMethod, method_vis)?
+            self.func_declaration(
+                FunctionType::Method {
+                    is_ai: true,
+                    is_static: false,
+                },
+                method_vis,
+            )?
         } else if self.match_token(TokenType::Fn) {
-            self.func_declaration(FunctionType::Method, method_vis)?
+            self.func_declaration(
+                FunctionType::Method {
+                    is_ai: false,
+                    is_static: false,
+                },
+                method_vis,
+            )?
         } else {
             self.error_at_current("Expect 'fn' or 'ai fn' modifier for method.");
             return None;
@@ -565,7 +577,7 @@ impl<'gc> Parser<'gc> {
         let previous_fn_type = self.fn_type;
         self.fn_type = fn_type;
         let type_name = match fn_type {
-            FunctionType::Method => "method",
+            FunctionType::Method { .. } => "method",
             FunctionType::Tool => "tool function",
             _ => "function",
         };
@@ -573,7 +585,7 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, &format!("Expect {type_name} name."));
         let name = self.previous;
         self.scopes.push(name.lexeme.to_string());
-        if self.fn_type == FunctionType::Method && name.lexeme == "init" {
+        if self.fn_type.is_method() && name.lexeme == "init" {
             self.fn_type = FunctionType::Constructor;
         }
 
@@ -596,12 +608,10 @@ impl<'gc> Parser<'gc> {
             if self.check(TokenType::Self_) {
                 self.advance();
                 match self.fn_type {
-                    FunctionType::AiMethod | FunctionType::Method
-                        if (self_args_count > 0 || !params.is_empty()) =>
-                    {
+                    FunctionType::Method { .. } if (self_args_count > 0 || !params.is_empty()) => {
                         self.error("'self' only allow as the first paramater.");
                     }
-                    FunctionType::AiFunction | FunctionType::Function | FunctionType::Tool => {
+                    FunctionType::Function { .. } | FunctionType::Tool => {
                         self.error("'self' parameter is only allowed in class methods");
                     }
                     FunctionType::Constructor => {
@@ -662,6 +672,16 @@ impl<'gc> Parser<'gc> {
             }
         }
         self.consume(TokenType::CloseParen, "Expect ')' after parameters.");
+
+        if self_args_count == 0 {
+            // Set this method to static
+            if let FunctionType::Method { is_ai, .. } = self.fn_type {
+                self.fn_type = FunctionType::Method {
+                    is_ai,
+                    is_static: true,
+                };
+            }
+        }
 
         // Parse optional return type
         let return_type = if self.match_token(TokenType::Arrow) {
@@ -1400,6 +1420,11 @@ impl<'gc> Parser<'gc> {
     fn self_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         if self.class_compiler.is_none() {
             self.error("Can't use 'self' outside of a class.");
+            return None;
+        }
+
+        if self.fn_type.is_static_method() {
+            self.error("Can't use 'self' in static method.");
             return None;
         }
 

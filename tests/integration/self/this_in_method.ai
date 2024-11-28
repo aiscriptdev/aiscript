@@ -1,6 +1,6 @@
 class Foo {
-  fn bar() { return self; }
-  fn baz() { return "baz"; }
+  fn bar(self) { return self; }
+  fn baz(self) { return "baz"; }
 }
 
 print(Foo().bar().baz()); // expect: baz

@@ -70,11 +70,9 @@ impl<'gc> Display for Function<'gc> {
 pub enum FunctionType {
     Lambda,
     // Regular functions
-    AiFunction,
-    Function,
+    Function { is_ai: bool },
     // Class methods
-    AiMethod,
-    Method,
+    Method { is_ai: bool, is_static: bool },
     // Class constructor
     Constructor,
     // Agent tool function
@@ -85,7 +83,19 @@ pub enum FunctionType {
 
 impl FunctionType {
     pub fn is_ai_function(&self) -> bool {
-        matches!(self, Self::AiFunction | Self::AiMethod)
+        matches!(self, Self::Function { is_ai }  | Self::Method { is_ai, .. } if *is_ai)
+    }
+
+    pub fn is_method(&self) -> bool {
+        matches!(self, Self::Method { .. })
+    }
+
+    pub fn is_static_method(&self) -> bool {
+        matches!(self, Self::Method { is_static, .. } if *is_static)
+    }
+
+    pub fn is_constructor(&self) -> bool {
+        matches!(self, Self::Constructor)
     }
 }
 

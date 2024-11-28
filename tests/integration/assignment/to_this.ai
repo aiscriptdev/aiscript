@@ -1,5 +1,5 @@
 class Foo {
-  fn Foo() {
+  fn init() {
     self = "value"; // Error at '=': Invalid assignment target.
   }
 }
