@@ -1,24 +1,24 @@
 class A {
-  fn say() {
+  fn say(self) {
     print("A");
   }
 }
 
 class B(A) {
-  fn getClosure() {
+  fn getClosure(self) {
     fn closure() {
       super.say();
     }
     return closure;
   }
 
-  fn say() {
+  fn say(self) {
     print("B");
   }
 }
 
 class C(B) {
-  fn say() {
+  fn say(self) {
     print("C");
   }
 }

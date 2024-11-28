@@ -1,7 +1,7 @@
 let foo = "variable";
 
 class Foo {
-  fn method() {
+  fn method(self) {
     print(foo);
   }
 }

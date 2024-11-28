@@ -12,7 +12,7 @@ class Foo {
     return f;
   }
 
-  fn toString() { return "Foo"; }
+  fn toString(self) { return "Foo"; }
 }
 
 let closure = Foo().getClosure();

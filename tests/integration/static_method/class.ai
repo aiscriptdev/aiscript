@@ -1,0 +1,8 @@
+class Foo {
+    fn s() {
+        print("static");
+    }
+}
+
+Foo.s(); // expect: static
+Foo.invalid(); // expect runtime error: Undefined static method 'invalid' of class 'Foo'.

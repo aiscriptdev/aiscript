@@ -1,13 +1,13 @@
 class Foo {
-  fn method0() { return "no args"; }
-  fn method1(a) { return a; }
-  fn method2(a, b) { return a + b; }
-  fn method3(a, b, c) { return a + b + c; }
-  fn method4(a, b, c, d) { return a + b + c + d; }
-  fn method5(a, b, c, d, e) { return a + b + c + d + e; }
-  fn method6(a, b, c, d, e, f) { return a + b + c + d + e + f; }
-  fn method7(a, b, c, d, e, f, g) { return a + b + c + d + e + f + g; }
-  fn method8(a, b, c, d, e, f, g, h) { return a + b + c + d + e + f + g + h; }
+  fn method0(self) { return "no args"; }
+  fn method1(self, a) { return a; }
+  fn method2(self, a, b) { return a + b; }
+  fn method3(self, a, b, c) { return a + b + c; }
+  fn method4(self, a, b, c, d) { return a + b + c + d; }
+  fn method5(self, a, b, c, d, e) { return a + b + c + d + e; }
+  fn method6(self, a, b, c, d, e, f) { return a + b + c + d + e + f; }
+  fn method7(self, a, b, c, d, e, f, g) { return a + b + c + d + e + f + g; }
+  fn method8(self, a, b, c, d, e, f, g, h) { return a + b + c + d + e + f + g + h; }
 }
 
 let foo = Foo();

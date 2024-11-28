@@ -6,7 +6,7 @@ class Foo {
     return closure;
   }
 
-  fn toString() { return "Foo"; }
+  fn toString(self) { return "Foo"; }
 }
 
 let closure = Foo().getClosure();

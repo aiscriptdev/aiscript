@@ -1,0 +1,8 @@
+class Foo {
+    fn s() {
+        print("static");
+    }
+}
+
+let foo = Foo();
+foo.s(); // expect runtime error: 's' is a static method, use static method syntax instead: Foo.s().

@@ -1,11 +1,11 @@
 class Base {
-  fn foo(a, b) {
+  fn foo(self, a, b) {
     print("Base.foo(" + a + ", " + b + ")");
   }
 }
 
 class Derived(Base) {
-  fn foo() {
+  fn foo(self) {
     super.foo(1); // expect runtime error: Expected 2 arguments but got 1.
   }
 }

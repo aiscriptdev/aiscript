@@ -1,16 +1,16 @@
 class Base {
-  fn toString() { return "Base"; }
+  fn toString(self) { return "Base"; }
 }
 
 class Derived(Base) {
-  fn getClosure() {
+  fn getClosure(self) {
     fn closure() {
       return super.toString();
     }
     return closure;
   }
 
-  fn toString() { return "Derived"; }
+  fn toString(self) { return "Derived"; }
 }
 
 let closure = Derived().getClosure();

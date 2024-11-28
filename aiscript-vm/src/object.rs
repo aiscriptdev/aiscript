@@ -110,6 +110,7 @@ impl FunctionType {
 pub struct Class<'gc> {
     pub name: InternedString<'gc>,
     pub methods: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    pub static_methods: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 #[derive(Debug, Collect)]
@@ -165,6 +166,7 @@ impl<'gc> Class<'gc> {
         Self {
             name,
             methods: HashMap::default(),
+            static_methods: HashMap::default(),
         }
     }
 }

@@ -1,17 +1,17 @@
 class Foo {
-  fn inFoo() {
+  fn inFoo(self) {
     print("in foo");
   }
 }
 
 class Bar(Foo) {
-  fn inBar() {
+  fn inBar(self) {
     print("in bar");
   }
 }
 
 class Baz(Bar) {
-  fn inBaz() {
+  fn inBaz(self) {
     print("in baz");
   }
 }

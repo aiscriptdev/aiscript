@@ -1,5 +1,5 @@
 class A {
-  fn foo() {
+  fn foo(self) {
     print("A.foo()");
   }
 }
@@ -7,7 +7,7 @@ class A {
 class B(A) {}
 
 class C(B) {
-  fn foo() {
+  fn foo(self) {
     print("C.foo()");
     super.foo();
   }

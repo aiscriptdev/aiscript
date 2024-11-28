@@ -1,0 +1,11 @@
+class Foo {
+    fn f(self) {
+        self.s(); // expect runtime error: 's' is a static method, use static method syntax instead: Foo.s().
+    }
+
+    fn s() {
+        print("static");
+    }
+}
+
+Foo().f();

@@ -987,10 +987,12 @@ impl<'gc> State<'gc> {
     fn define_method(&mut self, name: InternedString<'gc>, is_static: bool) -> Result<(), VmError> {
         match *self.peek(1) {
             Value::Class(class) => {
-                class
-                    .borrow_mut(self.mc)
-                    .methods
-                    .insert(name, *self.peek(0));
+                let mut c = class.borrow_mut(self.mc);
+                if is_static {
+                    c.static_methods.insert(name, *self.peek(0));
+                } else {
+                    c.methods.insert(name, *self.peek(0));
+                }
             }
             Value::Enum(enum_) => {
                 let mut e = enum_.borrow_mut(self.mc);
@@ -1122,10 +1124,38 @@ impl<'gc> State<'gc> {
         let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         let receiver = *self.peek(args_slot_count);
         match receiver {
+            Value::Class(class) => {
+                if let Some(value) = class.borrow().static_methods.get(&name) {
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!(
+                            "Undefined static method '{}' of class '{}'.",
+                            name,
+                            class.borrow().name,
+                        )
+                        .into(),
+                    ))
+                }
+            }
             Value::Instance(instance) => {
                 if let Some(value) = instance.borrow().fields.get(&name) {
                     self.stack[self.stack_top - args_slot_count - 1] = *value;
                     self.call_value(*value, args_count, keyword_args_count)
+                } else if instance
+                    .borrow()
+                    .class
+                    .borrow()
+                    .static_methods
+                    .contains_key(&name)
+                {
+                    Err(self.runtime_error(
+                            format!(
+                                "'{name}' is a static method, use static method syntax instead: {}.{name}().",
+                                instance.borrow().class.borrow().name,
+                            )
+                            .into(),
+                        ))
                 } else {
                     self.invoke_from_class(
                         instance.borrow().class,

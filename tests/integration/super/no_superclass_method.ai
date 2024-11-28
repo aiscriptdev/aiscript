@@ -1,7 +1,7 @@
 class Base {}
 
 class Derived(Base) {
-  fn foo() {
+  fn foo(self) {
     super.doesNotExist(1); // expect runtime error: Undefined property 'doesNotExist'.
   }
 }

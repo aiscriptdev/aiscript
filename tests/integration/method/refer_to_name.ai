@@ -1,5 +1,5 @@
 class Foo {
-  fn method() {
+  fn method(self) {
     print(method); // expect runtime error: Undefined variable 'method'.
   }
 }

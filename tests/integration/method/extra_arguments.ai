@@ -1,5 +1,5 @@
 class Foo {
-  fn method(a, b) {
+  fn method(self, a, b) {
     print(a);
     print(b);
   }
