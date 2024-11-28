@@ -20,8 +20,6 @@ chrono = "0.4.38"
 regex = "1.11.1"
 
 [features]
-# v1 one-pass compiler
-v1 = []
 # Enable debug features.
 debug = []
 # For testing AI

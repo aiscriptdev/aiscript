@@ -5,6 +5,7 @@ pub use state::State;
 
 use crate::{
     ast::ChunkId,
+    builtins,
     object::{Class, Instance},
     stdlib,
     string::{InternedString, InternedStringSet},
@@ -74,28 +75,7 @@ impl Vm {
         });
     }
 
-    #[cfg(feature = "v1")]
     pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
-        self.arena.mutate_root(|mc, state| {
-            let context = Context {
-                mutation: mc,
-                strings: state.strings,
-            };
-            let function = crate::v1::compile(context, source)?;
-            #[cfg(feature = "debug")]
-            function.disassemble("script");
-            state.define_builtins();
-            let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
-            state.push_stack(Value::from(closure));
-            state.call(closure, 0)
-        })?;
-        Ok(())
-    }
-
-    #[cfg(not(feature = "v1"))]
-    pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
-        use crate::builtins;
-
         self.arena.mutate_root(|mc, state| {
             let context = Context {
                 mutation: mc,
