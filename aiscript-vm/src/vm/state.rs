@@ -563,7 +563,7 @@ impl<'gc> State<'gc> {
                         }
                         _ => {
                             return Err(self.runtime_error(
-                                "The variable is not an enum variant and is not evaluable.".into(),
+                                "The variable is not an enum variant and is not evaluable. To declare a single-element array, use [element,] syntax instead of [element].".into(),
                             ));
                         }
                     }

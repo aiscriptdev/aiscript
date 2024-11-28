@@ -1,2 +1,2 @@
 let x = 1;
-[x]; // expect runtime error: The variable is not an enum variant and is not evaluable.
+[x]; // expect runtime error: The variable is not an enum variant and is not evaluable. To declare a single-element array, use [element,] syntax instead of [element].
