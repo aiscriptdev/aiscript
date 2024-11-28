@@ -1,0 +1,10 @@
+enum Either {
+    A = 1,
+    B = 2,
+
+    fn s() {
+        print("static");
+    }
+}
+
+Either::A.s(); // expect runtime error: 's' is a static method, use static method syntax instead: Either.s().

@@ -62,7 +62,10 @@ pub enum OpCode {
     Class(u8),
     SetProperty(u8),
     GetProperty(u8),
-    Method(u8),
+    Method {
+        name_constant: u8,
+        is_static: bool,
+    },
     Invoke {
         method_constant: u8,
         positional_count: u8,
@@ -280,7 +283,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Class(c) => self.constant_instruction("CLASS", c),
                 OpCode::SetProperty(c) => self.constant_instruction("SET_PROPERTY", c),
                 OpCode::GetProperty(c) => self.constant_instruction("GET_PROPERTY", c),
-                OpCode::Method(c) => self.constant_instruction("METHOD", c),
+                OpCode::Method { name_constant, .. } => {
+                    self.constant_instruction("METHOD", name_constant)
+                }
                 OpCode::Invoke {
                     method_constant,
                     positional_count,

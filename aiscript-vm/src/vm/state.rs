@@ -659,9 +659,12 @@ impl<'gc> State<'gc> {
                     _ => return Err(self.runtime_error("Only instances have fields.".into())),
                 }
             }
-            OpCode::Method(byte) => {
-                let name = frame.read_constant(byte).as_string().unwrap();
-                self.define_method(name)?;
+            OpCode::Method {
+                name_constant,
+                is_static,
+            } => {
+                let name = frame.read_constant(name_constant).as_string().unwrap();
+                self.define_method(name, is_static)?;
             }
             OpCode::Invoke {
                 method_constant,
@@ -981,7 +984,7 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn define_method(&mut self, name: InternedString<'gc>) -> Result<(), VmError> {
+    fn define_method(&mut self, name: InternedString<'gc>, is_static: bool) -> Result<(), VmError> {
         match *self.peek(1) {
             Value::Class(class) => {
                 class
@@ -990,10 +993,12 @@ impl<'gc> State<'gc> {
                     .insert(name, *self.peek(0));
             }
             Value::Enum(enum_) => {
-                enum_
-                    .borrow_mut(self.mc)
-                    .methods
-                    .insert(name, *self.peek(0));
+                let mut e = enum_.borrow_mut(self.mc);
+                if is_static {
+                    e.static_methods.insert(name, *self.peek(0));
+                } else {
+                    e.methods.insert(name, *self.peek(0));
+                }
             }
             _ => {
                 return Err(self.runtime_error("Only class and enum support define method.".into()));
@@ -1130,10 +1135,31 @@ impl<'gc> State<'gc> {
                     )
                 }
             }
+            Value::Enum(enum_) => {
+                if let Some(value) = enum_.borrow().static_methods.get(&name) {
+                    self.call_value(*value, args_count, keyword_args_count)
+                } else {
+                    Err(self.runtime_error(
+                        format!(
+                            "Undefined static method '{}' of enum '{}'.",
+                            name,
+                            enum_.borrow().name,
+                        )
+                        .into(),
+                    ))
+                }
+            }
             Value::EnumVariant(variant) => {
                 if let Some(value) = variant.enum_.borrow().methods.get(&name) {
-                    self.stack[self.stack_top - args_slot_count - 1] = *value;
                     self.call_value(*value, args_count, keyword_args_count)
+                } else if variant.enum_.borrow().static_methods.contains_key(&name) {
+                    Err(self.runtime_error(
+                            format!(
+                                "'{name}' is a static method, use static method syntax instead: {}.{name}().",
+                                variant.enum_.borrow().name,
+                            )
+                            .into(),
+                        ))
                 } else {
                     Err(self.runtime_error(
                         format!(

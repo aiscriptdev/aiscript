@@ -414,8 +414,7 @@ impl<'gc> Parser<'gc> {
         let mut checker = EnumVariantChecker::new(name.lexeme);
 
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            if self.check(TokenType::Fn) || self.check(TokenType::AI) || self.check(TokenType::Pub)
-            {
+            if self.current.is_function_def_keyword() {
                 // Parse method
                 methods.push(self.method_declaration()?);
                 continue;
@@ -724,22 +723,23 @@ impl<'gc> Parser<'gc> {
 
         let body = self.block();
 
-        // Restore previous function type
-        self.fn_type = previous_fn_type;
         let mangled_name = self.scopes.join("$");
         self.scopes.pop();
 
-        Some(Stmt::Function(FunctionDecl {
+        let func = Stmt::Function(FunctionDecl {
             name,
             mangled_name,
             doc,
             params,
             return_type,
             body,
-            fn_type,
+            fn_type: self.fn_type,
             visibility,
             line: name.line,
-        }))
+        });
+        // Restore previous function type
+        self.fn_type = previous_fn_type;
+        Some(func)
     }
 
     fn lambda(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -1251,8 +1251,9 @@ impl<'gc> Parser<'gc> {
             loop {
                 let item = self.expression()?;
                 if once.next().is_some()
-                    // EvaluateVariant can only perform on those two Expr
-                    && matches!(item, Expr::EnumVariant { .. } | Expr::Variable { .. })
+                    // EvaluateVariant can only perform on those three Expr.
+                    // We allow [self] syntax in enum's method.
+                    && matches!(item, Expr::EnumVariant { .. } | Expr::Variable { .. } | Expr::Self_ { .. })
                     && self.match_token(TokenType::CloseBracket)
                 {
                     // Evaluate expression value

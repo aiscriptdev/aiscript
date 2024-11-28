@@ -1,0 +1,10 @@
+enum Either {
+    A = 1,
+    B = 2,
+
+    fn f(self) {
+        print("f");
+    }
+}
+
+Either.f(); // expect runtime error: Undefined static method 'f' of enum 'Either'.

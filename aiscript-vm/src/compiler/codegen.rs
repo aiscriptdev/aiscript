@@ -440,6 +440,7 @@ impl<'gc> CodeGen<'gc> {
                             })
                             .collect(),
                         methods: HashMap::default(),
+                        static_methods: HashMap::default(),
                     }),
                 );
                 self.type_resolver.register_enum(name.lexeme, enum_);
@@ -477,7 +478,10 @@ impl<'gc> CodeGen<'gc> {
                             *fn_type,
                         )?;
                         let method_constant = self.identifier_constant(method_name.lexeme);
-                        self.emit(OpCode::Method(method_constant as u8));
+                        self.emit(OpCode::Method {
+                            name_constant: method_constant as u8,
+                            is_static: fn_type.is_static_method(),
+                        });
                     }
                 }
                 // Pop the enum
@@ -550,7 +554,10 @@ impl<'gc> CodeGen<'gc> {
                             fn_type,
                         )?;
                         let method_constant = self.identifier_constant(method_name.lexeme);
-                        self.emit(OpCode::Method(method_constant as u8));
+                        self.emit(OpCode::Method {
+                            name_constant: method_constant as u8,
+                            is_static: fn_type.is_static_method(),
+                        });
                     }
                 }
 

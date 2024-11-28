@@ -5,16 +5,16 @@ enum HttpStatus {
     NotFound = 404,
     ServerError = 500,
 
-    pub ai fn as_str() {
+    pub ai fn as_str(self) {
         print("as_str");
     }
-    pub fn as_str2() {
+    pub fn as_str2(self) {
         print("as_str2");
     }
-    ai fn as_str3() {
+    ai fn as_str3(self) {
         print("as_str3");
     }
-    fn as_str4() {
+    fn as_str4(self) {
         print("as_str4");
     }
 }

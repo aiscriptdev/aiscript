@@ -140,6 +140,7 @@ pub struct Enum<'gc> {
     pub variants: HashMap<InternedString<'gc>, Value<'gc>>,
     // Method name -> function mapping
     pub methods: HashMap<InternedString<'gc>, Value<'gc>>,
+    pub static_methods: HashMap<InternedString<'gc>, Value<'gc>>,
 }
 
 #[derive(Debug, Clone, Collect)]

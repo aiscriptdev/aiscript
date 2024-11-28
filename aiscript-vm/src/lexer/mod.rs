@@ -118,6 +118,10 @@ impl<'a> Token<'a> {
         }
     }
 
+    pub fn is_function_def_keyword(&self) -> bool {
+        matches!(self.kind, TokenType::Fn | TokenType::AI | TokenType::Pub)
+    }
+
     pub fn is_literal_token(&self) -> bool {
         matches!(
             self.kind,

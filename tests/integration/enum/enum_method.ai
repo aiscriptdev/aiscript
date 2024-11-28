@@ -1,0 +1,21 @@
+enum Either {
+    A = 1,
+
+    fn f1(self) {
+        print(self);
+    }
+
+    fn f2(self) {
+        print([self]);
+    }
+
+    fn f3() {
+        print("static method");
+    }
+}
+
+Either::A.f1(); // expect: Either::A(1)
+let e = Either::A;
+e.f1(); // expect: Either::A(1)
+e.f2(); // expect: 1
+Either.f3(); // expect: static method

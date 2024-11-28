@@ -1,0 +1,7 @@
+enum Either {
+    A = 1,
+    B = 2,
+}
+
+let e = Either::A;
+e.invalid(); // expect runtime error: Undefined method 'invalid' of enum 'Either'.
