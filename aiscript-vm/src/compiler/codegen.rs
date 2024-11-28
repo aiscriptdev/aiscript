@@ -73,7 +73,7 @@ impl<'gc> CodeGen<'gc> {
             locals: std::array::from_fn(|i| {
                 if i == 0 {
                     let name = if fn_type != FunctionType::Function {
-                        Token::new(TokenType::This, "this", 0)
+                        Token::new(TokenType::Self_, "self", 0)
                     } else {
                         Token::default()
                     };
@@ -905,11 +905,11 @@ impl<'gc> CodeGen<'gc> {
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::SetProperty(name_constant as u8));
             }
-            Expr::This { .. } => {
-                self.named_variable(&Token::new(TokenType::This, "this", 0), false)?;
+            Expr::Self_ { .. } => {
+                self.named_variable(&Token::new(TokenType::Self_, "self", 0), false)?;
             }
             Expr::Super { method, .. } => {
-                // Get the receiver ('this')
+                // Get the receiver ('self')
                 self.emit(OpCode::GetLocal(0));
 
                 // Look up 'super' in upvalues

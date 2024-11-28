@@ -1036,7 +1036,7 @@ impl<'gc> State<'gc> {
         match callee {
             Value::BoundMethod(bound) => {
                 // inserts the receiver into the new CallFrame's slot zero.
-                // normally, the receiver is 'this' or 'super' keyword.
+                // normally, the receiver is 'self' or 'super' keyword.
                 /*
                    Diagram for this: scone.topping("berries", "cream");
 

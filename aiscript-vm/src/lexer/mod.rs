@@ -71,7 +71,7 @@ pub enum TokenType {
     Pub,
     Return,
     Super,
-    This,
+    Self_,
     True,
     Let,
     Use,
@@ -150,12 +150,6 @@ impl<'a> Token<'a> {
                 | TokenType::Use
                 | TokenType::While
         )
-    }
-
-    /// Creates a new identifier token (available with v1 feature)
-    #[cfg(feature = "v1")]
-    pub fn identifier(name: &'a str) -> Self {
-        Token::new(TokenType::Identifier, name, 0)
     }
 }
 
@@ -370,7 +364,7 @@ impl<'a> Scanner<'a> {
             "pub" => TokenType::Pub,
             "return" => TokenType::Return,
             "super" => TokenType::Super,
-            "this" => TokenType::This,
+            "self" => TokenType::Self_,
             "true" => TokenType::True,
             "let" => TokenType::Let,
             "use" => TokenType::Use,

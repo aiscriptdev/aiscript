@@ -1370,13 +1370,13 @@ impl<'gc> Parser<'gc> {
         }
     }
 
-    fn this(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+    fn self_(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         if self.class_compiler.is_none() {
-            self.error("Can't use 'this' outside of a class.");
+            self.error("Can't use 'self' outside of a class.");
             return None;
         }
 
-        Some(Expr::This {
+        Some(Expr::Self_ {
             line: self.previous.line,
         })
     }
@@ -1612,7 +1612,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::And => ParseRule::new(None, Some(Parser::and), Precedence::And),
         TokenType::Or => ParseRule::new(None, Some(Parser::or), Precedence::Or),
         TokenType::Super => ParseRule::new(Some(Parser::super_), None, Precedence::None),
-        TokenType::This => ParseRule::new(Some(Parser::this), None, Precedence::None),
+        TokenType::Self_ => ParseRule::new(Some(Parser::self_), None, Precedence::None),
         TokenType::True | TokenType::False | TokenType::Nil => {
             ParseRule::new(Some(Parser::literal), None, Precedence::None)
         }

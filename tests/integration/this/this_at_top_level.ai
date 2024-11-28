@@ -1,1 +1,1 @@
-this; // Error at 'this': Can't use 'this' outside of a class.
+self; // Error at 'self': Can't use 'self' outside of a class.

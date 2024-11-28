@@ -3,7 +3,7 @@ class Foo {
     fn f() {
       fn g() {
         fn h() {
-          return this.toString();
+          return self.toString();
         }
         return h;
       }

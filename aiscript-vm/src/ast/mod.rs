@@ -269,7 +269,7 @@ pub enum Expr<'gc> {
         value: Box<Expr<'gc>>,
         line: u32,
     },
-    This {
+    Self_ {
         line: u32,
     },
     Super {
@@ -311,7 +311,7 @@ impl<'gc> Expr<'gc> {
             | Self::Invoke { line, .. }
             | Self::Get { line, .. }
             | Self::Set { line, .. }
-            | Self::This { line, .. }
+            | Self::Self_ { line, .. }
             | Self::Super { line, .. }
             | Self::SuperInvoke { line, .. }
             | Self::Prompt { line, .. } => *line,

@@ -1,13 +1,13 @@
 class Base {
   fn init(a) {
-    this.a = a;
+    self.a = a;
   }
 }
 
 class Derived(Base) {
   fn init(a, b) {
     super.init(a);
-    this.b = b;
+    self.b = b;
   }
 }
 

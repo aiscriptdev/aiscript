@@ -1,2 +1,2 @@
-// [line 2] Error at 'this': Expect variable name.
-let this = "value";
+// [line 2] Error at 'self': Expect variable name.
+let self = "value";

@@ -73,7 +73,7 @@ mod tests {
                 name: "张三",
                 age: 25,
                 greet: fn() {
-                    print("你好，" + this.name + "！");
+                    print("你好，" + self.name + "！");
                 }
             };
         "#;
@@ -102,7 +102,7 @@ mod tests {
             TokenType::OpenParen,
             TokenType::String, // "你好，"
             TokenType::Plus,
-            TokenType::This,
+            TokenType::Self_,
             TokenType::Dot,
             TokenType::Identifier, // name
             TokenType::Plus,
