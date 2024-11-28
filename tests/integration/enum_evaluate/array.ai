@@ -1,0 +1,10 @@
+enum Foo { A = "a", B = "b" }
+
+print([[Foo::A], [Foo::B]]); // expect: [a, b]
+
+let a = [[Foo::A], [Foo::B]];
+print(a); // expect: [a, b]
+
+print([[Foo.A], [Foo.B]]); // expect: [[a], [b]]
+let a = [[Foo.A], [Foo.B]];
+print(a); // expect: [[a], [b]]
