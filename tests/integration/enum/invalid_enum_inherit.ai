@@ -1,0 +1,8 @@
+enum Base {}
+enum Either(Base) { // Error at '(': Enum doesn't support inherit.
+    A = 1,
+    B,
+}
+
+enum A() { // Error at '(': Expect '{' before enum body.
+}

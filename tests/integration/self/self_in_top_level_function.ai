@@ -1,3 +1,3 @@
 fn foo() {
-  self; // Error at 'self': Can't use 'self' outside of a class.
+  self; // Error at 'self': Can't use 'self' outside of a class or enum.
 }

@@ -1,0 +1,15 @@
+enum A {
+    fn f() {
+        print(self.v); // Error at 'self': Can't use 'self' in static method.
+    }
+}
+
+// self in closure function in static method
+enum Foo {
+  fn getClosure() {
+    fn closure() {
+      return self.toString(); // Error at 'self': Can't use 'self' in static method.
+    }
+    return closure;
+  }
+}

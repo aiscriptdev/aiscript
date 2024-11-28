@@ -396,6 +396,17 @@ impl<'gc> Parser<'gc> {
     fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect enum name.");
         let name = self.previous;
+        self.scopes.push(name.lexeme.to_owned());
+        if self.check(TokenType::OpenParen) && self.check_next(TokenType::Identifier) {
+            self.error_at_current("Enum doesn't support inherit.");
+        }
+
+        let class_compiler = ClassCompiler {
+            has_superclass: false,
+            enclosing: self.class_compiler.take(),
+            current_method_type: self.fn_type,
+        };
+        self.class_compiler = Some(Box::new(class_compiler));
         self.consume(TokenType::OpenBrace, "Expect '{' before enum body.");
 
         let mut variants = Vec::new();
@@ -464,6 +475,9 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::CloseBrace, "Expect '}' after enum body.");
 
+        self.scopes.pop();
+        // pop that compiler off the stack and restore the enclosing class compiler.
+        self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
         Some(Stmt::Enum(EnumDecl {
             name,
             variants,
@@ -627,7 +641,7 @@ impl<'gc> Parser<'gc> {
                 self_args_count += 1;
                 if self.check(TokenType::Comma) {
                     self.advance();
-                } else if self.peek_next().map(|t| t.kind == TokenType::CloseParen) == Some(true) {
+                } else if self.check_next(TokenType::CloseParen) {
                     self.consume(TokenType::Comma, "Expect ',' between 'self' and parameter.");
                 }
                 continue;
@@ -1432,7 +1446,7 @@ impl<'gc> Parser<'gc> {
         let is_in_static_method = if let Some(class_compiler) = self.class_compiler.as_ref() {
             class_compiler.current_method_type.is_static_method() || self.fn_type.is_static_method()
         } else {
-            self.error("Can't use 'self' outside of a class.");
+            self.error("Can't use 'self' outside of a class or enum.");
             return None;
         };
 
@@ -1538,6 +1552,10 @@ impl<'gc> Parser<'gc> {
 
     fn check(&self, kind: TokenType) -> bool {
         self.current.kind == kind
+    }
+
+    fn check_next(&mut self, kind: TokenType) -> bool {
+        self.peek_next().map(|t| t.kind == kind) == Some(true)
     }
 
     fn is_at_end(&self) -> bool {
