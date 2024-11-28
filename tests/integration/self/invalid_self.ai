@@ -7,3 +7,8 @@ class B {
     fn f(self: A, a) { // Error at ':': Expect parameter name.
     }
 }
+
+class C {
+    fn f(self a) { // Error at 'a': Expect ',' between 'self' and parameter.
+    }
+}

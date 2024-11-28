@@ -627,6 +627,8 @@ impl<'gc> Parser<'gc> {
                 self_args_count += 1;
                 if self.check(TokenType::Comma) {
                     self.advance();
+                } else if self.peek_next().map(|t| t.kind == TokenType::CloseParen) == Some(true) {
+                    self.consume(TokenType::Comma, "Expect ',' between 'self' and parameter.");
                 }
                 continue;
             }
