@@ -25,8 +25,12 @@ pub enum TokenType {
     Colon,      // :
     Percent,    // %
     Pipe,       // |
+    At,         // @
     StarStar,   // **
     ColonColon, // ::
+    Arrow,      // ->
+    FatArrow,   // =>
+    PipeArrow,  // |>
 
     // Comparison and logical operators
     Bang,         // !
@@ -37,8 +41,6 @@ pub enum TokenType {
     GreaterEqual, // >=
     Less,         // <
     LessEqual,    // <=
-    Arrow,        // ->
-    PipeArrow,    // |>
 
     // Compound assignment
     PlusEqual,    // +=
@@ -400,6 +402,7 @@ impl<'a> Scanner<'a> {
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
+            '@' => self.make_token(TokenType::At),
             '|' => {
                 let kind = if self.peek() == Some('>') {
                     self.advance();
@@ -481,9 +484,13 @@ impl<'a> Scanner<'a> {
                 self.make_token(kind)
             }
             '=' => {
-                let kind = if self.peek() == Some('=') {
+                let p = self.peek();
+                let kind = if p == Some('=') {
                     self.advance();
                     TokenType::EqualEqual
+                } else if p == Some('>') {
+                    self.advance();
+                    TokenType::FatArrow
                 } else {
                     TokenType::Equal
                 };
