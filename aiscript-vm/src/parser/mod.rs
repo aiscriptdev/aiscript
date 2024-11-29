@@ -106,68 +106,6 @@ impl<'gc> Parser<'gc> {
         self.previous
     }
 
-    fn parse_parameter_default_value(&mut self) -> Option<Expr<'gc>> {
-        let expr = match self.current.kind {
-            TokenType::Number => {
-                self.match_token(TokenType::Number);
-                Expr::Literal {
-                    value: Literal::Number(self.previous.lexeme.parse().unwrap()),
-                    line: self.previous.line,
-                }
-            }
-            TokenType::String => {
-                self.match_token(TokenType::String);
-                Expr::Literal {
-                    value: Literal::String(
-                        self.ctx
-                            .intern(self.previous.lexeme.trim_matches('"').as_bytes()),
-                    ),
-                    line: self.previous.line,
-                }
-            }
-            TokenType::True => {
-                self.match_token(TokenType::True);
-                Expr::Literal {
-                    value: Literal::Boolean(true),
-                    line: self.previous.line,
-                }
-            }
-            TokenType::False => {
-                self.match_token(TokenType::False);
-                Expr::Literal {
-                    value: Literal::Boolean(false),
-                    line: self.previous.line,
-                }
-            }
-            TokenType::Nil => {
-                self.match_token(TokenType::Nil);
-                Expr::Literal {
-                    value: Literal::Nil,
-                    line: self.previous.line,
-                }
-            }
-            _ => {
-                if matches!(self.peek_next(), Some(token) if token.kind == TokenType::ColonColon) {
-                    // EnumVariant as the default value
-                    let enum_name = self.current;
-                    // Give this: Enum::Variant1
-                    self.advance(); // Consume token Enum
-                    self.advance(); // Consume token ::
-                    let variant = self.current;
-                    self.advance(); // Consume token Variant1
-                    Expr::EnumVariant {
-                        enum_name,
-                        variant,
-                        line: self.previous.line,
-                    }
-                } else {
-                    return None;
-                }
-            }
-        };
-        Some(expr)
-    }
-
     fn declaration(&mut self) -> Option<Stmt<'gc>> {
         let visibility = if self.match_token(TokenType::Pub) {
             Visibility::Public
@@ -378,22 +316,6 @@ impl<'gc> Parser<'gc> {
         Some((key, value))
     }
 
-    fn parse_enum_variant_value(&mut self) -> Option<Literal<'gc>> {
-        let token = self.previous;
-        match token.kind {
-            TokenType::Number => Some(Literal::Number(token.lexeme.parse().unwrap())),
-            TokenType::String => Some(Literal::String(
-                self.ctx.intern(token.lexeme.trim_matches('"').as_bytes()),
-            )),
-            TokenType::True => Some(Literal::Boolean(true)),
-            TokenType::False => Some(Literal::Boolean(false)),
-            _ => {
-                self.error_at_current("Invalid enum variant value");
-                None
-            }
-        }
-    }
-
     fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
         self.consume(TokenType::Identifier, "Expect enum name.");
         let name = self.previous;
@@ -442,8 +364,7 @@ impl<'gc> Parser<'gc> {
                     return None;
                 }
 
-                self.advance();
-                if let Some(literal) = self.parse_enum_variant_value() {
+                if let Some(Expr::Literal { value: literal, .. }) = self.expression() {
                     if let Err(msg) = checker.check_value(variant_name, &literal) {
                         self.error_at(variant_name, &msg);
                         return None;
@@ -488,7 +409,7 @@ impl<'gc> Parser<'gc> {
         }))
     }
 
-    fn enum_access(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+    fn enum_variant(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         // The enum name is in previous_expr since this is an infix operator
         let enum_name = match &self.previous_expr.take()? {
             Expr::Variable { name, .. } => *name,
@@ -666,7 +587,7 @@ impl<'gc> Parser<'gc> {
 
             // Parse default value if present - must be a literal
             let default_value = if self.match_token(TokenType::Equal) {
-                match self.parse_parameter_default_value() {
+                match self.expression() {
                     Some(expr) => {
                         keyword_args_count += 1;
                         Some(expr)
@@ -1428,7 +1349,7 @@ impl<'gc> Parser<'gc> {
                 return None;
             } else if class_compiler.is_enum {
                 self.error("Can't use 'super' in an enum.");
-                return None; 
+                return None;
             }
             class_compiler.current_method_type.is_static_method() || self.fn_type.is_static_method()
         } else {
@@ -1683,7 +1604,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::OpenBracket => {
             ParseRule::new(Some(Parser::bracket), Some(Parser::index), Precedence::Call)
         }
-        TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_access), Precedence::Call),
+        TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_variant), Precedence::Call),
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
         TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Pipe),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),

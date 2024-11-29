@@ -2,10 +2,11 @@ class Foo {
     fn init(a, b: str = "bb") {
         self.a = a;
         self.b = b;
+        print(a, b, sep=", ");
     }
 }
 
-print(Foo(a="aa"));            // expect: Foo {b: bb, a: aa}
-print(Foo("aa", b="bbb"));     // expect: Foo {b: bbb, a: aa}
-print(Foo(a="aa", b="bbb"));   // expect: Foo {b: bbb, a: aa}
-print(Foo(b="bbb", a="aa"));   // expect: Foo {b: bbb, a: aa}
+Foo(a="aa");            // expect: aa, bb
+Foo("aa", b="bbb");     // expect: aa, bbb
+Foo(a="aa", b="bbb");   // expect: aa, bbb
+Foo(b="bbb", a="aa");   // expect: aa, bbb
