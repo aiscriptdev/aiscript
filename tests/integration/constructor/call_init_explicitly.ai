@@ -1,15 +1,15 @@
 class Foo {
-  fn init(arg) {
-    print("Foo.init(" + arg + ")");
-    self.field = "init";
+  fn new(arg) {
+    print("Foo.new(" + arg + ")");
+    self.field = "new";
   }
 }
 
-let foo = Foo("one"); // expect: Foo.init(one)
+let foo = Foo("one"); // expect: Foo.new(one)
 foo.field = "field";
 
-let foo2 = foo.init("two"); // expect: Foo.init(two)
-print(foo2); // expect: Foo {field: init}
+let foo2 = foo.new("two"); // expect: Foo.new(two)
+print(foo2); // expect: Foo {field: new}
 
-// Make sure init() doesn't create a fresh instance.
-print(foo.field); // expect: init
+// Make sure new() doesn't create a fresh instance.
+print(foo.field); // expect: new

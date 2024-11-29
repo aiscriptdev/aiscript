@@ -1,5 +1,5 @@
 class Foo {
-  fn init(a, b) {
+  fn new(a, b) {
     self.a = a;
     self.b = b;
   }

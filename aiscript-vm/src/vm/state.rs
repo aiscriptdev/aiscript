@@ -1068,9 +1068,7 @@ impl<'gc> State<'gc> {
                 let instance = Instance::new(class);
                 self.stack[self.stack_top - args_slot_count - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
-                let init = self.intern_static("init");
-
-                if let Some(initializer) = class.borrow().methods.get(&init) {
+                if let Some(initializer) = class.borrow().methods.get(&self.intern_static("new")) {
                     self.call(initializer.as_closure()?, args_count, keyword_args_count)
                 } else if (args_count + keyword_args_count) != 0 {
                     Err(self.runtime_error(

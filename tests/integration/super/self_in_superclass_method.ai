@@ -1,12 +1,12 @@
 class Base {
-  fn init(a) {
+  fn new(a) {
     self.a = a;
   }
 }
 
 class Derived(Base) {
-  fn init(a, b) {
-    super.init(a);
+  fn new(a, b) {
+    super.new(a);
     self.b = b;
   }
 }

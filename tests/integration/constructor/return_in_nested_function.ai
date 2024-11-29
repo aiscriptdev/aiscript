@@ -1,9 +1,9 @@
 class Foo {
-  fn init() {
-    fn init() {
+  fn new() {
+    fn new() {
       return "bar";
     }
-    print(init()); // expect: bar
+    print(new()); // expect: bar
   }
 }
 

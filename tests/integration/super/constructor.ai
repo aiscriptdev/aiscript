@@ -1,16 +1,16 @@
 class Base {
-  fn init(a, b) {
-    print("Base.init(" + a + ", " + b + ")");
+  fn new(a, b) {
+    print("Base.new(" + a + ", " + b + ")");
   }
 }
 
 class Derived(Base) {
-  fn init() {
-    print("Derived.init()");
-    super.init("a", "b");
+  fn new() {
+    print("Derived.new()");
+    super.new("a", "b");
   }
 }
 
 Derived();
-// expect: Derived.init()
-// expect: Base.init(a, b)
+// expect: Derived.new()
+// expect: Base.new(a, b)

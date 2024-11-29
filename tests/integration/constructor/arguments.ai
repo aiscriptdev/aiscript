@@ -1,6 +1,6 @@
 class Foo {
-  fn init(a, b) {
-    print("init"); // expect: init
+  fn new(a, b) {
+    print("new"); // expect: new
     self.a = a;
     self.b = b;
   }

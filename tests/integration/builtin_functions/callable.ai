@@ -7,13 +7,13 @@ print(callable(print));    // expect: true
 
 // Test with classes
 class TestClass {
-    fn init() {}
+    fn new() {}
 }
 print(callable(TestClass));  // expect: true
 
 // Test with methods
 let instance = TestClass();
-print(callable(instance.init));  // expect: true
+print(callable(instance.new));  // expect: true
 
 // Test with non-callable types
 print(callable(1));           // expect: false

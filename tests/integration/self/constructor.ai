@@ -1,5 +1,5 @@
 class A {
-    fn init(self) { // Error at 'self': No need to declare 'self' parameter for class constructor.
+    fn new(self) { // Error at 'self': No need to declare 'self' parameter for class constructor.
         self.v = 1;
     }
 }

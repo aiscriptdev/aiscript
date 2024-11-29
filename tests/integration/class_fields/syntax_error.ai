@@ -15,16 +15,16 @@ class Baz {
 } // Error at '}': Expect expression.
 
 class Faz {
-    a: int =, // Expect default value after '='.
+    a: int =, // Error at ',': Expect default value after '='.
 }
 
 class Fab {
     a: int =
-} // Expect default value after '='.
+} // Error at '}': Expect default value after '='.
 
 class Fax {
-    a: int = 1 // Error at '}': Expect ',' after field declaration.
-}
+    a: int = 1
+} // Error at '}': Expect ',' after field declaration.
 
 class Fbx {
     a: int = value, // Error at 'value': Only allow set literal (number, string, bool) as the default value.

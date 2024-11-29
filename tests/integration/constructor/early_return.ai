@@ -1,10 +1,10 @@
 class Foo {
-  fn init() {
-    print("init");
+  fn new() {
+    print("new");
     return;
     print("nope");
   }
 }
 
-let foo = Foo(); // expect: init
+let foo = Foo(); // expect: new
 print(foo); // expect: Foo {}

@@ -502,9 +502,8 @@ impl<'gc> Parser<'gc> {
             }
         }
 
-        // Get the single init method if it exists
+        // Get the single constructor if it exists
         if !fields.is_empty() {
-            // Process methods and find init if it exists
             let (constructor, other_methods): (Vec<_>, Vec<_>) = methods.into_iter()
             .partition(
                 |m| matches!(m, Stmt::Function(FunctionDecl { fn_type, .. }) if fn_type.is_constructor()),
@@ -535,14 +534,14 @@ impl<'gc> Parser<'gc> {
                             ..constructor_decl
                         })
                     } else {
-                        // No declared fields need initialization, use original init as-is
+                        // No declared fields need initialization, use original constructor as-is
                         Stmt::Function(constructor_decl)
                     }
                 } else {
                     // No constructor exists, create synthetic one that initializes declared fields
                     Stmt::Function(FunctionDecl {
-                        name: Token::new(TokenType::Identifier, "init", name.line),
-                        mangled_name: format!("{}$init", self.scopes.join("$")),
+                        name: Token::new(TokenType::Identifier, "new", name.line),
+                        mangled_name: format!("{}$new", self.scopes.join("$")),
                         params: IndexMap::new(),
                         doc: None,
                         return_type: None,
@@ -650,7 +649,7 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::Identifier, &format!("Expect {type_name} name."));
         let name = self.previous;
         self.scopes.push(name.lexeme.to_string());
-        if self.fn_type.is_method() && name.lexeme == "init" {
+        if self.fn_type.is_method() && name.lexeme == "new" {
             self.fn_type = FunctionType::Constructor;
         }
 

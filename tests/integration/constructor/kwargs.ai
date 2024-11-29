@@ -1,5 +1,5 @@
 class Foo {
-    fn init(a, b: str = "bb") {
+    fn new(a, b: str = "bb") {
         self.a = a;
         self.b = b;
         print(a, b, sep=", ");

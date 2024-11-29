@@ -1,12 +1,12 @@
 class Foo {
-  fn init(arg) {
-    print("Foo.init(" + arg + ")");
-    self.field = "init";
+  fn new(arg) {
+    print("Foo.new(" + arg + ")");
+    self.field = "new";
   }
 }
 
-fn init() {
+fn new() {
   print("not initializer");
 }
 
-init(); // expect: not initializer
+new(); // expect: not initializer

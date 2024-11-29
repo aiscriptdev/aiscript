@@ -1,5 +1,5 @@
 class A {
-  fn init(param) {
+  fn new(param) {
     self.field = param;
   }
 

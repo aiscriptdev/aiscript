@@ -251,8 +251,8 @@ impl<'gc> CodeGen<'gc> {
                 ..
             }) => {
                 self.declare_variable(name, Mutability::Mutable);
-                if let Some(init) = initializer {
-                    self.generate_expr(init)?;
+                if let Some(initial_value) = initializer {
+                    self.generate_expr(initial_value)?;
                 } else {
                     self.emit(OpCode::Nil);
                 }
@@ -322,8 +322,8 @@ impl<'gc> CodeGen<'gc> {
                 self.begin_scope();
 
                 // Initialize if needed
-                if let Some(init) = initializer {
-                    self.generate_stmt(init)?;
+                if let Some(initial_value) = initializer {
+                    self.generate_stmt(initial_value)?;
                 }
 
                 let loop_start = self.function.code_size();

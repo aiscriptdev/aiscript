@@ -4,7 +4,7 @@ class Point1 {
   y: int,
   z: str = "zz",
   
-  fn init(x: int, y: int) {
+  fn new(x: int, y: int) {
     let o = {a: 1};
     o.a = 2;         // NOT counted as a field initialization
     self.x = x;    // Counted as initializing x
@@ -23,7 +23,7 @@ class Point2 {
   y: int,
   z: str = "zz",
   
-  fn init(x: int, y: int, other: bool) {
+  fn new(x: int, y: int, other: bool) {
     self.x = x;
     self.y = y;
     self.other = other;
