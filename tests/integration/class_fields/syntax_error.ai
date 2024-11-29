@@ -1,0 +1,31 @@
+class A {
+    a
+} // Error at '}': Expect ':' after field name.
+
+class Foo {
+    a, int // Error at ',': Expect ':' after field name.
+}
+
+class Bar {
+    a: 1 // Error at '1': Invalid type annotation.
+}
+
+class Baz {
+    a: int; //  Error at ';': Expect ',' after field declaration.
+} // Error at '}': Expect expression.
+
+class Faz {
+    a: int =, // Expect default value after '='.
+}
+
+class Fab {
+    a: int =
+} // Expect default value after '='.
+
+class Fax {
+    a: int = 1 // Error at '}': Expect ',' after field declaration.
+}
+
+class Fbx {
+    a: int = value, // Error at 'value': Only allow set literal (number, string, bool) as the default value.
+}

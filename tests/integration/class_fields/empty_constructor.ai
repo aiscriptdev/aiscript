@@ -1,0 +1,7 @@
+class Foo {
+    a: int,
+    b: int = 0,
+    fn init() {}
+}
+let f = Foo();
+print(f.a, f.b, sep=", "); // expect: nil, 0

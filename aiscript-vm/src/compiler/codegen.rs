@@ -122,7 +122,7 @@ impl<'gc> CodeGen<'gc> {
         }
 
         for stmt in program.statements {
-            generator.generate_stmt(&stmt)?;
+            generator.generate_stmt(stmt)?;
         }
 
         generator.emit_return();
@@ -210,7 +210,8 @@ impl<'gc> CodeGen<'gc> {
         Ok(())
     }
 
-    fn generate_stmt(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
+    fn generate_stmt<S: Into<Stmt<'gc>>>(&mut self, stmt: S) -> Result<(), VmError> {
+        let stmt = stmt.into();
         self.current_line = stmt.line();
         match stmt {
             Stmt::Use { path, .. } => {
@@ -249,7 +250,7 @@ impl<'gc> CodeGen<'gc> {
                 visibility,
                 ..
             }) => {
-                self.declare_variable(*name, Mutability::Mutable);
+                self.declare_variable(name, Mutability::Mutable);
                 if let Some(init) = initializer {
                     self.generate_expr(init)?;
                 } else {
@@ -261,7 +262,7 @@ impl<'gc> CodeGen<'gc> {
                     let global = self.identifier_constant(name.lexeme);
                     self.emit(OpCode::DefineGlobal {
                         name_constant: global as u8,
-                        visibility: *visibility,
+                        visibility,
                     });
                 }
             }
@@ -271,7 +272,7 @@ impl<'gc> CodeGen<'gc> {
                 visibility,
                 ..
             } => {
-                self.declare_variable(*name, Mutability::Immutable);
+                self.declare_variable(name, Mutability::Immutable);
                 self.generate_expr(initializer)?;
                 if self.scope_depth > 0 {
                     self.mark_initialized();
@@ -280,7 +281,7 @@ impl<'gc> CodeGen<'gc> {
                     let global = self.identifier_constant(name.lexeme);
                     self.emit(OpCode::DefineGlobal {
                         name_constant: global as u8,
-                        visibility: *visibility,
+                        visibility,
                     });
                 }
             }
@@ -383,25 +384,25 @@ impl<'gc> CodeGen<'gc> {
                 visibility,
                 ..
             }) => {
-                self.declare_variable(*name, Mutability::default());
+                self.declare_variable(name, Mutability::default());
                 if self.scope_depth > 0 {
                     self.mark_initialized();
                 }
 
                 self.generate_function(
                     name.lexeme,
-                    mangled_name.to_owned(),
-                    params,
+                    &mangled_name,
+                    &params,
                     return_type,
                     body,
-                    *fn_type,
+                    fn_type,
                 )?;
 
                 if self.scope_depth == 0 {
                     let global = self.identifier_constant(name.lexeme);
                     self.emit(OpCode::DefineGlobal {
                         name_constant: global as u8,
-                        visibility: *visibility,
+                        visibility,
                     });
                 }
             }
@@ -447,123 +448,22 @@ impl<'gc> CodeGen<'gc> {
                 // Define globally right away
                 self.emit(OpCode::DefineGlobal {
                     name_constant: name_constant as u8,
-                    visibility: *visibility,
+                    visibility,
                 });
 
                 // Load enum again for method definitions
                 self.emit(OpCode::GetGlobal(name_constant as u8));
 
                 for method in methods {
-                    if let Stmt::Function(FunctionDecl {
-                        name: method_name,
-                        mangled_name,
-                        params,
-                        return_type,
-                        body,
-                        fn_type,
-                        ..
-                    }) = method
-                    {
-                        self.generate_function(
-                            method_name.lexeme,
-                            mangled_name.to_owned(),
-                            params,
-                            return_type,
-                            body,
-                            *fn_type,
-                        )?;
-                        let method_constant = self.identifier_constant(method_name.lexeme);
-                        self.emit(OpCode::Method {
-                            name_constant: method_constant as u8,
-                            is_static: fn_type.is_static_method(),
-                        });
+                    if let Stmt::Function(function_decl) = method {
+                        self.generate_method(function_decl)?;
                     }
                 }
                 // Pop the enum
                 self.emit(OpCode::Pop(1));
             }
-            Stmt::Class(ClassDecl {
-                name,
-                superclass,
-                methods,
-                visibility,
-                ..
-            }) => {
-                // Emit class declaration
-                let name_constant = self.identifier_constant(name.lexeme);
-                self.emit(OpCode::Class(name_constant as u8));
-                self.emit(OpCode::DefineGlobal {
-                    name_constant: name_constant as u8,
-                    visibility: *visibility,
-                });
-
-                // Handle inheritance
-                if let Some(superclass) = superclass {
-                    // Begin a new scope for 'super'
-                    self.begin_scope();
-
-                    // First get the superclass
-                    self.generate_expr(superclass)?;
-
-                    // Creating a new lexical scope ensures that if we declare two classes in the same scope,
-                    // each has a different local slot to store its superclass. Since we always name this
-                    // variable “super”, if we didn’t make a scope for each subclass, the variables would collide.
-                    let super_token = Token::new(TokenType::Super, "super", name.line);
-                    self.declare_variable(super_token, Mutability::Immutable);
-                    self.mark_initialized();
-
-                    // Then get the class we just defined
-                    self.emit(OpCode::GetGlobal(name_constant as u8));
-
-                    // Emit inherit instruction
-                    self.emit(OpCode::Inherit);
-
-                    // Load class again for method definitions
-                    self.emit(OpCode::GetGlobal(name_constant as u8));
-                } else {
-                    // Load class for method definitions
-                    self.emit(OpCode::GetGlobal(name_constant as u8));
-                }
-
-                // Generate methods
-                for method in methods {
-                    if let Stmt::Function(FunctionDecl {
-                        name: method_name,
-                        mangled_name,
-                        params,
-                        return_type,
-                        body,
-                        mut fn_type,
-                        ..
-                    }) = method
-                    {
-                        if method_name.lexeme == "init" {
-                            fn_type = FunctionType::Constructor
-                        };
-                        self.generate_function(
-                            method_name.lexeme,
-                            mangled_name.to_owned(),
-                            params,
-                            return_type,
-                            body,
-                            fn_type,
-                        )?;
-                        let method_constant = self.identifier_constant(method_name.lexeme);
-                        self.emit(OpCode::Method {
-                            name_constant: method_constant as u8,
-                            is_static: fn_type.is_static_method(),
-                        });
-                    }
-                }
-
-                // Once we’ve reached the end of the methods, we no longer need
-                // the class and tell the VM to pop it off the stack.
-                self.emit(OpCode::Pop(1));
-
-                // Close the scope created for 'super' if there was inheritance
-                if superclass.is_some() {
-                    self.end_scope();
-                }
+            Stmt::Class(class_decl) => {
+                self.generate_class(class_decl)?;
             }
             Stmt::Agent(AgentDecl {
                 name,
@@ -576,9 +476,9 @@ impl<'gc> CodeGen<'gc> {
                 // Emit agent declaration
                 let agent_name = self.ctx.intern(name.lexeme.as_bytes());
                 let mut agent = Agent::new(&self.ctx, agent_name)
-                    .parse_instructions(fields)
-                    .parse_model(fields)
-                    .parse_tools(fields, |name| {
+                    .parse_instructions(&fields)
+                    .parse_model(&fields)
+                    .parse_tools(&fields, |name| {
                         let mut scopes = mangled_name.split("$").collect::<Vec<_>>();
                         loop {
                             if scopes.is_empty() {
@@ -596,6 +496,7 @@ impl<'gc> CodeGen<'gc> {
                         }
                     });
 
+                let tool_count = tools.len();
                 for tool in tools {
                     if let Stmt::Function(FunctionDecl {
                         name,
@@ -610,31 +511,31 @@ impl<'gc> CodeGen<'gc> {
                         let fn_type = FunctionType::Tool;
                         let chunk_id = self.generate_function(
                             name.lexeme,
-                            mangled_name.to_owned(),
-                            params,
+                            &mangled_name,
+                            &params,
                             return_type,
                             body,
                             fn_type,
                         )?;
                         if agent
                             .tools
-                            .insert(name.lexeme.to_string(), FnDef::new(chunk_id, doc, params))
+                            .insert(name.lexeme.to_string(), FnDef::new(chunk_id, &doc, &params))
                             .is_some()
                         {
-                            self.error_at(*name, &format!("Duplicate tool name: {}", name.lexeme));
+                            self.error_at(name, &format!("Duplicate tool name: {}", name.lexeme));
                         }
                     }
                 }
                 // Pop tool functions from stack because we never
                 // define global for this tool function.
-                self.emit(OpCode::Pop(tools.len() as u8));
+                self.emit(OpCode::Pop(tool_count as u8));
                 let agent = Gc::new(&self.ctx, agent);
                 let agent_constant = self.make_constant(Value::from(agent));
                 self.emit(OpCode::Agent(agent_constant as u8));
                 let name_constant = self.identifier_constant(name.lexeme);
                 self.emit(OpCode::DefineGlobal {
                     name_constant: name_constant as u8,
-                    visibility: *visibility,
+                    visibility,
                 });
                 // self.emit(OpCode::Pop);
             }
@@ -642,20 +543,22 @@ impl<'gc> CodeGen<'gc> {
         Ok(())
     }
 
-    fn generate_expr(&mut self, expr: &Expr<'gc>) -> Result<(), VmError> {
+    fn generate_expr<E: Into<Expr<'gc>>>(&mut self, expr: E) -> Result<(), VmError> {
+        let expr = expr.into();
         self.current_line = expr.line();
         match expr {
             Expr::Array { elements, .. } => {
+                let len = elements.len();
                 // Generate code for each element
                 for element in elements {
                     self.generate_expr(element)?;
                 }
-                self.emit(OpCode::MakeArray(elements.len() as u8));
+                self.emit(OpCode::MakeArray(len as u8));
             }
             Expr::EnumVariant {
                 enum_name, variant, ..
             } => {
-                self.validate_enum_variant(*enum_name, *variant);
+                self.validate_enum_variant(enum_name, variant);
                 self.named_variable(enum_name, false)?;
 
                 let name_constant = self.identifier_constant(variant.lexeme) as u8;
@@ -665,6 +568,7 @@ impl<'gc> CodeGen<'gc> {
                 });
             }
             Expr::Object { properties, .. } => {
+                let len = properties.len();
                 // For each property, first emit key and value onto stack
                 for property in properties {
                     match property {
@@ -688,7 +592,7 @@ impl<'gc> CodeGen<'gc> {
 
                 // Now create object with all properties
                 // Stack has pairs of [key1, value1, key2, value2, ...]
-                self.emit(OpCode::MakeObject(properties.len() as u8));
+                self.emit(OpCode::MakeObject(len as u8));
             }
             Expr::Binary {
                 left,
@@ -719,9 +623,9 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(expression)?;
             }
             Expr::Literal { value, .. } => match value {
-                Literal::Number(n) => self.emit_constant(Value::from(*n)),
-                Literal::String(s) => self.emit_constant(Value::from(*s)),
-                Literal::Boolean(b) => self.emit(OpCode::Bool(*b)),
+                Literal::Number(n) => self.emit_constant(Value::from(n)),
+                Literal::String(s) => self.emit_constant(Value::from(s)),
+                Literal::Boolean(b) => self.emit(OpCode::Bool(b)),
                 Literal::Nil => self.emit(OpCode::Nil),
             },
             Expr::Unary {
@@ -742,6 +646,7 @@ impl<'gc> CodeGen<'gc> {
                 self.named_variable(name, true)?;
             }
             Expr::Block { statements, .. } => {
+                let last_is_return = matches!(statements.last(), Some(Stmt::Return { .. }));
                 // Generate code for each statement in the block
                 for stmt in statements {
                     self.generate_stmt(stmt)?;
@@ -749,7 +654,7 @@ impl<'gc> CodeGen<'gc> {
 
                 // If the block doesn't end with a return statement,
                 // implicitly return nil
-                if !matches!(statements.last(), Some(Stmt::Return { .. })) {
+                if !last_is_return {
                     self.emit(OpCode::Nil);
                 }
             }
@@ -773,7 +678,7 @@ impl<'gc> CodeGen<'gc> {
                 // Add parameters as locals
                 self.begin_scope();
                 for param in params {
-                    self.declare_variable(*param, Mutability::Mutable);
+                    self.declare_variable(param, Mutability::Mutable);
                     self.mark_initialized();
                 }
 
@@ -813,6 +718,8 @@ impl<'gc> CodeGen<'gc> {
                 keyword_args,
                 ..
             } => {
+                let positional_count = arguments.len() as u8;
+                let keyword_count = keyword_args.len() as u8;
                 self.generate_expr(callee)?;
                 for arg in arguments {
                     self.generate_expr(arg)?;
@@ -820,8 +727,8 @@ impl<'gc> CodeGen<'gc> {
                 // Create and emit constants for the keyword names
                 self.generate_keyword_args(keyword_args)?;
                 self.emit(OpCode::Call {
-                    positional_count: arguments.len() as u8,
-                    keyword_count: keyword_args.len() as u8,
+                    positional_count,
+                    keyword_count,
                 });
             }
             Expr::Invoke {
@@ -832,6 +739,8 @@ impl<'gc> CodeGen<'gc> {
                 ..
             } => {
                 self.generate_expr(object)?;
+                let positional_count = arguments.len() as u8;
+                let keyword_count = keyword_args.len() as u8;
                 let method_constant = self.identifier_constant(method.lexeme);
                 for arg in arguments {
                     self.generate_expr(arg)?;
@@ -839,8 +748,8 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_keyword_args(keyword_args)?;
                 self.emit(OpCode::Invoke {
                     method_constant: method_constant as u8,
-                    positional_count: arguments.len() as u8,
-                    keyword_count: keyword_args.len() as u8,
+                    positional_count,
+                    keyword_count,
                 });
             }
             Expr::Index {
@@ -878,14 +787,14 @@ impl<'gc> CodeGen<'gc> {
             Expr::EvaluateVariant { expr, .. } => {
                 if let Expr::EnumVariant {
                     enum_name, variant, ..
-                } = **expr
+                } = *expr
                 {
                     // Evaluate enum variant directly:
                     // enum E { A = 1 }
                     // print([E::A]) get 1
                     self.validate_enum_variant(enum_name, variant);
 
-                    self.named_variable(&enum_name, false)?;
+                    self.named_variable(enum_name, false)?;
                     let name_constant = self.identifier_constant(variant.lexeme) as u8;
                     self.emit(OpCode::EnumVariant {
                         name_constant,
@@ -922,7 +831,7 @@ impl<'gc> CodeGen<'gc> {
             Expr::Self_ { .. } => {
                 // we can’t assign to 'self', so we pass can_assign=false to disallow
                 // look for a following = operator in the expression
-                self.named_variable(&Token::new(TokenType::Self_, "self", 0), false)?;
+                self.named_variable(Token::new(TokenType::Self_, "self", 0), false)?;
             }
             Expr::Super { method, .. } => {
                 // Get the receiver ('self')
@@ -953,6 +862,8 @@ impl<'gc> CodeGen<'gc> {
                 // Get this instance
                 self.emit(OpCode::GetLocal(0));
 
+                let positional_count = arguments.len() as u8;
+                let keyword_count = keyword_args.len() as u8;
                 // Generate arguments
                 for arg in arguments {
                     self.generate_expr(arg)?;
@@ -972,8 +883,8 @@ impl<'gc> CodeGen<'gc> {
                 let method_constant = self.identifier_constant(method.lexeme);
                 self.emit(OpCode::SuperInvoke {
                     method_constant: method_constant as u8,
-                    positional_count: arguments.len() as u8,
-                    keyword_count: keyword_args.len() as u8,
+                    positional_count,
+                    keyword_count,
                 });
             }
             Expr::And { left, right, .. } => {
@@ -1003,10 +914,10 @@ impl<'gc> CodeGen<'gc> {
 
     fn generate_keyword_args(
         &mut self,
-        keyword_args: &HashMap<String, Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
     ) -> Result<(), VmError> {
         for (name, value) in keyword_args {
-            let name_constant = self.identifier_constant(name);
+            let name_constant = self.identifier_constant(&name);
             self.emit(OpCode::Constant(name_constant as u8));
             self.generate_expr(value)?;
         }
@@ -1015,13 +926,106 @@ impl<'gc> CodeGen<'gc> {
 }
 
 impl<'gc> CodeGen<'gc> {
+    fn generate_class(
+        &mut self,
+        ClassDecl {
+            name,
+            superclass,
+            methods,
+            visibility,
+            ..
+        }: ClassDecl<'gc>,
+    ) -> Result<(), VmError> {
+        // Emit class declaration
+        let name_constant = self.identifier_constant(name.lexeme);
+        self.emit(OpCode::Class(name_constant as u8));
+        self.emit(OpCode::DefineGlobal {
+            name_constant: name_constant as u8,
+            visibility,
+        });
+
+        let has_superclass = superclass.is_some();
+        // Handle inheritance
+        if let Some(superclass) = superclass {
+            // Begin a new scope for 'super'
+            self.begin_scope();
+
+            // First get the superclass
+            self.generate_expr(superclass)?;
+
+            // Creating a new lexical scope ensures that if we declare two classes in the same scope,
+            // each has a different local slot to store its superclass. Since we always name this
+            // variable “super”, if we didn’t make a scope for each subclass, the variables would collide.
+            let super_token = Token::new(TokenType::Super, "super", name.line);
+            self.declare_variable(super_token, Mutability::Immutable);
+            self.mark_initialized();
+
+            // Then get the class we just defined
+            self.emit(OpCode::GetGlobal(name_constant as u8));
+
+            // Emit inherit instruction
+            self.emit(OpCode::Inherit);
+
+            // Load class again for method definitions
+            self.emit(OpCode::GetGlobal(name_constant as u8));
+        } else {
+            // Load class for method definitions
+            self.emit(OpCode::GetGlobal(name_constant as u8));
+        }
+
+        // Generate methods
+        for method in methods {
+            if let Stmt::Function(function_decl) = method {
+                self.generate_method(function_decl)?;
+            }
+        }
+
+        // Once we’ve reached the end of the methods, we no longer need
+        // the class and tell the VM to pop it off the stack.
+        self.emit(OpCode::Pop(1));
+
+        // Close the scope created for 'super' if there was inheritance
+        if has_superclass {
+            self.end_scope();
+        }
+        Ok(())
+    }
+
+    fn generate_method(
+        &mut self,
+        FunctionDecl {
+            name,
+            mangled_name,
+            params,
+            return_type,
+            body,
+            fn_type,
+            ..
+        }: FunctionDecl<'gc>,
+    ) -> Result<(), VmError> {
+        self.generate_function(
+            name.lexeme,
+            &mangled_name,
+            &params,
+            return_type,
+            body,
+            fn_type,
+        )?;
+        let method_constant = self.identifier_constant(name.lexeme);
+        self.emit(OpCode::Method {
+            name_constant: method_constant as u8,
+            is_static: fn_type.is_static_method(),
+        });
+        Ok(())
+    }
+
     fn generate_function(
         &mut self,
         name: &'gc str,
-        mangle_name: String,
+        mangle_name: &str,
         params: &IndexMap<Token<'gc>, Parameter<'gc>>,
-        return_type: &Option<Token<'gc>>,
-        body: &[Stmt<'gc>],
+        return_type: Option<Token<'gc>>,
+        body: Vec<Stmt<'gc>>,
         fn_type: FunctionType,
     ) -> Result<ChunkId, VmError> {
         // Validate parameter types
@@ -1138,7 +1142,7 @@ impl<'gc> CodeGen<'gc> {
             let function = mem::take(&mut self.function);
             chunk_id = self
                 .named_id_map
-                .get(&mangle_name)
+                .get(mangle_name)
                 .map(|n| n.chunk_id)
                 .unwrap();
             // TODO: Duplicate function name?
@@ -1212,30 +1216,30 @@ impl<'gc> CodeGen<'gc> {
     }
 
     // Variable handling methods
-    fn named_variable(&mut self, name: &Token<'gc>, can_assign: bool) -> Result<(), VmError> {
+    fn named_variable(&mut self, name: Token<'gc>, can_assign: bool) -> Result<(), VmError> {
         let (get_op, set_op) =
             if let Some((pos, depth, mutability)) = self.resolve_local(name.lexeme) {
                 if depth == UNINITIALIZED_LOCAL_DEPTH {
-                    self.error_at(*name, "Can't read local variable in its own initializer.");
+                    self.error_at(name, "Can't read local variable in its own initializer.");
                 }
 
                 if can_assign && mutability == Mutability::Immutable {
-                    self.error_at(*name, "Cannot assign to constant variable.");
+                    self.error_at(name, "Cannot assign to constant variable.");
                 }
                 (OpCode::GetLocal(pos), OpCode::SetLocal(pos))
             } else if let Some((pos, _, mutability)) = self
                 .resolve_upvalue(name.lexeme)
-                .inspect_err(|err| self.error_at(*name, err))
+                .inspect_err(|err| self.error_at(name, err))
                 .ok()
                 .flatten()
             {
                 if can_assign && mutability == Mutability::Immutable {
-                    self.error_at(*name, "Cannot assign to constant variable.");
+                    self.error_at(name, "Cannot assign to constant variable.");
                 }
                 (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
             } else {
                 if can_assign && self.const_globals.contains(name.lexeme) {
-                    self.error_at(*name, "Cannot assign to constant variable.");
+                    self.error_at(name, "Cannot assign to constant variable.");
                 }
                 let pos = self.identifier_constant(name.lexeme) as u8;
                 (OpCode::GetGlobal(pos), OpCode::SetGlobal(pos))

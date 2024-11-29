@@ -1,0 +1,33 @@
+// Only count self.field assignments
+class Point1 {
+  x: int = 0,
+  y: int,
+  z: str = "zz",
+  
+  fn init(x: int, y: int) {
+    let o = {a: 1};
+    o.a = 2;         // NOT counted as a field initialization
+    self.x = x;    // Counted as initializing x
+    self.y = y;    // Counted as initializing y
+    let v = 100;
+    self.v = v;
+  }
+}
+
+let p = Point1(10, 11);
+print(p.x, p.y, p.z, p.v, sep=", "); // expect: 10, 11, zz, 100
+
+// Allow non-declared fields
+class Point2 {
+  x: int = 0,
+  y: int,
+  z: str = "zz",
+  
+  fn init(x: int, y: int, other: bool) {
+    self.x = x;
+    self.y = y;
+    self.other = other;
+  }
+}
+let p = Point2(5, 9, other=false);
+print(p.x, p.y, p.other, sep=", "); // expect: 5, 9, false

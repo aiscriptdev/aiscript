@@ -87,9 +87,18 @@ pub struct VariableDecl<'gc> {
 }
 
 #[derive(Debug, Clone)]
+pub struct ClassFieldDecl<'gc> {
+    pub name: Token<'gc>,
+    pub type_hint: Token<'gc>,
+    pub default_value: Option<Expr<'gc>>,
+    pub line: u32,
+}
+
+#[derive(Debug, Clone)]
 pub struct ClassDecl<'gc> {
     pub name: Token<'gc>,
     pub superclass: Option<Expr<'gc>>,
+    pub fields: Vec<ClassFieldDecl<'gc>>,
     pub methods: Vec<Stmt<'gc>>,
     pub visibility: Visibility,
     pub line: u32,
@@ -442,5 +451,17 @@ impl<'gc> From<&Literal<'gc>> for Value<'gc> {
             Literal::Boolean(value) => Value::Boolean(*value),
             Literal::Nil => Value::Nil,
         }
+    }
+}
+
+impl<'gc> From<Box<Expr<'gc>>> for Expr<'gc> {
+    fn from(value: Box<Expr<'gc>>) -> Self {
+        *value
+    }
+}
+
+impl<'gc> From<Box<Stmt<'gc>>> for Stmt<'gc> {
+    fn from(value: Box<Stmt<'gc>>) -> Self {
+        *value
     }
 }

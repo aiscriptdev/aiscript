@@ -1242,12 +1242,14 @@ impl<'gc> State<'gc> {
         args_count: u8,
         keyword_args_count: u8,
     ) -> Result<Vec<Value<'gc>>, VmError> {
-        if args_count != function.arity && function.arity == function.max_arity {
-            // No keyword arguments, simply compare the positional arguments number
+        let total_args = args_count + keyword_args_count; // Count keyword args too
+
+        // For functions without keyword args or default values
+        if function.arity == function.max_arity && total_args != function.arity {
             return Err(self.runtime_error(
                 format!(
                     "Expected {} arguments but got {}.",
-                    function.arity, args_count
+                    function.arity, total_args,
                 )
                 .into(),
             ));

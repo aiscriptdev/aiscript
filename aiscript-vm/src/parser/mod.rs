@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     iter::{self, Peekable},
     mem,
     ops::Add,
@@ -14,8 +14,8 @@ use super::{
 };
 use crate::{
     ast::{
-        AgentDecl, ClassDecl, EnumDecl, EnumVariant, FunctionDecl, ObjectProperty, VariableDecl,
-        Visibility,
+        AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, FunctionDecl, ObjectProperty,
+        VariableDecl, Visibility,
     },
     object::FunctionType,
     ty::EnumVariantChecker,
@@ -458,9 +458,101 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::OpenBrace, "Expect '{' before class body.");
 
+        let mut fields = Vec::new();
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-            methods.push(self.method_declaration()?);
+            if self.check(TokenType::Identifier) && !self.check_next(TokenType::OpenParen) {
+                fields.push(self.parse_class_field()?);
+            } else {
+                methods.push(self.method_declaration()?);
+            }
+        }
+
+        fn is_self_field_init<'gc>(stmt: &Stmt<'gc>) -> Option<&'gc str> {
+            if let Stmt::Expression {
+                expression: Expr::Set { object, name, .. },
+                ..
+            } = stmt
+            {
+                // Only count assignments to self.field
+                if matches!(**object, Expr::Self_ { .. }) {
+                    return Some(name.lexeme);
+                }
+            }
+            None
+        }
+
+        fn create_field_init<'gc>(field: &ClassFieldDecl<'gc>) -> Stmt<'gc> {
+            Stmt::Expression {
+                expression: Expr::Set {
+                    object: Box::new(Expr::Self_ { line: field.line }),
+                    name: field.name,
+                    value: Box::new(
+                        field
+                            .default_value
+                            .clone()
+                            .unwrap_or_else(|| Expr::Literal {
+                                value: Literal::Nil,
+                                line: field.line,
+                            }),
+                    ),
+                    line: field.line,
+                },
+                line: field.line,
+            }
+        }
+
+        // Get the single init method if it exists
+        if !fields.is_empty() {
+            // Process methods and find init if it exists
+            let (constructor, other_methods): (Vec<_>, Vec<_>) = methods.into_iter()
+            .partition(
+                |m| matches!(m, Stmt::Function(FunctionDecl { fn_type, .. }) if fn_type.is_constructor()),
+            );
+            methods = other_methods;
+            let constructor =
+                if let Some(Stmt::Function(constructor_decl)) = constructor.into_iter().next() {
+                    // Track which fields are initialized in constructor through self.field = ...
+                    let initialized_fields: HashSet<_> = constructor_decl
+                        .body
+                        .iter()
+                        .filter_map(is_self_field_init)
+                        .collect();
+
+                    // Create initialization statements for declared fields that aren't initialized
+                    let field_inits = fields
+                        .iter()
+                        .filter(|field| !initialized_fields.contains(field.name.lexeme))
+                        .map(create_field_init)
+                        .collect::<Vec<_>>();
+
+                    if !field_inits.is_empty() {
+                        let mut new_body = field_inits;
+                        // Keep all original statements, including assignments to non-declared fields
+                        new_body.extend_from_slice(&constructor_decl.body);
+                        Stmt::Function(FunctionDecl {
+                            body: new_body,
+                            ..constructor_decl
+                        })
+                    } else {
+                        // No declared fields need initialization, use original init as-is
+                        Stmt::Function(constructor_decl)
+                    }
+                } else {
+                    // No constructor exists, create synthetic one that initializes declared fields
+                    Stmt::Function(FunctionDecl {
+                        name: Token::new(TokenType::Identifier, "init", name.line),
+                        mangled_name: format!("{}$init", self.scopes.join("$")),
+                        params: IndexMap::new(),
+                        doc: None,
+                        return_type: None,
+                        body: fields.iter().map(create_field_init).collect(),
+                        fn_type: FunctionType::Constructor,
+                        visibility: Visibility::Public,
+                        line: name.line,
+                    })
+                };
+            methods.push(constructor);
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after class body.");
@@ -471,10 +563,44 @@ impl<'gc> Parser<'gc> {
         Some(Stmt::Class(ClassDecl {
             name,
             superclass,
+            fields,
             methods,
             visibility,
             line: name.line,
         }))
+    }
+
+    fn parse_class_field(&mut self) -> Option<ClassFieldDecl<'gc>> {
+        self.consume(TokenType::Identifier, "Expect field name.");
+        let name = self.previous;
+
+        self.consume(TokenType::Colon, "Expect ':' after field name.");
+        let type_hint = self.parse_type();
+
+        let default_value = if self.match_token(TokenType::Equal) {
+            if self.current.is_literal_token() {
+                Some(self.expression()?)
+            } else if self.check(TokenType::Identifier) {
+                self.error_at_current(
+                    "Only allow set literal (number, string, bool) as the default value.",
+                );
+                None
+            } else {
+                self.error_at_current("Expect default value after '='.");
+                None
+            }
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Comma, "Expect ',' after field declaration.");
+
+        Some(ClassFieldDecl {
+            name,
+            type_hint,
+            default_value,
+            line: name.line,
+        })
     }
 
     fn method_declaration(&mut self) -> Option<Stmt<'gc>> {

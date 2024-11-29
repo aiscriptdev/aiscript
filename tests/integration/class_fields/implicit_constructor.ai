@@ -1,0 +1,9 @@
+class Foo {
+    a: int,
+    b: int = 0,
+    c: str = "cc",
+    d: bool = true,
+}
+
+let f = Foo();
+print(f.a, f.b, f.c, f.d, sep=", "); // expect: nil, 0, cc, true
