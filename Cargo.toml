@@ -2,6 +2,7 @@
 members = [
     "aiscript",
     "aiscript-cli",
+    "aiscript-lexer",
     "aiscript-runtime",
     "aiscript-vm",
     "tests",

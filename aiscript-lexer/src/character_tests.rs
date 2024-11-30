@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{Scanner, TokenType};
+    use crate::{Scanner, TokenType};
 
     #[test]
     fn test_mixed_utf8_string() {

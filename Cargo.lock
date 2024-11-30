@@ -57,6 +57,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aiscript-lexer"
+version = "0.1.0"
+
+[[package]]
 name = "aiscript-runtime"
 version = "0.1.0"
 dependencies = [
@@ -81,6 +85,7 @@ name = "aiscript-vm"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "aiscript-lexer",
  "chrono",
  "gc-arena",
  "hashbrown 0.14.5",

@@ -3,7 +3,6 @@ mod ast;
 mod builtins;
 mod chunk;
 mod compiler;
-mod lexer;
 mod module;
 mod object;
 mod parser;
@@ -18,6 +17,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 
+pub(crate) use aiscript_lexer as lexer;
 pub(crate) use chunk::{Chunk, OpCode};
 use gc_arena::Collect;
 pub use value::Value;
