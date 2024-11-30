@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::CharIndices};
+use std::{iter::Peekable, mem, str::CharIndices};
 
 mod character_tests;
 mod tests;
@@ -159,25 +159,33 @@ impl<'a> Token<'a> {
     }
 }
 
-/// Scanner/Lexer for tokenizing source code
-pub struct Scanner<'a> {
-    /// The complete source code being scanned
-    pub source: &'a str,
-    /// Character iterator for the source
+// Lexer for tokenizing source code
+struct Lexer<'a> {
+    // The complete source code being scanned
+    source: &'a str,
+    // Character iterator for the source
     iter: Peekable<CharIndices<'a>>,
-    /// Start position of current token (in bytes)
-    pub start: usize,
-    /// Current position in the source (in bytes)
-    pub current: usize,
-    /// Current line number
-    pub line: u32,
-    /// Whether we've reached the end of file
+    // Start position of current token (in bytes)
+    start: usize,
+    // Current position in the source (in bytes)
+    current: usize,
+    // Current line number
+    line: u32,
+    // Whether we've reached the end of file
     is_eof: bool,
 }
 
-impl<'a> Scanner<'a> {
-    /// Creates a new Scanner for the given source code
-    pub fn new(source: &'a str) -> Self {
+pub struct Scanner<'a> {
+    lexer: Peekable<Lexer<'a>>,
+    pub current: Token<'a>,
+    pub previous: Token<'a>,
+    pub had_error: bool,
+    pub panic_mode: bool,
+}
+
+impl<'a> Lexer<'a> {
+    // Creates a new Scanner for the given source code
+    fn new(source: &'a str) -> Self {
         Self {
             source,
             iter: source.char_indices().peekable(),
@@ -188,7 +196,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Advances the scanner one character forward
+    // Advances the scanner one character forward
     fn advance(&mut self) -> Option<char> {
         match self.iter.next() {
             Some((pos, ch)) => {
@@ -199,12 +207,12 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Peeks at the next character without consuming it
+    // Peeks at the next character without consuming it
     fn peek(&mut self) -> Option<char> {
         self.iter.peek().map(|&(_, c)| c)
     }
 
-    /// Looks ahead at the next N characters without consuming them
+    // Looks ahead at the next N characters without consuming them
     fn check_next(&self, n: usize) -> Option<&str> {
         let mut chars = self.source[self.current..].char_indices();
         match chars.nth(n - 1) {
@@ -220,7 +228,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Returns the next 2 characters as a string slice
+    // Returns the next 2 characters as a string slice
     fn next2(&mut self) -> &str {
         let mut chars = self.source[self.current..].char_indices();
         match chars.nth(1) {
@@ -232,7 +240,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Skips whitespace and comments
+    // Skips whitespace and comments
     fn skip_white_spaces(&mut self) {
         while let Some(c) = self.peek() {
             match c {
@@ -257,7 +265,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Creates a token of the given type using the current lexeme
+    // Creates a token of the given type using the current lexeme
     fn make_token(&self, kind: TokenType) -> Token<'a> {
         Token {
             kind,
@@ -317,7 +325,7 @@ impl<'a> Scanner<'a> {
         token
     }
 
-    /// Scans numeric literals (integers and floats)
+    // Scans numeric literals (integers and floats)
     fn scan_number(&mut self) -> Token<'a> {
         self.consume_digits();
         // Look for a fractional part.
@@ -335,14 +343,14 @@ impl<'a> Scanner<'a> {
         self.make_token(TokenType::Number)
     }
 
-    /// Helper method to consume consecutive digits
+    // Helper method to consume consecutive digits
     fn consume_digits(&mut self) {
         while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
             self.advance();
         }
     }
 
-    /// Scans identifiers and keywords
+    // Scans identifiers and keywords
     fn scan_identifier(&mut self) -> Token<'a> {
         while matches!(self.peek(), Some(c) if c.is_alphanumeric() || c == '_') {
             self.advance();
@@ -381,7 +389,7 @@ impl<'a> Scanner<'a> {
         self.make_token(kind)
     }
 
-    /// Scans the next token from the source
+    // Scans the next token from the source
     fn scan_token(&mut self) -> Token<'a> {
         self.skip_white_spaces();
 
@@ -550,7 +558,7 @@ impl<'a> Scanner<'a> {
     }
 }
 
-impl<'a> Iterator for Scanner<'a> {
+impl<'a> Iterator for Lexer<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -560,6 +568,103 @@ impl<'a> Iterator for Scanner<'a> {
             let token = self.scan_token();
             self.is_eof = token.kind == TokenType::Eof;
             Some(token)
+        }
+    }
+}
+
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Self {
+        Scanner {
+            lexer: Lexer::new(source).peekable(),
+            current: Token::default(),
+            previous: Token::default(),
+            had_error: false,
+            panic_mode: false,
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.previous = mem::take(&mut self.current);
+
+        while let Some(token) = self.lexer.next() {
+            self.current = token;
+            if self.current.kind != TokenType::Error {
+                break;
+            }
+            self.error_at_current(self.current.lexeme);
+        }
+    }
+
+    pub fn consume(&mut self, kind: TokenType, message: &str) {
+        if self.check(kind) {
+            self.advance();
+            return;
+        }
+        self.error_at_current(message);
+    }
+
+    pub fn match_token(&mut self, kind: TokenType) -> bool {
+        if !self.check(kind) {
+            false
+        } else {
+            self.advance();
+            true
+        }
+    }
+
+    pub fn peek_next(&mut self) -> Option<Token<'a>> {
+        self.lexer.peek().copied()
+    }
+
+    pub fn check(&self, kind: TokenType) -> bool {
+        self.current.kind == kind
+    }
+
+    pub fn check_next(&mut self, kind: TokenType) -> bool {
+        self.peek_next().map(|t| t.kind == kind) == Some(true)
+    }
+
+    pub fn is_at_end(&self) -> bool {
+        self.current.kind == TokenType::Eof
+    }
+
+    pub fn error_at_current(&mut self, message: &str) {
+        self.error_at(self.current, message);
+    }
+
+    pub fn error(&mut self, message: &str) {
+        self.error_at(self.previous, message);
+    }
+
+    pub fn error_at(&mut self, token: Token<'a>, message: &str) {
+        if self.panic_mode {
+            return;
+        }
+        self.panic_mode = true;
+        eprint!("[line {}] Error", token.line);
+        if token.kind == TokenType::Eof {
+            eprint!(" at end");
+        } else if token.kind == TokenType::Error {
+            // Do nothing.
+        } else {
+            eprint!(" at '{}'", token.lexeme);
+        }
+        eprintln!(": {message}");
+        self.had_error = true;
+    }
+
+    pub fn synchronize(&mut self) {
+        self.panic_mode = false;
+
+        while !self.is_at_end() {
+            if self.previous.kind == TokenType::Semicolon {
+                return;
+            }
+
+            if self.current.is_synchronize_keyword() {
+                return;
+            }
+            self.advance();
         }
     }
 }

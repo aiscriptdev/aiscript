@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Scanner, TokenType};
+    use crate::{Lexer, TokenType};
 
     #[test]
     fn test_mixed_utf8_string() {
         let source = r#""Hello 你好 World 世界""#;
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::String);
@@ -15,7 +15,7 @@ mod tests {
     #[test]
     fn test_chinese_identifier() {
         let source = "let 变量 = 42;";
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let expected_tokens = vec![
             TokenType::Let,
@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn test_utf8_in_comments() {
         let source = "// 这是一个注释\nprint(x);";
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let expected_tokens = vec![
             TokenType::Identifier,
@@ -60,7 +60,7 @@ mod tests {
             包含多行中文内容。
             """
         "#;
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::Doc);
@@ -77,7 +77,7 @@ mod tests {
                 }
             };
         "#;
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let expected_tokens = vec![
             TokenType::Let,
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_check_next_with_utf8() {
         let source = "你好世界";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
 
         assert_eq!(scanner.check_next(2), Some("你好"));
         assert_eq!(scanner.check_next(3), Some("你好世"));
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn test_scanner_line_counting_with_utf8() {
         let source = "print \"你好\"\n print \"世界\"\n";
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         // First line
         let token = scanner.next().unwrap();
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn test_error_handling_with_utf8() {
         let source = "\"未终止的字符串";
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Lexer::new(source);
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::Error);

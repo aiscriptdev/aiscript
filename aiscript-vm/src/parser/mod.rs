@@ -1,8 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
-    iter::{self, Peekable},
-    mem,
-    ops::Add,
+    iter::{self},
+    ops::{Add, Deref, DerefMut},
 };
 
 use indexmap::IndexMap;
@@ -29,9 +28,7 @@ type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/) -> Option<Expr<'gc
 
 pub struct Parser<'gc> {
     ctx: Context<'gc>,
-    scanner: Peekable<Scanner<'gc>>,
-    current: Token<'gc>,
-    previous: Token<'gc>,
+    scanner: Scanner<'gc>,
     previous_expr: Option<Expr<'gc>>,
     fn_type: FunctionType,
     class_compiler: Option<Box<ClassCompiler>>,
@@ -45,8 +42,6 @@ pub struct Parser<'gc> {
     // since we omit the paren around,
     // it is hard to handle the '{' conflict without this flag.
     stop_at_brace: bool,
-    had_error: bool,
-    panic_mode: bool,
 }
 
 #[derive(Default, Debug)]
@@ -57,21 +52,31 @@ struct ClassCompiler {
     current_method_type: FunctionType,
 }
 
+impl<'a> Deref for Parser<'a> {
+    type Target = Scanner<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.scanner
+    }
+}
+
+impl<'a> DerefMut for Parser<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.scanner
+    }
+}
+
 impl<'gc> Parser<'gc> {
     pub fn new(ctx: Context<'gc>, source: &'gc str) -> Self {
         Parser {
             ctx,
-            scanner: Scanner::new(source).peekable(),
-            current: Token::default(),
-            previous: Token::default(),
+            scanner: Scanner::new(source),
             previous_expr: None,
             fn_type: FunctionType::Script,
             class_compiler: None,
             scopes: Vec::new(),
             loop_depth: 0,
             stop_at_brace: false,
-            had_error: false,
-            panic_mode: false,
         }
     }
 
@@ -91,10 +96,6 @@ impl<'gc> Parser<'gc> {
         } else {
             Ok(program)
         }
-    }
-
-    fn peek_next(&mut self) -> Option<Token<'gc>> {
-        self.scanner.peek().copied()
     }
 
     fn parse_type(&mut self) -> Token<'gc> {
@@ -1622,88 +1623,6 @@ impl<'gc> Parser<'gc> {
             }
         }
         Some(expr)
-    }
-
-    // Helper methods
-    fn advance(&mut self) {
-        self.previous = mem::take(&mut self.current);
-
-        while let Some(token) = self.scanner.next() {
-            self.current = token;
-            if self.current.kind != TokenType::Error {
-                break;
-            }
-            self.error_at_current(self.current.lexeme);
-        }
-    }
-
-    fn consume(&mut self, kind: TokenType, message: &str) {
-        if self.check(kind) {
-            self.advance();
-            return;
-        }
-        self.error_at_current(message);
-    }
-
-    fn match_token(&mut self, kind: TokenType) -> bool {
-        if !self.check(kind) {
-            false
-        } else {
-            self.advance();
-            true
-        }
-    }
-
-    fn check(&self, kind: TokenType) -> bool {
-        self.current.kind == kind
-    }
-
-    fn check_next(&mut self, kind: TokenType) -> bool {
-        self.peek_next().map(|t| t.kind == kind) == Some(true)
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.current.kind == TokenType::Eof
-    }
-
-    fn error_at_current(&mut self, message: &str) {
-        self.error_at(self.current, message);
-    }
-
-    fn error(&mut self, message: &str) {
-        self.error_at(self.previous, message);
-    }
-
-    fn error_at(&mut self, token: Token<'gc>, message: &str) {
-        if self.panic_mode {
-            return;
-        }
-        self.panic_mode = true;
-        eprint!("[line {}] Error", token.line);
-        if token.kind == TokenType::Eof {
-            eprint!(" at end");
-        } else if token.kind == TokenType::Error {
-            // Do nothing.
-        } else {
-            eprint!(" at '{}'", token.lexeme);
-        }
-        eprintln!(": {message}");
-        self.had_error = true;
-    }
-
-    fn synchronize(&mut self) {
-        self.panic_mode = false;
-
-        while !self.is_at_end() {
-            if self.previous.kind == TokenType::Semicolon {
-                return;
-            }
-
-            if self.current.is_synchronize_keyword() {
-                return;
-            }
-            self.advance();
-        }
     }
 }
 

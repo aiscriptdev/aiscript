@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Scanner, Token, TokenType};
+    use crate::{Lexer, Token, TokenType};
 
     #[test]
     fn test_docstring_basic() {
@@ -8,7 +8,7 @@ mod tests {
     """test1 doc"""
     print("Hello, world!");
 }"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = tokens
@@ -28,7 +28,7 @@ mod tests {
     """
     print("Hello");
 }"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = tokens
@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn test_docstring_whitespace() {
         let source = r#""""    spaces before and after    """"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = tokens
@@ -58,7 +58,7 @@ mod tests {
         let source = r#"fn test() {
     """unterminated docstring
     "#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let error_token = tokens
@@ -74,7 +74,7 @@ mod tests {
         let source = r#"
         """      """
         "#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = dbg!(&tokens)
@@ -85,7 +85,7 @@ mod tests {
         assert_eq!(doc_token.lexeme, "");
 
         let source = r#""""""""#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = &tokens
@@ -104,7 +104,7 @@ mod tests {
     """
     print("Hello");
 }"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let doc_token = tokens
@@ -121,7 +121,7 @@ mod tests {
     """
     Unterminated docstring
     "#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let error_token = tokens
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn test_string_tokens() {
         let source = r#"print("Hello" "World");"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         // Verify the sequence of tokens
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_numbers() {
         let source = "123 123.456 0.1";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         // Only check the number tokens, ignoring whitespace
@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn test_keywords() {
         let source = "fn let if else while for";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let keywords: Vec<TokenType> = tokens
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn test_operators() {
         let source = "+ - * / >= <= == != ->";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let operators: Vec<TokenType> = tokens
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn test_line_counting() {
         let source = "line1\nline2\n\nline4";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         // Find identifiers and check their line numbers
@@ -251,7 +251,7 @@ mod tests {
 fn test() { // Another comment
     print("Hello"); // Comment after code
 }"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let token_types: Vec<TokenType> = tokens
@@ -281,7 +281,7 @@ fn test() { // Another comment
     #[test]
     fn test_ai_keywords() {
         let source = "ai agent prompt";
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let keywords: Vec<TokenType> = tokens
@@ -302,7 +302,7 @@ fn test() { // Another comment
     let result = x * 2;
     return result;
 }"#;
-        let scanner = Scanner::new(source);
+        let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
         let token_types: Vec<TokenType> = tokens
