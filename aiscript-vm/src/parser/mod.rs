@@ -21,6 +21,7 @@ use crate::{
     vm::Context,
     VmError,
 };
+use aiscript_directive::DirectiveParser;
 
 mod stmt_test;
 
@@ -462,8 +463,14 @@ impl<'gc> Parser<'gc> {
         let mut fields = Vec::new();
         let mut methods = Vec::new();
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            let mut validators = Vec::new();
+            if self.check(TokenType::At) {
+                validators = DirectiveParser::new(&mut self.scanner).parse_validators();
+            }
             if self.check(TokenType::Identifier) && !self.check_next(TokenType::OpenParen) {
-                fields.push(self.parse_class_field()?);
+                let mut field = self.parse_class_field()?;
+                field.validators = validators;
+                fields.push(field);
             } else {
                 methods.push(self.method_declaration()?);
             }
@@ -635,6 +642,7 @@ impl<'gc> Parser<'gc> {
             name,
             type_hint,
             default_value,
+            validators: Vec::new(),
             line: name.line,
         })
     }

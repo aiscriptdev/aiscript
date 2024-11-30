@@ -93,6 +93,7 @@ name = "aiscript-vm"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "aiscript-directive",
  "aiscript-lexer",
  "chrono",
  "gc-arena",

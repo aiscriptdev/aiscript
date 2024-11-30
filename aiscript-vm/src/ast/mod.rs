@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use aiscript_directive::Validator;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
@@ -86,11 +87,11 @@ pub struct VariableDecl<'gc> {
     pub line: u32,
 }
 
-#[derive(Debug, Clone)]
 pub struct ClassFieldDecl<'gc> {
     pub name: Token<'gc>,
     pub type_hint: Token<'gc>,
     pub default_value: Option<Expr<'gc>>,
+    pub validators: Vec<Box<dyn Validator>>,
     pub line: u32,
 }
 

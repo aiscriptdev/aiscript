@@ -4,38 +4,36 @@ mod validator;
 use std::collections::HashMap;
 
 use aiscript_lexer::{Scanner, TokenType};
-// use ast::Directive;
+use ast::Directive;
 
-#[derive(Debug, Clone)]
-pub enum DirectiveValue<'a> {
-    String(&'a str),
-    Number(f64),
-    Boolean(bool),
-    Array(Vec<DirectiveValue<'a>>),
+use serde_json::Value;
+pub use validator::Validator;
+
+pub struct DirectiveParser<'a, 'b: 'a> {
+    scanner: &'a mut Scanner<'b>,
 }
 
-#[derive(Debug, Clone)]
-pub enum Directive<'a> {
-    Not(Box<Directive<'a>>),
-    In(Vec<DirectiveValue<'a>>),
-    Any(Vec<Directive<'a>>),
-    Simple {
-        name: &'a str,
-        params: HashMap<&'a str, DirectiveValue<'a>>,
-    },
-}
-
-pub struct DirectiveParser<'a> {
-    scanner: &'a mut Scanner<'a>,
-}
-
-impl<'a> DirectiveParser<'a> {
-    pub fn new(scanner: &'a mut Scanner<'a>) -> Self {
-        scanner.advance();
+impl<'a, 'b> DirectiveParser<'a, 'b> {
+    pub fn new(scanner: &'a mut Scanner<'b>) -> Self {
+        if scanner.check(TokenType::Eof) {
+            scanner.advance();
+        }
         Self { scanner }
     }
 
-    pub fn parse_directive(&mut self) -> Result<Directive<'a>, String> {
+    #[must_use]
+    pub fn parse_validators(&mut self) -> Vec<Box<dyn Validator>> {
+        let mut validiators = Vec::new();
+        while self.scanner.check(TokenType::At) {
+            if let Some(directive) = self.parse_directive() {
+                validiators.push(validator::convert_from_directive(directive));
+            }
+        }
+        validiators
+    }
+
+    #[must_use]
+    pub fn parse_directive(&mut self) -> Option<Directive> {
         self.scanner
             .consume(TokenType::At, "Expected '@' at start of directive");
 
@@ -47,33 +45,37 @@ impl<'a> DirectiveParser<'a> {
                 TokenType::In => self.parse_in_directive(),
                 TokenType::Identifier if name.lexeme == "not" => self.parse_not_directive(),
                 TokenType::Identifier if name.lexeme == "any" => self.parse_any_directive(),
-                TokenType::Identifier => self.parse_simple_directive(name.lexeme),
-                _ => Err("Expected directive name".to_string()),
+                TokenType::Identifier => self.parse_simple_directive(name.lexeme.to_owned()),
+                _ => {
+                    self.scanner.error_at_current("Expected directive name");
+                    None
+                }
             }
         } else {
-            Err("Unexpected end".to_string())
+            self.scanner.error_at_current("Unexpected end");
+            None
         }
     }
 
-    fn parse_not_directive(&mut self) -> Result<Directive<'a>, String> {
+    fn parse_not_directive(&mut self) -> Option<Directive> {
         self.scanner
             .consume(TokenType::OpenParen, "Expect '(' after '@not'.");
         let inner = self.parse_directive()?;
         self.scanner
             .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Ok(Directive::Not(Box::new(inner)))
+        Some(Directive::Not(Box::new(inner)))
     }
 
-    fn parse_in_directive(&mut self) -> Result<Directive<'a>, String> {
+    fn parse_in_directive(&mut self) -> Option<Directive> {
         self.scanner
             .consume(TokenType::OpenParen, "Expect '(' after '@in'.");
         let values = self.parse_array()?;
         self.scanner
             .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Ok(Directive::In(values))
+        Some(Directive::In(values))
     }
 
-    fn parse_any_directive(&mut self) -> Result<Directive<'a>, String> {
+    fn parse_any_directive(&mut self) -> Option<Directive> {
         self.scanner
             .consume(TokenType::OpenParen, "Expect '(' after '@any'.");
         let mut directives = Vec::new();
@@ -87,17 +89,17 @@ impl<'a> DirectiveParser<'a> {
 
         self.scanner
             .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Ok(Directive::Any(directives))
+        Some(Directive::Any(directives))
     }
 
-    fn parse_simple_directive(&mut self, name: &'a str) -> Result<Directive<'a>, String> {
+    fn parse_simple_directive(&mut self, name: String) -> Option<Directive> {
         let mut params = HashMap::new();
 
         if self.scanner.match_token(TokenType::OpenParen) {
             while !self.scanner.check(TokenType::CloseParen) {
                 self.scanner
                     .consume(TokenType::Identifier, "Expect parameter name.");
-                let param_name = self.scanner.previous.lexeme;
+                let param_name = self.scanner.previous.lexeme.to_owned();
                 self.scanner
                     .consume(TokenType::Equal, "Expect '=' after parameter.");
                 let value = self.parse_value()?;
@@ -112,10 +114,10 @@ impl<'a> DirectiveParser<'a> {
                 .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
         }
 
-        Ok(Directive::Simple { name, params })
+        Some(Directive::Simple { name, params })
     }
 
-    fn parse_array(&mut self) -> Result<Vec<DirectiveValue<'a>>, String> {
+    fn parse_array(&mut self) -> Option<Vec<Value>> {
         self.scanner
             .consume(TokenType::OpenBracket, "Expect '[' before array.");
         let mut values = Vec::new();
@@ -130,28 +132,32 @@ impl<'a> DirectiveParser<'a> {
 
         self.scanner
             .consume(TokenType::CloseBracket, "Expect '] at the end of array.");
-        Ok(values)
+        Some(values)
     }
 
-    fn parse_value(&mut self) -> Result<DirectiveValue<'a>, String> {
+    fn parse_value(&mut self) -> Option<Value> {
         let token = self.scanner.current;
         self.scanner.advance();
         match token.kind {
-            TokenType::String => Ok(DirectiveValue::String(token.lexeme.trim_matches('"'))),
-            TokenType::Number => {
-                let num = token
-                    .lexeme
-                    .parse::<f64>()
-                    .map_err(|_| "Invalid number".to_string())?;
-                Ok(DirectiveValue::Number(num))
-            }
-            TokenType::True => Ok(DirectiveValue::Boolean(true)),
-            TokenType::False => Ok(DirectiveValue::Boolean(false)),
+            TokenType::String => Some(Value::String(token.lexeme.trim_matches('"').to_owned())),
+            TokenType::Number => match token.lexeme.parse::<f64>() {
+                Ok(num) => Some(Value::Number(serde_json::Number::from(num as i64))),
+                Err(err) => {
+                    self.scanner.error(&format!("Invalid number: {err}"));
+                    None
+                }
+            },
+            TokenType::True => Some(Value::Bool(true)),
+            TokenType::False => Some(Value::Bool(false)),
             TokenType::OpenBracket => {
                 let values = self.parse_array()?;
-                Ok(DirectiveValue::Array(values))
+                Some(Value::Array(values))
             }
-            _ => Err(format!("Unexpected token {:?}", token.kind)),
+            _ => {
+                self.scanner
+                    .error(&format!("Unexpected token {:?}", token.kind));
+                None
+            }
         }
     }
 }
@@ -173,7 +179,7 @@ mod tests {
                 assert_eq!(name, "length");
                 assert_eq!(params.len(), 1);
                 match params.get("max") {
-                    Some(DirectiveValue::Number(n)) => assert_eq!(*n, 10.0),
+                    Some(Value::Number(n)) => assert_eq!(*n, 10i64.into()),
                     _ => panic!("Expected max parameter with number value"),
                 }
             }
@@ -213,7 +219,7 @@ mod tests {
                 assert!(!parser.scanner.had_error);
                 assert_eq!(values.len(), 3);
                 match &values[0] {
-                    DirectiveValue::String(s) => assert_eq!(*s, "a"),
+                    Value::String(s) => assert_eq!(*s, "a"),
                     _ => panic!("Expected string value"),
                 }
             }

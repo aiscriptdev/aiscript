@@ -1,0 +1,6 @@
+class Foo {
+    @string(max_len=10)
+    @string(min_len=10)
+    name: str,
+    age: int = 18,
+}
