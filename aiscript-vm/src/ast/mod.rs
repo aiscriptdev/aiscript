@@ -98,7 +98,7 @@ pub struct ClassFieldDecl<'gc> {
 pub struct ClassDecl<'gc> {
     pub name: Token<'gc>,
     pub superclass: Option<Expr<'gc>>,
-    pub fields: Vec<ClassFieldDecl<'gc>>,
+    // pub fields: Vec<ClassFieldDecl<'gc>>,
     pub methods: Vec<Stmt<'gc>>,
     pub visibility: Visibility,
     pub line: u32,

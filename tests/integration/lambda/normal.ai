@@ -93,3 +93,17 @@ let fib = |n| {
     return fib(n - 1) + fib(n - 2);
 };
 print(fib(6)); // expect: 8
+
+let empty_array = || [];
+print(empty_array()); // expect: []
+
+let enum_varaint_array = |x| [x];
+enum Foo { A = "a" }
+print(enum_varaint_array(Foo::A)); // expect: a
+
+let array1 = |x| [x,];
+print(array1(1)); // expect: [1]
+
+let array2 = |x| [x, x];
+print(array2(1)); // expect: [1, 1]
+print(array2(Foo::A)); // expect: [Foo::A(a), Foo::A(a)]

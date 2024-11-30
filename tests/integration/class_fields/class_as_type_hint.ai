@@ -1,0 +1,33 @@
+class Point {
+    x: int = 0,
+    y: int = 0,
+}
+
+class Foo {
+    point: Point,
+
+    fn print_point(self) {
+        print(self.point.x, self.point.y, sep=", ");
+    }
+}
+
+Foo(Point()).print_point(); // expect: 0, 0
+Foo(point=Point(1, 1)).print_point(); // expect: 1, 1
+Foo(point=Point(1, y=1)).print_point(); // expect: 1, 1
+Foo(point=Point(x=1, y=1)).print_point(); // expect: 1, 1
+Foo(point=Point(y=1, x=1)).print_point(); // expect: 1, 1
+
+// ignore: not support yet
+class Bar {
+    point: Point = Point(1, 1),
+
+    fn print_point(self) {
+        print(self.point.x, self.point.y, sep=", ");
+    }
+}
+
+Foo(Point()).print_point(); // expect: 0, 0
+Foo(point=Point(2, 2)).print_point(); // expect: 1, 1
+Foo(point=Point(2, y=2)).print_point(); // expect: 1, 1
+Foo(point=Point(x=2, y=2)).print_point(); // expect: 1, 1
+Foo(point=Point(y=2, x=2)).print_point(); // expect: 1, 1

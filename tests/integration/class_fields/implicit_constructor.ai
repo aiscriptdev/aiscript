@@ -5,5 +5,18 @@ class Foo {
     d: bool = true,
 }
 
-let f = Foo();
-print(f.a, f.b, f.c, f.d, sep=", "); // expect: nil, 0, cc, true
+let f = Foo(1);
+print(f.a, f.b, f.c, f.d, sep=", "); // expect: 1, 0, cc, true
+
+class Point {
+    x: int = 0,
+    y: int = 0,
+}
+let p1 = Point();
+print(p1.x, p1.y); // expect: 0 0
+let p2 = Point(x=1);
+print(p2.x, p2.y); // expect: 1 0
+let p3 = Point(y=1);
+print(p3.x, p3.y); // expect: 0 1
+let p4 = Point(x=1, y=1);
+print(p4.x, p4.y); // expect: 1 1

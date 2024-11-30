@@ -538,14 +538,50 @@ impl<'gc> Parser<'gc> {
                         Stmt::Function(constructor_decl)
                     }
                 } else {
-                    // No constructor exists, create synthetic one that initializes declared fields
+                    // No constructor exists, create synthetic one that declare all fields as keyword arguments:
+                    // class Foo {
+                    //   x: int = 0,
+                    //   y: int = 0,
+                    //
+                    //  // Auto-generated constructor
+                    //  fn new(x: int = 0, y: int = 0) {
+                    //      self.x = x;
+                    //      self.y = y;
+                    //  }
+                    // }
+                    let mut params = IndexMap::with_capacity(fields.len());
+                    let mut body = Vec::with_capacity(fields.len());
+                    for field in fields {
+                        // Note: the line is not real, we just give the field's line.
+                        let line = field.line;
+                        body.push(Stmt::Expression {
+                            expression: Expr::Set {
+                                object: Box::new(Expr::Self_ { line }),
+                                name: field.name,
+                                value: Box::new(Expr::Variable {
+                                    name: field.name,
+                                    line,
+                                }),
+                                line,
+                            },
+                            line,
+                        });
+                        params.insert(
+                            field.name,
+                            Parameter {
+                                name: field.name,
+                                type_hint: Some(field.type_hint),
+                                default_value: field.default_value,
+                            },
+                        );
+                    }
                     Stmt::Function(FunctionDecl {
                         name: Token::new(TokenType::Identifier, "new", name.line),
                         mangled_name: format!("{}$new", self.scopes.join("$")),
-                        params: IndexMap::new(),
+                        params,
                         doc: None,
                         return_type: None,
-                        body: fields.iter().map(create_field_init).collect(),
+                        body,
                         fn_type: FunctionType::Constructor,
                         visibility: Visibility::Public,
                         line: name.line,
@@ -562,7 +598,7 @@ impl<'gc> Parser<'gc> {
         Some(Stmt::Class(ClassDecl {
             name,
             superclass,
-            fields,
+            // fields,
             methods,
             visibility,
             line: name.line,
