@@ -57,6 +57,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aiscript-directive"
+version = "0.1.0"
+dependencies = [
+ "aiscript-lexer",
+ "serde_json",
+]
+
+[[package]]
 name = "aiscript-lexer"
 version = "0.1.0"
 

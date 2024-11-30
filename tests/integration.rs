@@ -48,10 +48,10 @@ fn parse_comments(path: &PathBuf) -> Option<Expected> {
 
     println!("{}", path.display());
     let content = fs::read_to_string(path).unwrap();
-    if content.starts_with("// ignore") {
-        return None;
-    }
     for (i, line) in content.lines().enumerate() {
+        if line.trim().starts_with("// ignore") {
+            return None;
+        }
         if let Some(m) = output_re.captures(line) {
             let s = m.get(1).unwrap().as_str().trim_matches('"').to_owned();
             expected.out.push(s);

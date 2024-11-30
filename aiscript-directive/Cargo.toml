@@ -1,0 +1,10 @@
+[package]
+name = "aiscript-directive"
+version = "0.1.0"
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+aiscript-lexer = { path = "../aiscript-lexer" }
+serde_json = "1.0.132"

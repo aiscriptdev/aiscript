@@ -572,6 +572,14 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
+impl<'a> Iterator for Scanner<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.lexer.next()
+    }
+}
+
 impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
@@ -604,11 +612,11 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn match_token(&mut self, kind: TokenType) -> bool {
-        if !self.check(kind) {
-            false
-        } else {
+        if self.check(kind) {
             self.advance();
             true
+        } else {
+            false
         }
     }
 
