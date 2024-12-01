@@ -34,7 +34,7 @@ pub enum TokenType {
 
     // Comparison and logical operators
     Bang,         // !
-    BangEqual,    // !=
+    NotEqual,     // !=
     Equal,        // =
     EqualEqual,   // ==
     Greater,      // >
@@ -69,6 +69,7 @@ pub enum TokenType {
     If,
     In,
     Nil,
+    Not,
     Or,
     Pub,
     Return,
@@ -373,6 +374,7 @@ impl<'a> Lexer<'a> {
             "if" => TokenType::If,
             "in" => TokenType::In,
             "nil" => TokenType::Nil,
+            "not" => TokenType::Not,
             "or" => TokenType::Or,
             "prompt" => TokenType::Prompt,
             "pub" => TokenType::Pub,
@@ -485,7 +487,7 @@ impl<'a> Lexer<'a> {
             '!' => {
                 let kind = if self.peek() == Some('=') {
                     self.advance();
-                    TokenType::BangEqual
+                    TokenType::NotEqual
                 } else {
                     TokenType::Bang
                 };

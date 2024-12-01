@@ -1712,8 +1712,8 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             Some(Parser::binary),
             Precedence::Factor, // Same precedence as multiply/divide
         ),
-        TokenType::Bang => ParseRule::new(Some(Parser::unary), None, Precedence::None),
-        TokenType::BangEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
+        TokenType::Not => ParseRule::new(Some(Parser::unary), None, Precedence::None),
+        TokenType::NotEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
         TokenType::EqualEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
         TokenType::Greater => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         TokenType::GreaterEqual => {

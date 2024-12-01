@@ -609,14 +609,19 @@ impl<'gc> CodeGen<'gc> {
                     TokenType::StarStar => self.emit(OpCode::Power),
                     TokenType::Slash => self.emit(OpCode::Divide),
                     TokenType::Percent => self.emit(OpCode::Modulo),
-                    TokenType::BangEqual => self.emit(OpCode::NotEqual),
+                    TokenType::NotEqual => self.emit(OpCode::NotEqual),
                     TokenType::EqualEqual => self.emit(OpCode::Equal),
                     TokenType::Greater => self.emit(OpCode::Greater),
                     TokenType::GreaterEqual => self.emit(OpCode::GreaterEqual),
                     TokenType::Less => self.emit(OpCode::Less),
                     TokenType::LessEqual => self.emit(OpCode::LessEqual),
                     TokenType::In => self.emit(OpCode::In),
-                    _ => return Err(VmError::CompileError),
+                    _ => {
+                        self.error_at(
+                            operator,
+                            &format!("Invalid binary operator: {}", operator.lexeme),
+                        );
+                    }
                 }
             }
             Expr::Grouping { expression, .. } => {
@@ -634,8 +639,13 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(right)?;
                 match operator.kind {
                     TokenType::Minus => self.emit(OpCode::Negate),
-                    TokenType::Bang => self.emit(OpCode::Not),
-                    _ => return Err(VmError::CompileError),
+                    TokenType::Not => self.emit(OpCode::Not),
+                    _ => {
+                        self.error_at(
+                            operator,
+                            &format!("Invalid unary operator: {}", operator.lexeme),
+                        );
+                    }
                 }
             }
             Expr::Variable { name, .. } => {

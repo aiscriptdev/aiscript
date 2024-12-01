@@ -43,7 +43,7 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
             self.scanner.advance();
             match name.kind {
                 TokenType::In => self.parse_in_directive(),
-                TokenType::Identifier if name.lexeme == "not" => self.parse_not_directive(),
+                TokenType::Not => self.parse_not_directive(),
                 TokenType::Identifier if name.lexeme == "any" => self.parse_any_directive(),
                 TokenType::Identifier => self.parse_simple_directive(name.lexeme.to_owned()),
                 _ => {

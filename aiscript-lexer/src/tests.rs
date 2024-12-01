@@ -216,7 +216,7 @@ mod tests {
                 TokenType::GreaterEqual,
                 TokenType::LessEqual,
                 TokenType::EqualEqual,
-                TokenType::BangEqual,
+                TokenType::NotEqual,
                 TokenType::Arrow,
             ]
         );
