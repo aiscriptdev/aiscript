@@ -1,6 +1,8 @@
+use aiscript_directive::Directive;
+
 use super::*;
 use crate::{
-    ast::{BodyKind, Directive, Endpoint, Field, FieldType, PathParameter, RequestBody, Route},
+    ast::{BodyKind, Endpoint, Field, FieldType, PathParameter, RequestBody, Route},
     utils,
 };
 

@@ -244,13 +244,6 @@ impl<'s> Lexer<'s> {
         let next = self.advance()?;
         Some(self.parse_token(next))
     }
-
-    #[allow(unused)]
-    pub fn peek_token(&mut self) -> Option<Result<Token, String>> {
-        self.consume_whitespace();
-        let next = *self.chars.peek()?;
-        Some(self.parse_token(next))
-    }
 }
 
 impl Display for Token {

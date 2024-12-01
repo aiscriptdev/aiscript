@@ -1,11 +1,11 @@
 mod ast;
-mod validator;
+pub mod validator;
 
 use std::collections::HashMap;
 
 use aiscript_lexer::{Scanner, TokenType};
-use ast::Directive;
 
+pub use ast::Directive;
 use serde_json::Value;
 pub use validator::Validator;
 
@@ -23,13 +23,21 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
 
     #[must_use]
     pub fn parse_validators(&mut self) -> Vec<Box<dyn Validator>> {
-        let mut validiators = Vec::new();
+        self.parse_directives()
+            .into_iter()
+            .map(validator::convert_from_directive)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn parse_directives(&mut self) -> Vec<Directive> {
+        let mut directives = Vec::new();
         while self.scanner.check(TokenType::At) {
             if let Some(directive) = self.parse_directive() {
-                validiators.push(validator::convert_from_directive(directive));
+                directives.push(directive);
             }
         }
-        validiators
+        directives
     }
 
     #[must_use]

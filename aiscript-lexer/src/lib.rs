@@ -574,14 +574,6 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
-impl<'a> Iterator for Scanner<'a> {
-    type Item = Token<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.lexer.next()
-    }
-}
-
 impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
@@ -591,6 +583,37 @@ impl<'a> Scanner<'a> {
             had_error: false,
             panic_mode: false,
         }
+    }
+
+    pub fn read_raw_script(&mut self) -> Result<String, String> {
+        let mut script = String::new();
+        let mut brace_count = 1; // Start at 1 since we're already inside a block
+
+        while !self.is_at_end() {
+            if let Some(token) = self.lexer.next() {
+                match token.kind {
+                    TokenType::OpenBrace => {
+                        brace_count += 1;
+                        script.push('{');
+                    }
+                    TokenType::CloseBrace => {
+                        brace_count -= 1;
+                        if brace_count == 0 {
+                            break;
+                        } else {
+                            script.push('}');
+                        }
+                    }
+                    _ => script.push_str(token.lexeme),
+                }
+            }
+        }
+
+        if brace_count > 0 {
+            return Err("Unclosed script block".to_string());
+        }
+
+        Ok(script.trim().to_owned())
     }
 
     pub fn advance(&mut self) {

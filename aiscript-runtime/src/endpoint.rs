@@ -1,3 +1,4 @@
+use aiscript_directive::{validator, Validator};
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     body::Body,
@@ -18,10 +19,7 @@ use std::{
 use tokio::task::{self, JoinHandle};
 use tower::Service;
 
-use crate::{
-    ast::{self, *},
-    validator::{convert_from_directive, Validator},
-};
+use crate::ast::{self, *};
 
 use crate::error::ServerError;
 
@@ -304,7 +302,7 @@ pub(crate) fn convert_field(field: ast::Field) -> Field {
             field
                 .directives
                 .into_iter()
-                .map(convert_from_directive)
+                .map(validator::convert_from_directive)
                 .collect(),
         ),
     }

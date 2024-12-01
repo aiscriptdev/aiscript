@@ -13,11 +13,11 @@ use crate::endpoint::{convert_field, Endpoint};
 mod ast;
 mod endpoint;
 mod error;
-mod lexer;
 mod openapi;
 mod parser;
 mod utils;
-mod validator;
+
+use aiscript_lexer as lexer;
 
 #[derive(Debug, Clone)]
 struct ReloadSignal;

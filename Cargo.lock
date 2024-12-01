@@ -72,6 +72,8 @@ version = "0.1.0"
 name = "aiscript-runtime"
 version = "0.1.0"
 dependencies = [
+ "aiscript-directive",
+ "aiscript-lexer",
  "aiscript-vm",
  "axum",
  "bytes",
