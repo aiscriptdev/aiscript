@@ -1,6 +1,7 @@
 use std::{iter::Peekable, mem, str::CharIndices};
 
 mod character_tests;
+mod peakable;
 mod tests;
 
 /// Represents different types of tokens in the language
@@ -177,7 +178,7 @@ struct Lexer<'a> {
 }
 
 pub struct Scanner<'a> {
-    lexer: Peekable<Lexer<'a>>,
+    lexer: peakable::Peekable<Lexer<'a>>,
     pub current: Token<'a>,
     pub previous: Token<'a>,
     pub had_error: bool,
@@ -560,6 +561,44 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Lexer<'a> {
+    fn read_raw_script(&mut self) -> Result<String, String> {
+        let mut script = String::new();
+        let mut brace_count = 1;
+
+        while let Some((_, ch)) = self.iter.peek() {
+            match ch {
+                '{' => {
+                    brace_count += 1;
+                    script.push('{');
+                }
+                '}' => {
+                    brace_count -= 1;
+                    if brace_count == 0 {
+                        break;
+                    } else {
+                        script.push('}');
+                    }
+                }
+                '\n' => {
+                    script.push('\n');
+                    self.line += 1;
+                }
+                ch => {
+                    script.push(*ch);
+                }
+            }
+            self.advance();
+        }
+
+        if brace_count > 0 {
+            return Err("Unclosed script block".to_string());
+        }
+
+        Ok(script.trim().to_owned())
+    }
+}
+
 impl<'a> Iterator for Lexer<'a> {
     type Item = Token<'a>;
 
@@ -574,10 +613,16 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
+impl<'a> From<peakable::Peekable<Lexer<'a>>> for Lexer<'a> {
+    fn from(p: peakable::Peekable<Lexer<'a>>) -> Self {
+        p.iter
+    }
+}
+
 impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
-            lexer: Lexer::new(source).peekable(),
+            lexer: peakable::Peekable::new(Lexer::new(source)),
             current: Token::default(),
             previous: Token::default(),
             had_error: false,
@@ -586,34 +631,15 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn read_raw_script(&mut self) -> Result<String, String> {
-        let mut script = String::new();
-        let mut brace_count = 1; // Start at 1 since we're already inside a block
+        let mut lexer = Lexer::from(mem::replace(
+            &mut self.lexer,
+            peakable::Peekable::new(Lexer::new("")),
+        ));
+        let script = format!("{} {}", self.current.lexeme, lexer.read_raw_script()?);
 
-        while !self.is_at_end() {
-            if let Some(token) = self.lexer.next() {
-                match token.kind {
-                    TokenType::OpenBrace => {
-                        brace_count += 1;
-                        script.push('{');
-                    }
-                    TokenType::CloseBrace => {
-                        brace_count -= 1;
-                        if brace_count == 0 {
-                            break;
-                        } else {
-                            script.push('}');
-                        }
-                    }
-                    _ => script.push_str(token.lexeme),
-                }
-            }
-        }
-
-        if brace_count > 0 {
-            return Err("Unclosed script block".to_string());
-        }
-
-        Ok(script.trim().to_owned())
+        self.lexer = peakable::Peekable::new(lexer);
+        self.advance();
+        Ok(script)
     }
 
     pub fn advance(&mut self) {
