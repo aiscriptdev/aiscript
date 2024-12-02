@@ -638,6 +638,7 @@ impl<'a> Scanner<'a> {
         let script = format!("{} {}", self.current.lexeme, lexer.read_raw_script()?);
 
         self.lexer = peakable::Peekable::new(lexer);
+        // Advance to next token.
         self.advance();
         Ok(script)
     }
@@ -677,6 +678,10 @@ impl<'a> Scanner<'a> {
 
     pub fn check(&self, kind: TokenType) -> bool {
         self.current.kind == kind
+    }
+
+    pub fn check_identifier(&self, lexme: &str) -> bool {
+        self.current.kind == TokenType::Identifier && self.current.lexeme == lexme
     }
 
     pub fn check_next(&mut self, kind: TokenType) -> bool {

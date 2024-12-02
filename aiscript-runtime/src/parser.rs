@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
         }
 
         // Check if this is a top-level route declaration
-        let is_top_route = self.check(TokenType::Identifier) && self.current.lexeme == "route";
+        let is_top_route = self.check_identifier("route");
 
         if is_top_route {
             self.advance(); // consume 'route'
@@ -50,21 +50,8 @@ impl<'a> Parser<'a> {
         }
 
         let mut endpoints = Vec::new();
-        while !self.is_at_end() {
-            // Break if we hit the closing brace of a top-level route
-            if is_top_route && self.check(TokenType::CloseBrace) {
-                break;
-            }
-
-            // Parse endpoints
-            if self.check(TokenType::Doc)
-                || self.check(TokenType::Identifier)
-                || self.check(TokenType::At)
-            {
-                endpoints.push(self.parse_endpoint()?);
-            } else {
-                self.advance(); // skip unexpected tokens
-            }
+        while !self.is_at_end() && !self.check(TokenType::CloseBrace) {
+            endpoints.push(self.parse_endpoint()?);
         }
 
         if is_top_route {
@@ -98,19 +85,16 @@ impl<'a> Parser<'a> {
 
         // Only parse structured blocks (query/body) and directives
         while !self.is_at_end() {
-            match self.current.kind {
-                TokenType::Identifier if self.current.lexeme == "query" => {
-                    self.advance();
-                    query = self.parse_fields()?;
-                }
-                TokenType::Identifier if self.current.lexeme == "body" => {
-                    self.advance();
-                    body.fields = self.parse_fields()?;
-                }
-                TokenType::At => {
-                    let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
-                    for directive in directives {
-                        match &*directive.name() {
+            if self.scanner.check_identifier("query") {
+                self.advance();
+                query = self.parse_fields()?;
+            } else if self.scanner.check_identifier("body") {
+                self.advance();
+                body.fields = self.parse_fields()?;
+            } else if self.scanner.check(TokenType::At) {
+                let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
+                for directive in directives {
+                    match &*directive.name() {
                             "form" => body.kind = BodyKind::Form,
                             "json" => body.kind = BodyKind::Json,
                             name => {
@@ -120,19 +104,23 @@ impl<'a> Parser<'a> {
                             }
                         }
 
-                        if !self.check(TokenType::Identifier) || self.current.lexeme != "body" {
-                            return Err("Only body block supports @form or @json directive".into());
-                        }
+                    if !self.check_identifier("body") {
+                        return Err("Only body block supports @form or @json directive".into());
                     }
                 }
-                _ => break, // Break for anything else to handle raw script
+            } else {
+                // Break for anything else to handle raw script
+                break;
             }
         }
 
+        if self.check(TokenType::CloseBrace) {
+            return Err("Route without handler script is not allowed.".to_string());
+        }
         // Parse the handler function body
         let script = self.read_raw_script()?;
         let statements = format!("fn handler(query, body, request, header){{{}}}", script);
-
+        self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
             path_specs,
             return_type: None,
@@ -208,14 +196,23 @@ impl<'a> Parser<'a> {
     fn parse_value(&mut self) -> Result<Value, String> {
         let value = match self.current.kind {
             TokenType::Number => {
-                let num = self
-                    .current
-                    .lexeme
-                    .parse::<f64>()
-                    .map_err(|_| "Invalid number".to_string())?;
-                Value::Number(serde_json::Number::from_f64(num).ok_or("Invalid number")?)
+                if self.current.lexeme.contains(".") {
+                    let num = self
+                        .current
+                        .lexeme
+                        .parse::<f64>()
+                        .map_err(|_| "Invalid number".to_string())?;
+                    Value::Number(serde_json::Number::from_f64(num).ok_or("Invalid number")?)
+                } else {
+                    let num = self
+                        .current
+                        .lexeme
+                        .parse::<i64>()
+                        .map_err(|_| "Invalid number".to_string())?;
+                    Value::Number(serde_json::Number::from(num))
+                }
             }
-            TokenType::String => Value::String(self.current.lexeme.to_string()),
+            TokenType::String => Value::String(self.current.lexeme.trim_matches('"').to_string()),
             TokenType::True => Value::Bool(true),
             TokenType::False => Value::Bool(false),
             _ => return Err("Expected value".to_string()),
@@ -333,6 +330,10 @@ pub fn parse_route(input: &str) -> Result<Route, String> {
 // Add some tests to verify the implementation
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use aiscript_directive::Directive;
+
     use super::*;
 
     #[test]
@@ -470,6 +471,8 @@ mod tests {
                         @any(@a, @b(arg=1), @c)
                         z: str
                     }
+
+                    return "hi";
                 }
             }
         "#;
@@ -484,63 +487,63 @@ mod tests {
         let field = &endpoint.body.fields[0];
         assert_eq!(field.name, "field");
         assert_eq!(field.directives.len(), 2);
-        // assert_eq!(
-        //     field.directives[0],
-        //     Directive::Simple {
-        //         name: String::from("length"),
-        //         params: [(String::from("max"), Value::from(10)).into()]
-        //             .into_iter()
-        //             .collect::<HashMap<String, Value>>()
-        //     }
-        // );
-        // assert_eq!(
-        //     field.directives[1],
-        //     Directive::Not(Box::new(Directive::Simple {
-        //         name: String::from("another"),
-        //         params: HashMap::new(),
-        //     }))
-        // );
+        assert_eq!(
+            field.directives[0],
+            Directive::Simple {
+                name: String::from("length"),
+                params: [(String::from("max"), Value::from(10)).into()]
+                    .into_iter()
+                    .collect::<HashMap<String, Value>>()
+            }
+        );
+        assert_eq!(
+            field.directives[1],
+            Directive::Not(Box::new(Directive::Simple {
+                name: String::from("another"),
+                params: HashMap::new(),
+            }))
+        );
 
-        // let field = &endpoint.body.fields[1];
-        // assert_eq!(field.name, "x");
-        // assert_eq!(field.default, Some(Value::from("a")));
-        // assert_eq!(field.directives.len(), 1);
-        // assert_eq!(
-        //     field.directives[0],
-        //     Directive::In(vec![Value::from("a"), Value::from("b"), Value::from("c"),])
-        // );
+        let field = &endpoint.body.fields[1];
+        assert_eq!(field.name, "x");
+        assert_eq!(field.default, Some(Value::from("a")));
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::In(vec![Value::from("a"), Value::from("b"), Value::from("c"),])
+        );
 
-        // let field = &endpoint.body.fields[2];
-        // assert_eq!(field.name, "y");
-        // assert_eq!(field.default, Some(Value::from(1)));
-        // assert_eq!(field.directives.len(), 1);
-        // assert_eq!(
-        //     field.directives[0],
-        //     Directive::In(vec![Value::from(1), Value::from(2), Value::from(3),])
-        // );
+        let field = &endpoint.body.fields[2];
+        assert_eq!(field.name, "y");
+        assert_eq!(field.default, Some(Value::from(1)));
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::In(vec![Value::from(1), Value::from(2), Value::from(3),])
+        );
 
-        // let field = &endpoint.body.fields[3];
-        // assert_eq!(field.name, "z");
-        // assert_eq!(field.directives.len(), 1);
-        // assert_eq!(
-        //     field.directives[0],
-        //     Directive::Any(vec![
-        //         Directive::Simple {
-        //             name: String::from("a"),
-        //             params: HashMap::new(),
-        //         },
-        //         Directive::Simple {
-        //             name: String::from("b"),
-        //             params: [(String::from("arg"), Value::from(1)).into()]
-        //                 .into_iter()
-        //                 .collect::<HashMap<String, Value>>(),
-        //         },
-        //         Directive::Simple {
-        //             name: String::from("c"),
-        //             params: HashMap::new(),
-        //         },
-        //     ])
-        // );
+        let field = &endpoint.body.fields[3];
+        assert_eq!(field.name, "z");
+        assert_eq!(field.directives.len(), 1);
+        assert_eq!(
+            field.directives[0],
+            Directive::Any(vec![
+                Directive::Simple {
+                    name: String::from("a"),
+                    params: HashMap::new(),
+                },
+                Directive::Simple {
+                    name: String::from("b"),
+                    params: [(String::from("arg"), Value::from(1)).into()]
+                        .into_iter()
+                        .collect::<HashMap<String, Value>>(),
+                },
+                Directive::Simple {
+                    name: String::from("c"),
+                    params: HashMap::new(),
+                },
+            ])
+        );
     }
 
     #[test]
@@ -600,12 +603,17 @@ mod tests {
                 get /, post /, put / {
                     return "root";
                 }
+
+                get /hi {
+                    return "hi;
+                }
             }
         "#;
 
         let mut parser = Parser::new(input);
         let result = parser.parse_route().unwrap();
 
+        assert_eq!(result.endpoints.len(), 2);
         let endpoint = &result.endpoints[0];
         assert_eq!(endpoint.path_specs.len(), 3);
         assert_eq!(endpoint.path_specs[0].path, "/");
