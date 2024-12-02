@@ -1,13 +1,33 @@
-mod ast;
 pub mod validator;
 
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use aiscript_lexer::{Scanner, TokenType};
 
-pub use ast::Directive;
 use serde_json::Value;
 pub use validator::Validator;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Directive {
+    Simple {
+        name: String,
+        params: HashMap<String, Value>,
+    },
+    Any(Vec<Directive>), // Must have 2 or more directives
+    Not(Box<Directive>),
+    In(Vec<Value>),
+}
+
+impl Directive {
+    pub fn name(&self) -> Cow<'static, str> {
+        match self {
+            Directive::Simple { name, .. } => Cow::Owned(name.to_owned()),
+            Directive::Any(_) => "any".into(),
+            Directive::Not(_) => "not".into(),
+            Directive::In(_) => "in".into(),
+        }
+    }
+}
 
 pub struct DirectiveParser<'a, 'b: 'a> {
     scanner: &'a mut Scanner<'b>,

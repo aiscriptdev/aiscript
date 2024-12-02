@@ -1437,7 +1437,7 @@ impl<'gc> CodeGen<'gc> {
         eprint!("[line {}] Error", token.line);
         if token.kind == TokenType::Eof {
             eprint!(" at end");
-        } else if token.kind == TokenType::Error {
+        } else if token.kind == TokenType::Invalid {
             // Do nothing.
         } else {
             eprint!(" at '{}'", token.lexeme);

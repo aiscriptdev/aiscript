@@ -63,7 +63,7 @@ mod tests {
 
         let error_token = tokens
             .iter()
-            .find(|t| t.kind == TokenType::Error)
+            .find(|t| t.kind == TokenType::Invalid)
             .expect("Error token not found");
 
         assert_eq!(error_token.lexeme, "Unterminated docstring.");
@@ -126,7 +126,7 @@ mod tests {
 
         let error_token = tokens
             .iter()
-            .find(|t| t.kind == TokenType::Error)
+            .find(|t| t.kind == TokenType::Invalid)
             .expect("Error token not found");
 
         assert_eq!(error_token.lexeme, "Unterminated docstring.");

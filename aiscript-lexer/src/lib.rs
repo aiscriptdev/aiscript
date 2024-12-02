@@ -26,6 +26,8 @@ pub enum TokenType {
     Colon,      // :
     Percent,    // %
     Pipe,       // |
+    Bang,       // !
+    Question,   // ?
     At,         // @
     StarStar,   // **
     ColonColon, // ::
@@ -34,7 +36,6 @@ pub enum TokenType {
     PipeArrow,  // |>
 
     // Comparison and logical operators
-    Bang,         // !
     NotEqual,     // !=
     Equal,        // =
     EqualEqual,   // ==
@@ -52,6 +53,7 @@ pub enum TokenType {
 
     // Literals
     Identifier, // Variable/function names
+    Error,      // Error type name (ends with qustion mark, e.g. NetworkError! )
     String,     // "string literal"
     Number,     // 123, 123.45
     Doc,        // """docstring"""
@@ -73,6 +75,7 @@ pub enum TokenType {
     Not,
     Or,
     Pub,
+    Raise,
     Return,
     Super,
     Self_,
@@ -87,8 +90,8 @@ pub enum TokenType {
     Agent,
 
     // Special tokens
-    Error, // Lexing error
-    Eof,   // End of file
+    Invalid, // Invalid token error
+    Eof,     // End of file
 }
 
 /// Represents a single token in the source code
@@ -126,6 +129,10 @@ impl<'a> Token<'a> {
         matches!(self.kind, TokenType::Fn | TokenType::AI | TokenType::Pub)
     }
 
+    pub fn is_error_type(&self) -> bool {
+        self.kind == TokenType::Error
+    }
+
     pub fn is_literal_token(&self) -> bool {
         matches!(
             self.kind,
@@ -154,6 +161,7 @@ impl<'a> Token<'a> {
                 | TokenType::If
                 | TokenType::Let
                 | TokenType::Pub
+                | TokenType::Raise
                 | TokenType::Return
                 | TokenType::Use
                 | TokenType::While
@@ -299,7 +307,7 @@ impl<'a> Lexer<'a> {
                 }
                 // Check for EOF
                 None => {
-                    return Token::new(TokenType::Error, "Unterminated docstring.", self.line);
+                    return Token::new(TokenType::Invalid, "Unterminated docstring.", self.line);
                 }
             }
         }
@@ -358,6 +366,13 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
 
+        // Check for ! after identifier for error types
+        if self.peek() == Some('!') {
+            self.advance();
+            // The lexeme will include the !.
+            return self.make_token(TokenType::Error);
+        }
+
         let text = &self.source[self.start..self.current];
         let kind = match text {
             "ai" => TokenType::AI,
@@ -380,6 +395,7 @@ impl<'a> Lexer<'a> {
             "prompt" => TokenType::Prompt,
             "pub" => TokenType::Pub,
             "return" => TokenType::Return,
+            "raise" => TokenType::Raise,
             "super" => TokenType::Super,
             "self" => TokenType::Self_,
             "true" => TokenType::True,
@@ -414,6 +430,7 @@ impl<'a> Lexer<'a> {
             ',' => self.make_token(TokenType::Comma),
             '.' => self.make_token(TokenType::Dot),
             '@' => self.make_token(TokenType::At),
+            '?' => self.make_token(TokenType::Question),
             '|' => {
                 let kind = if self.peek() == Some('>') {
                     self.advance();
@@ -549,14 +566,14 @@ impl<'a> Lexer<'a> {
                             self.advance();
                             self.make_token(TokenType::String)
                         }
-                        _ => Token::new(TokenType::Error, "Unterminated string.", self.line),
+                        _ => Token::new(TokenType::Invalid, "Unterminated string.", self.line),
                     }
                 }
             }
 
             c if c.is_ascii_digit() => self.scan_number(),
             c if c.is_alphabetic() || c == '_' => self.scan_identifier(),
-            _ => Token::new(TokenType::Error, "Unexpected character.", self.line),
+            _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
         }
     }
 }
@@ -648,7 +665,7 @@ impl<'a> Scanner<'a> {
 
         while let Some(token) = self.lexer.next() {
             self.current = token;
-            if self.current.kind != TokenType::Error {
+            if self.current.kind != TokenType::Invalid {
                 break;
             }
             self.error_at_current(self.current.lexeme);
@@ -657,6 +674,14 @@ impl<'a> Scanner<'a> {
 
     pub fn consume(&mut self, kind: TokenType, message: &str) {
         if self.check(kind) {
+            self.advance();
+            return;
+        }
+        self.error_at_current(message);
+    }
+
+    pub fn consume_either(&mut self, k1: TokenType, k2: TokenType, message: &str) {
+        if self.check(k1) || self.check(k2) {
             self.advance();
             return;
         }
@@ -708,7 +733,7 @@ impl<'a> Scanner<'a> {
         eprint!("[line {}] Error", token.line);
         if token.kind == TokenType::Eof {
             eprint!(" at end");
-        } else if token.kind == TokenType::Error {
+        } else if token.kind == TokenType::Invalid {
             // Do nothing.
         } else {
             eprint!(" at '{}'", token.lexeme);

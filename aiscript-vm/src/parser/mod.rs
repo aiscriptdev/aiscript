@@ -100,7 +100,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn parse_type(&mut self) -> Token<'gc> {
-        if !self.check(TokenType::Identifier) {
+        if !self.check(TokenType::Identifier) && !self.check(TokenType::Error) {
             self.error_at_current("Invalid type annotation.");
         }
         // Parse either builtin type or custom type (identifier)
@@ -319,7 +319,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn enum_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::Identifier, "Expect enum name.");
+        self.consume_either(TokenType::Identifier, TokenType::Error, "Expect enum name.");
         let name = self.previous;
         self.scopes.push(name.lexeme.to_owned());
         if self.check(TokenType::OpenParen) && self.check_next(TokenType::Identifier) {
@@ -432,8 +432,17 @@ impl<'gc> Parser<'gc> {
     }
 
     fn class_declaration(&mut self, visibility: Visibility) -> Option<Stmt<'gc>> {
-        self.consume(TokenType::Identifier, "Expect class name.");
+        self.consume_either(
+            TokenType::Identifier,
+            TokenType::Error,
+            "Expect class name.",
+        );
         let name = self.previous;
+        if name.is_error_type() && self.match_token(TokenType::OpenParen) {
+            self.error_at(name, "Error types cannot inherit from other classes.");
+            return None;
+        }
+
         self.scopes.push(name.lexeme.to_owned());
         let superclass = if self.match_token(TokenType::OpenParen) {
             self.consume(TokenType::Identifier, "Expect superclass name.");
@@ -1490,6 +1499,14 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn error_type(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let name = self.previous;
+        Some(Expr::Variable {
+            name,
+            line: self.previous.line,
+        })
+    }
+
     fn variable(&mut self, can_assign: bool) -> Option<Expr<'gc>> {
         let name = self.previous;
 
@@ -1721,6 +1738,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         }
         TokenType::Less => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         TokenType::LessEqual => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
+        TokenType::Error => ParseRule::new(Some(Parser::error_type), None, Precedence::None),
         TokenType::Identifier => ParseRule::new(Some(Parser::variable), None, Precedence::None),
         TokenType::String => ParseRule::new(Some(Parser::string), None, Precedence::None),
         TokenType::Number => ParseRule::new(Some(Parser::number), None, Precedence::None),
