@@ -1,12 +1,12 @@
-/// Test POC API
 route /poc {
-    /// Get hello API
+    """Test POC API"""
     get /hello {
+        """Get hello API"""
         query {
-            /// hello content
+            """hello content"""
             @string(min_len=3, max_len=30)
             content: str
-            /// hello age
+            """hello age"""
             age: int = 18
         }
 
@@ -21,12 +21,12 @@ route /poc {
         return "get: hello";
     }
 
-    /// Post and put hello API
     post /hello, put /hello2 {
+        """Post and put hello API"""
         query {
             @string(min_len=3, max_len=30)
             content: str
-            /// age
+            """age"""
             age: int = 18
             @in(["ios", "android"])
             platform: str = "ios" 
@@ -34,7 +34,7 @@ route /poc {
 
         @json
         body {
-            /// test flag
+            """test flag"""
             test: bool = true
         }
 

@@ -1,14 +1,14 @@
-/// Gist lists
 get /gists {
+    """Gist lists"""
     return "gist";
 }
 
-/// Get gist by id
 get /gists/<id:int> {
+    """Get gist by id"""
     return "gist: " + id;
 }
 
-/// Delete gist by id
 delete /gists/<id:int> {
+    """Delete gist by id"""
     return "delete gist: " + id;
 }

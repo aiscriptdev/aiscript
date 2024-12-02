@@ -1,7 +1,7 @@
-/// Repo API
 get /repo {
+    """Repo API"""
     query {
-        /// repo name
+        """repo name"""
         @string(min_len=3, max_len=30)
         name: str
     }
@@ -9,10 +9,10 @@ get /repo {
     return "repo: " + name;
 }
 
-/// Create a repository
 post /repo {
+    """Create a repository"""
     body {
-        /// The repository name
+        """The repository name"""
         @string(min_len=3, max_len=30)
         name: str
     }
@@ -20,10 +20,10 @@ post /repo {
     return "create repo: " + name;
 }
 
-/// Update a repository API
 put /repo/<id:int> {
+    """Update a repository API"""
     body {
-        /// The repository name
+        """The repository name"""
         @string(min_len=3, max_len=30)
         name: str
     }

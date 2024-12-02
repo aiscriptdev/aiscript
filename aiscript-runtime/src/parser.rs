@@ -29,24 +29,32 @@ impl<'a> Parser<'a> {
         Parser { scanner }
     }
 
+    fn parse_docs(&mut self) -> String {
+        let mut docs = String::new();
+        if self.match_token(TokenType::Doc) {
+            let lines = self
+                .previous
+                .lexeme
+                .lines()
+                .map(|line| line.trim())
+                .collect::<Vec<_>>();
+            docs = lines.join("\n");
+        }
+        docs
+    }
+
     pub fn parse_route(&mut self) -> Result<Route, String> {
         let mut docs = String::new();
         let mut path = (String::from("/"), Vec::new());
 
-        // Parse docs at the start
-        while self.check(TokenType::Doc) {
-            docs.push_str(self.current.lexeme);
-            docs.push('\n');
-            self.advance();
-        }
-
         // Check if this is a top-level route declaration
         let is_top_route = self.check_identifier("route");
-
         if is_top_route {
             self.advance(); // consume 'route'
             path = self.parse_path()?;
             self.consume(TokenType::OpenBrace, "Expect '{' after route path")?;
+
+            docs = self.parse_docs();
         }
 
         let mut endpoints = Vec::new();
@@ -67,17 +75,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_endpoint(&mut self) -> Result<Endpoint, String> {
-        // Parse docs
-        let mut docs = String::new();
-        while self.check(TokenType::Doc) {
-            docs.push_str(self.current.lexeme);
-            docs.push('\n');
-            self.advance();
-        }
-
         let path_specs = self.parse_path_specs()?;
 
         self.consume(TokenType::OpenBrace, "Expect '{' before endpoint")?;
+
+        // Parse docs
+        let docs = self.parse_docs();
 
         // Parse structured parts (query and body)
         let mut query = Vec::new();
@@ -136,17 +139,11 @@ impl<'a> Parser<'a> {
 
         let mut fields = Vec::new();
         while !self.check(TokenType::CloseBrace) {
-            let mut docs = String::new();
-            let mut directives = Vec::new();
-
             // Parse doc comments
-            while self.check(TokenType::Doc) {
-                docs.push_str(self.current.lexeme);
-                docs.push('\n');
-                self.advance();
-            }
+            let docs = self.parse_docs();
 
             // Parse directives
+            let mut directives = Vec::new();
             while self.check(TokenType::At) {
                 directives.append(&mut DirectiveParser::new(&mut self.scanner).parse_directives());
             }
@@ -339,18 +336,21 @@ mod tests {
     #[test]
     fn test_basic_route() {
         let input = r#"
-            /// Test route line1
-            /// Test route line2
             route /test/<id:int> {
-                /// Test endpoint
+                """
+                Test route line1
+                Test route line2
+                """
+
                 get /a {
+                    """Test endpoint"""
                     query {
-                        /// field name
+                        """field name"""
                         name: str = "hello"
                         age: int = 18
                     }
                     body {
-                        /// field a
+                        """field a"""
                         @length(max=10)
                         a: str
                         b: bool = false
@@ -363,8 +363,9 @@ mod tests {
                     return greeting;
                 }
 
-                /// Test endpoint2
                 post /b {
+                    """Test endpoint2"""
+
                     return "endpoint2";
                 }
             }
@@ -372,29 +373,28 @@ mod tests {
 
         let mut parser = Parser::new(input);
         let result = parser.parse_route();
-        // assert!(result.is_ok());
 
         let route = result.unwrap();
-        // assert_eq!(route.docs, "Test route line1\nTest route line2");
+        assert_eq!(route.docs, "Test route line1\nTest route line2");
         assert_eq!(route.prefix, "/test/:id");
         assert_eq!(route.params.len(), 1);
         assert_eq!(route.params[0].name, "id");
         assert_eq!(route.params[0].param_type, "int");
 
         let endpoint = &route.endpoints[0];
-        // assert_eq!(endpoint.docs, "Test endpoint");
+        assert_eq!(endpoint.docs, "Test endpoint");
         assert_eq!(endpoint.path_specs[0].method, HttpMethod::Get);
         assert_eq!(endpoint.path_specs[0].path, "/a");
 
         // Verify query parameters
         assert_eq!(endpoint.query.len(), 2);
-        // assert_eq!(endpoint.query[0].docs, "field name");
+        assert_eq!(endpoint.query[0].docs, "field name");
         assert_eq!(endpoint.query[0].name, "name");
         assert_eq!(endpoint.query[1].name, "age");
 
         // Verify body fields
         assert_eq!(endpoint.body.fields.len(), 2);
-        // assert_eq!(endpoint.body.fields[0].docs, "field a");
+        assert_eq!(endpoint.body.fields[0].docs, "field a");
         assert_eq!(endpoint.body.fields[0].name, "a");
         assert_eq!(endpoint.body.fields[1].name, "b");
 
@@ -405,7 +405,7 @@ mod tests {
 
         // Verify endpoint2
         let endpoint2 = &route.endpoints[1];
-        // assert_eq!(endpoint2.docs, "Test endpoint2");
+        assert_eq!(endpoint2.docs, "Test endpoint2");
         assert_eq!(endpoint2.path_specs[0].method, HttpMethod::Post);
         assert_eq!(endpoint2.path_specs[0].path, "/b");
         assert!(endpoint2.statements.contains("return \"endpoint2\""));
