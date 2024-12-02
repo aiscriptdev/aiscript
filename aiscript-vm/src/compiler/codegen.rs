@@ -406,6 +406,7 @@ impl<'gc> CodeGen<'gc> {
                     });
                 }
             }
+            Stmt::Raise { .. } => {}
             Stmt::Return { value, .. } => {
                 if let Some(expr) = value {
                     self.generate_expr(expr)?;

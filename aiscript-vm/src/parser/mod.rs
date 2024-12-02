@@ -13,8 +13,8 @@ use super::{
 };
 use crate::{
     ast::{
-        AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, FunctionDecl, ObjectProperty,
-        VariableDecl, Visibility,
+        AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FunctionDecl,
+        ObjectProperty, VariableDecl, Visibility,
     },
     object::FunctionType,
     ty::EnumVariantChecker,
@@ -190,6 +190,8 @@ impl<'gc> Parser<'gc> {
             })
         } else if self.match_token(TokenType::If) {
             self.if_statement()
+        } else if self.match_token(TokenType::Raise) {
+            self.raise_statement()
         } else if self.match_token(TokenType::Return) {
             self.return_statement()
         } else if self.match_token(TokenType::While) {
@@ -598,6 +600,7 @@ impl<'gc> Parser<'gc> {
                         params,
                         doc: None,
                         return_type: None,
+                        error_types: Vec::new(),
                         body,
                         fn_type: FunctionType::Constructor,
                         visibility: Visibility::Public,
@@ -815,12 +818,8 @@ impl<'gc> Parser<'gc> {
             }
         }
 
-        // Parse optional return type
-        let return_type = if self.match_token(TokenType::Arrow) {
-            Some(self.parse_type())
-        } else {
-            None
-        };
+        // Parse optional return type and error types
+        let (return_type, error_types) = self.parse_function_return();
         self.consume(TokenType::OpenBrace, "Expect '{' before function body.");
 
         let doc = if self.match_token(TokenType::Doc) {
@@ -840,6 +839,7 @@ impl<'gc> Parser<'gc> {
             doc,
             params,
             return_type,
+            error_types,
             body,
             fn_type: self.fn_type,
             visibility,
@@ -848,6 +848,49 @@ impl<'gc> Parser<'gc> {
         // Restore previous function type
         self.fn_type = previous_fn_type;
         Some(func)
+    }
+
+    fn parse_function_return(&mut self) -> (Option<Token<'gc>>, Vec<Token<'gc>>) {
+        let mut return_type = None;
+        let mut error_types = Vec::new();
+
+        if self.match_token(TokenType::Arrow) {
+            // Check if first type is an error type
+            self.consume_either(
+                TokenType::Error,
+                TokenType::Identifier,
+                "Expect type after '->'.",
+            );
+            let first_type = self.previous;
+
+            if first_type.is_error_type() {
+                error_types.push(first_type);
+            } else {
+                return_type = Some(first_type);
+            }
+
+            // Parse additional types (must be error types)
+            while self.match_token(TokenType::Comma) {
+                if self.check(TokenType::OpenBrace) {
+                    break; // Handle optional trailing comma
+                }
+                self.consume_either(
+                    TokenType::Error,
+                    TokenType::Identifier,
+                    "Expect error type.",
+                );
+                let error_type = self.previous;
+                if !error_type.is_error_type() {
+                    self.error_at(
+                        error_type,
+                        "Only error types can be listed after return type.",
+                    );
+                }
+                error_types.push(error_type);
+            }
+        }
+
+        (return_type, error_types)
     }
 
     fn lambda(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -934,6 +977,7 @@ impl<'gc> Parser<'gc> {
             callee,
             arguments: std::iter::once(*left).chain(arguments).collect(),
             keyword_args,
+            error_handler: self.parse_error_handling(),
             line: callee_name.line,
         })
     }
@@ -1402,6 +1446,7 @@ impl<'gc> Parser<'gc> {
             callee,
             arguments,
             keyword_args,
+            error_handler: self.parse_error_handling(),
             line: self.previous.line,
         })
     }
@@ -1449,6 +1494,7 @@ impl<'gc> Parser<'gc> {
                 method: name,
                 arguments,
                 keyword_args,
+                error_handler: self.parse_error_handling(),
                 line: self.previous.line,
             })
         } else {
@@ -1496,6 +1542,50 @@ impl<'gc> Parser<'gc> {
                 line: operator.line,
             }),
             line: operator.line,
+        })
+    }
+
+    // Parse error handling after a call/invoke
+    fn parse_error_handling(&mut self) -> Option<ErrorHandler<'gc>> {
+        let mut handler = None;
+        if self.match_token(TokenType::Pipe) {
+            self.consume(
+                TokenType::Identifier,
+                "Expect error variable name after '|'.",
+            );
+            let error_var = self.previous;
+
+            self.consume(TokenType::Pipe, "Expect closing '|' after error variable.");
+            self.consume(
+                TokenType::OpenBrace,
+                "Expect '{' before error handler body.",
+            );
+
+            let handler_body = self.block();
+
+            handler = Some(ErrorHandler {
+                error_var,
+                handler_body,
+                propagate: false,
+            });
+        } else if self.match_token(TokenType::Question) {
+            // If we saw a ? but no handler, create an implicit propagation handler
+            handler = Some(ErrorHandler {
+                error_var: Token::default(), // Dummy token since we don't need a variable name
+                handler_body: Vec::new(),    // Empty body since we're just propagating
+                propagate: true,
+            });
+        }
+
+        handler
+    }
+
+    fn raise_statement(&mut self) -> Option<Stmt<'gc>> {
+        let error = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after raise expression.");
+        Some(Stmt::Raise {
+            error,
+            line: self.previous.line,
         })
     }
 
