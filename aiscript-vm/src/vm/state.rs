@@ -857,6 +857,13 @@ impl<'gc> State<'gc> {
                     ));
                 }
             }
+            OpCode::JumpIfError(offset) => {
+                let value = *self.peek(0);
+                if value.is_error() {
+                    // Jump to error handler
+                    self.current_frame().ip += offset as usize;
+                }
+            }
         }
         Ok(None)
     }

@@ -7,8 +7,8 @@ use std::{
 use crate::{
     ai::Agent,
     ast::{
-        AgentDecl, ChunkId, ClassDecl, EnumDecl, FunctionDecl, Mutability, ObjectProperty,
-        VariableDecl,
+        AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, FunctionDecl, Mutability,
+        ObjectProperty, VariableDecl,
     },
     object::{Enum, EnumVariant, Function, FunctionType, Upvalue},
     vm::{Context, VmError},
@@ -406,7 +406,10 @@ impl<'gc> CodeGen<'gc> {
                     });
                 }
             }
-            Stmt::Raise { .. } => {}
+            Stmt::Raise { error, .. } => {
+                self.generate_expr(error)?;
+                self.emit(OpCode::Return);
+            }
             Stmt::Return { value, .. } => {
                 if let Some(expr) = value {
                     self.generate_expr(expr)?;
@@ -727,41 +730,20 @@ impl<'gc> CodeGen<'gc> {
                 callee,
                 arguments,
                 keyword_args,
+                error_handler,
                 ..
             } => {
-                let positional_count = arguments.len() as u8;
-                let keyword_count = keyword_args.len() as u8;
-                self.generate_expr(callee)?;
-                for arg in arguments {
-                    self.generate_expr(arg)?;
-                }
-                // Create and emit constants for the keyword names
-                self.generate_keyword_args(keyword_args)?;
-                self.emit(OpCode::Call {
-                    positional_count,
-                    keyword_count,
-                });
+                self.generate_call(callee, arguments, keyword_args, error_handler)?;
             }
             Expr::Invoke {
                 object,
                 method,
                 arguments,
                 keyword_args,
+                error_handler,
                 ..
             } => {
-                self.generate_expr(object)?;
-                let positional_count = arguments.len() as u8;
-                let keyword_count = keyword_args.len() as u8;
-                let method_constant = self.identifier_constant(method.lexeme);
-                for arg in arguments {
-                    self.generate_expr(arg)?;
-                }
-                self.generate_keyword_args(keyword_args)?;
-                self.emit(OpCode::Invoke {
-                    method_constant: method_constant as u8,
-                    positional_count,
-                    keyword_count,
-                });
+                self.generate_invoke(object, method, arguments, keyword_args, error_handler)?;
             }
             Expr::Index {
                 object, key, value, ..
@@ -937,6 +919,100 @@ impl<'gc> CodeGen<'gc> {
 }
 
 impl<'gc> CodeGen<'gc> {
+    fn generate_call(
+        &mut self,
+        callee: Box<Expr<'gc>>,
+        arguments: Vec<Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
+        error_handler: Option<ErrorHandler<'gc>>,
+    ) -> Result<(), VmError> {
+        let arg_count = arguments.len() as u8;
+        let kw_count = keyword_args.len() as u8;
+        self.generate_expr(callee)?;
+        for arg in arguments {
+            self.generate_expr(arg)?;
+        }
+        self.generate_keyword_args(keyword_args)?;
+
+        // Emit call instruction - result will be on stack
+        self.emit(OpCode::Call {
+            positional_count: arg_count,
+            keyword_count: kw_count,
+        });
+
+        if let Some(handler) = error_handler {
+            self.generate_error_handler(handler)?;
+        }
+        Ok(())
+    }
+
+    fn generate_invoke(
+        &mut self,
+        object: Box<Expr<'gc>>,
+        method: Token<'gc>,
+        arguments: Vec<Expr<'gc>>,
+        keyword_args: HashMap<String, Expr<'gc>>,
+        error_handler: Option<ErrorHandler<'gc>>,
+    ) -> Result<(), VmError> {
+        let arg_count = arguments.len() as u8;
+        let kw_count = keyword_args.len() as u8;
+
+        self.generate_expr(object)?;
+        for arg in arguments {
+            self.generate_expr(arg)?;
+        }
+        self.generate_keyword_args(keyword_args)?;
+
+        let method_const = self.identifier_constant(method.lexeme);
+
+        self.emit(OpCode::Invoke {
+            method_constant: method_const as u8,
+            positional_count: arg_count,
+            keyword_count: kw_count,
+        });
+
+        if let Some(handler) = error_handler {
+            self.generate_error_handler(handler)?;
+        }
+        Ok(())
+    }
+
+    fn generate_error_handler(&mut self, handler: ErrorHandler<'gc>) -> Result<(), VmError> {
+        let error_check = self.emit_jump(OpCode::JumpIfError(0));
+        let end_jump = self.emit_jump(OpCode::Jump(0));
+
+        self.patch_jump(error_check);
+        if handler.propagate {
+            // For ? operator, return error directly
+            self.emit(OpCode::Return);
+
+            self.patch_jump(end_jump);
+        } else {
+            // Begin scope for error variable
+            self.begin_scope();
+
+            // Store error in handler variable
+            let error_slot = self.add_local(handler.error_var, Mutability::Mutable);
+            self.mark_initialized();
+            self.emit(OpCode::SetLocal(error_slot as u8));
+
+            let has_return = matches!(handler.handler_body.last(), Some(Stmt::Return { .. }));
+            // Generate handler body - any return here will return from entire function
+            for stmt in handler.handler_body {
+                self.generate_stmt(stmt)?;
+            }
+
+            // If no return in handler, set nil as value and continue
+            if !has_return {
+                self.emit(OpCode::Nil);
+                self.end_scope();
+                self.patch_jump(end_jump);
+            } else {
+                self.end_scope();
+            }
+        }
+        Ok(())
+    }
     fn generate_class(
         &mut self,
         ClassDecl {
@@ -1390,10 +1466,10 @@ impl<'gc> CodeGen<'gc> {
         self.add_local(name, mutability);
     }
 
-    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) {
+    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) -> usize {
         if self.local_count == MAX_LOCALS {
             self.error_at(name, "Too many local variables in function.");
-            return;
+            return 0;
         }
 
         self.locals[self.local_count] = Local {
@@ -1402,7 +1478,9 @@ impl<'gc> CodeGen<'gc> {
             is_captured: false,
             mutability,
         };
+        let slot = self.local_count;
         self.local_count += 1;
+        slot // Return the slot index
     }
 
     fn mark_initialized(&mut self) {

@@ -156,6 +156,10 @@ pub struct EnumVariant<'gc> {
 }
 
 impl<'gc> Enum<'gc> {
+    pub fn is_error_type(&self) -> bool {
+        self.name.to_str().unwrap().ends_with('!')
+    }
+
     pub fn get_variant_value(&self, variant_name: InternedString<'gc>) -> Option<Value<'gc>> {
         self.variants.get(&variant_name).copied()
     }
@@ -168,6 +172,10 @@ impl<'gc> Class<'gc> {
             methods: HashMap::default(),
             static_methods: HashMap::default(),
         }
+    }
+
+    pub fn is_error_type(&self) -> bool {
+        self.name.to_str().unwrap().ends_with('!')
     }
 }
 
