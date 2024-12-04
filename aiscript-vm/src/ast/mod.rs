@@ -9,6 +9,8 @@ use crate::object::FunctionType;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
+mod pretty;
+
 /// Use u16 to represent the chunk id
 /// It is enough for a program to assign id for each function chunk.
 pub type ChunkId = u16;
