@@ -156,7 +156,7 @@ mod tests {
         let mut scanner = Lexer::new(source);
 
         let token = scanner.next().unwrap();
-        assert_eq!(token.kind, TokenType::Error);
+        assert_eq!(token.kind, TokenType::Invalid);
         assert_eq!(token.lexeme, "Unterminated string.");
     }
 }

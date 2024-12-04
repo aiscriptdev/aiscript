@@ -43,6 +43,7 @@ pub enum OpCode {
     SetLocal(u8),
     JumpIfFalse(u16),
     JumpPopIfFalse(u16),
+    JumpIfError(u16), // Jump to error handler if top of stack is error
     Jump(u16),
     Loop(u16),
     Call {
@@ -109,6 +110,9 @@ impl OpCode {
                 *j = jump;
             }
             OpCode::Loop(j) => {
+                *j = jump;
+            }
+            OpCode::JumpIfError(j) => {
                 *j = jump;
             }
             _ => {}
@@ -284,7 +288,7 @@ impl<'gc> Chunk<'gc> {
                     name_constant,
                     evaluate,
                 } => println!(
-                    "{:-16} {:4} '{}'",
+                    "{:-16} {:4} evaluate:'{}'",
                     "OP_ENUM_VARIANT", name_constant, evaluate
                 ),
                 OpCode::Class(c) => self.constant_instruction("CLASS", c),
@@ -322,6 +326,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Prompt => simple_instruction("PROMPT"),
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);
+                }
+                OpCode::JumpIfError(jump) => {
+                    self.jump_instruction("JUMP_IF_ERROR", 1, offset, jump)
                 }
             }
         } else {

@@ -14,7 +14,8 @@ pub fn compile<'gc>(
     // Step 1: Parse source into AST
     let mut parser = Parser::new(ctx, source);
     let program = parser.parse()?;
-    // println!("AST: {}", program);
+    #[cfg(feature = "debug")]
+    println!("AST: {}", program);
     // Step 2: Generate bytecode from AST
     CodeGen::generate(program, ctx).map(|chunks| {
         chunks

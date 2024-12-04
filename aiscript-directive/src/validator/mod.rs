@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::ast::Directive;
+use crate::Directive;
 
 pub trait Validator: Send + Sync + 'static {
     fn validate(&self, value: &Value) -> Result<(), String>;

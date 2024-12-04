@@ -189,6 +189,16 @@ impl<'gc> Value<'gc> {
         }
     }
 
+    pub fn is_error(&self) -> bool {
+        match self {
+            // Check instance of error class (NetworkError!)
+            Value::Instance(instance) => instance.borrow().class.borrow().is_error_type(),
+            // Check enum variant from error enum (IOError!::ReadError)
+            Value::EnumVariant(variant) => variant.enum_.borrow().is_error_type(),
+            _ => false,
+        }
+    }
+
     pub fn is_object(&self) -> bool {
         matches!(self, Value::Object(_))
     }

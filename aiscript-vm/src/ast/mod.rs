@@ -9,6 +9,8 @@ use crate::object::FunctionType;
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
+mod pretty;
+
 /// Use u16 to represent the chunk id
 /// It is enough for a program to assign id for each function chunk.
 pub type ChunkId = u16;
@@ -73,6 +75,7 @@ pub struct FunctionDecl<'gc> {
     pub doc: Option<Token<'gc>>,
     pub params: IndexMap<Token<'gc>, Parameter<'gc>>,
     pub return_type: Option<Token<'gc>>,
+    pub error_types: Vec<Token<'gc>>,
     pub body: Vec<Stmt<'gc>>,
     pub fn_type: FunctionType,
     pub visibility: Visibility,
@@ -130,6 +133,13 @@ impl<'gc> Parameter<'gc> {
             default_value: None,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ErrorHandler<'gc> {
+    pub error_var: Token<'gc>,
+    pub handler_body: Vec<Stmt<'gc>>,
+    pub propagate: bool, // Whether to use ? operator
 }
 
 #[derive(Debug, Clone, Collect)]
@@ -253,6 +263,7 @@ pub enum Expr<'gc> {
         callee: Box<Expr<'gc>>,
         arguments: Vec<Expr<'gc>>,
         keyword_args: HashMap<String, Expr<'gc>>,
+        error_handler: Option<ErrorHandler<'gc>>,
         line: u32,
     },
     Invoke {
@@ -260,6 +271,7 @@ pub enum Expr<'gc> {
         method: Token<'gc>,
         arguments: Vec<Expr<'gc>>,
         keyword_args: HashMap<String, Expr<'gc>>,
+        error_handler: Option<ErrorHandler<'gc>>,
         line: u32,
     },
     InlineIf {
@@ -371,6 +383,10 @@ pub enum Stmt<'gc> {
         line: u32,
     },
     Function(FunctionDecl<'gc>),
+    Raise {
+        error: Expr<'gc>,
+        line: u32,
+    },
     Return {
         value: Option<Expr<'gc>>,
         line: u32,
@@ -393,6 +409,7 @@ impl<'gc> Stmt<'gc> {
             | Self::If { line, .. }
             | Self::Loop { line, .. }
             | Self::Function(FunctionDecl { line, .. })
+            | Self::Raise { line, .. }
             | Self::Return { line, .. }
             | Self::Class(ClassDecl { line, .. })
             | Self::Agent(AgentDecl { line, .. }) => *line,

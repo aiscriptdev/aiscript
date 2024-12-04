@@ -1,337 +1,373 @@
-use std::fmt;
+use std::fmt::{self, Write};
 
-use super::ast::*;
+use crate::ast::ObjectProperty;
 
-struct PrettyPrint<'a, T> {
-    value: &'a T,
-    indent: usize,
+use super::{ErrorHandler, Expr, Program, Stmt};
+
+const INDENT: &str = "  ";
+
+fn indent(level: usize) -> String {
+    INDENT.repeat(level)
 }
 
-impl<'gc> fmt::Display for Program<'gc> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Program")?;
+fn write_error_handler(f: &mut String, handler: &ErrorHandler<'_>, level: usize) {
+    writeln!(f, "{}Error Handler:", indent(level)).unwrap();
+    if handler.propagate {
+        writeln!(f, "{}Propagate(?)", indent(level + 1)).unwrap();
+    } else {
+        writeln!(
+            f,
+            "{}Variable: {}",
+            indent(level + 1),
+            handler.error_var.lexeme
+        )
+        .unwrap();
+        writeln!(f, "{}Body:", indent(level + 1)).unwrap();
+        for stmt in &handler.handler_body {
+            stmt.fmt_with_indent(f, level + 2);
+        }
+    }
+}
+
+impl<'gc> Program<'gc> {
+    pub fn pretty_print(&self) -> String {
+        let mut output = String::from("AST:\n");
+        self.fmt_with_indent(&mut output, 0);
+        output
+    }
+
+    fn fmt_with_indent(&self, f: &mut String, level: usize) {
+        writeln!(f, "{}Program", indent(level)).unwrap();
         for stmt in &self.statements {
-            write!(f, "{}", PrettyPrint::new(stmt, 1))?;
-        }
-        Ok(())
-    }
-}
-
-impl<'gc> fmt::Display for Expr<'gc> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", PrettyPrint::new(self, 0))
-    }
-}
-
-impl<'gc> fmt::Display for Stmt<'gc> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", PrettyPrint::new(self, 0))
-    }
-}
-
-impl<'gc> fmt::Display for PrettyPrint<'_, Box<Expr<'gc>>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", PrettyPrint::new(self.value.as_ref(), self.indent))
-    }
-}
-
-impl<'gc> fmt::Display for PrettyPrint<'_, Box<Stmt<'gc>>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", PrettyPrint::new(self.value.as_ref(), self.indent))
-    }
-}
-
-impl<'a, T> PrettyPrint<'a, T> {
-    fn new(value: &'a T, indent: usize) -> Self {
-        Self { value, indent }
-    }
-
-    fn indent(&self) -> String {
-        "  ".repeat(self.indent)
-    }
-}
-
-impl<'gc> fmt::Display for PrettyPrint<'_, Expr<'gc>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let indent = self.indent();
-        match self.value {
-            Expr::Array { elements, line } => {
-                writeln!(f, "{indent}Array [line {line}]")?;
-                for element in elements {
-                    write!(f, "{}", PrettyPrint::new(element, self.indent + 1))?;
-                }
-                Ok(())
-            }
-            Expr::Binary {
-                left,
-                operator,
-                right,
-                line,
-            } => {
-                writeln!(f, "{indent}Binary [line {line}]")?;
-                writeln!(
-                    f,
-                    "{}Operator: {:?}",
-                    "  ".repeat(self.indent + 1),
-                    operator
-                )?;
-                write!(f, "{}Left: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(left, self.indent + 2))?;
-                write!(f, "{}Right: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(right, self.indent + 2))
-            }
-            Expr::Grouping { expression, line } => {
-                writeln!(f, "{indent}Grouping [line {line}]")?;
-                write!(f, "{}Expression: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(expression, self.indent + 2))
-            }
-            Expr::Literal { value, line } => {
-                writeln!(f, "{indent}Literal [line {line}]")?;
-                match value {
-                    Literal::Number(n) => {
-                        writeln!(f, "{}Number: {}", "  ".repeat(self.indent + 1), n)
-                    }
-                    Literal::String(s) => {
-                        writeln!(f, "{}String: {:?}", "  ".repeat(self.indent + 1), s)
-                    }
-                    Literal::Boolean(b) => {
-                        writeln!(f, "{}Boolean: {}", "  ".repeat(self.indent + 1), b)
-                    }
-                    Literal::Nil => writeln!(f, "{}Nil", "  ".repeat(self.indent + 1)),
-                }
-            }
-            Expr::Unary {
-                operator,
-                right,
-                line,
-            } => {
-                writeln!(f, "{indent}Unary [line {line}]")?;
-                writeln!(
-                    f,
-                    "{}Operator: {:?}",
-                    "  ".repeat(self.indent + 1),
-                    operator
-                )?;
-                write!(f, "{}Right: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(right, self.indent + 2))
-            }
-            Expr::Variable { name, line } => {
-                writeln!(f, "{indent}Variable [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)
-            }
-            Expr::Assign { name, value, line } => {
-                writeln!(f, "{indent}Assign [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                write!(f, "{}Value: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(value, self.indent + 2))
-            }
-            Expr::And { left, right, line } => {
-                writeln!(f, "{indent}And [line {line}]")?;
-                write!(f, "{}Left: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(left, self.indent + 2))?;
-                write!(f, "{}Right: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(right, self.indent + 2))
-            }
-            Expr::Or { left, right, line } => {
-                writeln!(f, "{indent}Or [line {line}]")?;
-                write!(f, "{}Left: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(left, self.indent + 2))?;
-                write!(f, "{}Right: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(right, self.indent + 2))
-            }
-            Expr::Call {
-                callee,
-                arguments,
-                line,
-                ..
-            } => {
-                writeln!(f, "{indent}Call [line {line}]")?;
-                write!(f, "{}Callee: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(callee, self.indent + 2))?;
-                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
-                for arg in arguments {
-                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
-                }
-                Ok(())
-            }
-            Expr::Invoke {
-                object,
-                method,
-                arguments,
-                line,
-                ..
-            } => {
-                writeln!(f, "{indent}Invoke [line {line}]")?;
-                write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(object, self.indent + 2))?;
-                writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
-                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
-                for arg in arguments {
-                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
-                }
-                Ok(())
-            }
-            Expr::Get { object, name, line } => {
-                writeln!(f, "{indent}Get [line {line}]")?;
-                write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(object, self.indent + 2))?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)
-            }
-            Expr::Set {
-                object,
-                name,
-                value,
-                line,
-            } => {
-                writeln!(f, "{indent}Set [line {line}]")?;
-                write!(f, "{}Object: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(object, self.indent + 2))?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                write!(f, "{}Value: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(value, self.indent + 2))
-            }
-            Expr::This { line } => {
-                writeln!(f, "{indent}This [line {line}]")
-            }
-            Expr::Super { method, line } => {
-                writeln!(f, "{indent}Super [line {line}]")?;
-                writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
-                Ok(())
-            }
-            Expr::SuperInvoke {
-                method,
-                arguments,
-                line,
-                ..
-            } => {
-                writeln!(f, "{indent}SuperInvoke [line {line}]")?;
-                writeln!(f, "{}Method: {:?}", "  ".repeat(self.indent + 1), method)?;
-                writeln!(f, "{}Arguments:", "  ".repeat(self.indent + 1))?;
-                for arg in arguments {
-                    write!(f, "{}", PrettyPrint::new(arg, self.indent + 2))?;
-                }
-                Ok(())
-            }
-            Expr::Prompt { expression, line } => {
-                writeln!(f, "{indent}Prompt [line {line}]")?;
-                write!(f, "{}Expression: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(expression, self.indent + 2))
-            }
+            stmt.fmt_with_indent(f, level + 1);
         }
     }
 }
 
-impl<'gc> fmt::Display for PrettyPrint<'_, Stmt<'gc>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let indent = self.indent();
-        match self.value {
-            Stmt::Expression { expression, line } => {
-                writeln!(f, "{indent}Expression Statement [line {line}]")?;
-                write!(f, "{}", PrettyPrint::new(expression, self.indent + 1))
+impl<'gc> Stmt<'gc> {
+    fn fmt_with_indent(&self, f: &mut String, level: usize) {
+        let ind = indent(level);
+        match self {
+            Self::Use { path, .. } => writeln!(f, "{ind}Use({})", path.lexeme).unwrap(),
+            Self::Expression { expression, .. } => {
+                writeln!(f, "{ind}Expr").unwrap();
+                expression.fmt_with_indent(f, level + 1);
             }
-            Stmt::Print { expression, line } => {
-                writeln!(f, "{indent}Print Statement [line {line}]")?;
-                write!(f, "{}", PrettyPrint::new(expression, self.indent + 1))
-            }
-            Stmt::Let {
-                name,
-                initializer,
-                line,
-            } => {
-                writeln!(f, "{indent}Let Statement [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                if let Some(init) = initializer {
-                    write!(f, "{}Initializer: ", "  ".repeat(self.indent + 1))?;
-                    write!(f, "{}", PrettyPrint::new(init, self.indent + 2))?;
+            Self::Let(var) => {
+                writeln!(f, "{ind}Let {}", var.name.lexeme).unwrap();
+                writeln!(f, "{}Expr", indent(level + 1)).unwrap();
+                if let Some(init) = &var.initializer {
+                    init.fmt_with_indent(f, level + 2);
                 }
-                Ok(())
             }
-            Stmt::Block { statements, line } => {
-                writeln!(f, "{indent}Block Statement [line {line}]")?;
+            Self::Block { statements, .. } => {
+                writeln!(f, "{ind}Block").unwrap();
                 for stmt in statements {
-                    write!(f, "{}", PrettyPrint::new(stmt, self.indent + 1))?;
+                    stmt.fmt_with_indent(f, level + 1);
                 }
-                Ok(())
             }
-            Stmt::If {
+            Self::If {
                 condition,
                 then_branch,
                 else_branch,
-                line,
-            } => {
-                writeln!(f, "{indent}If Statement [line {line}]")?;
-                write!(f, "{}Condition: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(condition, self.indent + 2))?;
-                write!(f, "{}Then: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(then_branch, self.indent + 2))?;
-                if let Some(else_branch) = else_branch {
-                    write!(f, "{}Else: ", "  ".repeat(self.indent + 1))?;
-                    write!(f, "{}", PrettyPrint::new(else_branch, self.indent + 2))?;
-                }
-                Ok(())
-            }
-            Stmt::Loop {
-                condition,
-                body,
-                line,
-            } => {
-                writeln!(f, "{indent}While Statement [line {line}]")?;
-                write!(f, "{}Condition: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(condition, self.indent + 2))?;
-                write!(f, "{}Body: ", "  ".repeat(self.indent + 1))?;
-                write!(f, "{}", PrettyPrint::new(body, self.indent + 2))
-            }
-            Stmt::Function {
-                name,
-                params,
-                body,
-                line,
                 ..
             } => {
-                writeln!(f, "{indent}Function Statement [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                writeln!(f, "{}Parameters:", "  ".repeat(self.indent + 1))?;
-                for param in params {
-                    writeln!(f, "{}{:?}", "  ".repeat(self.indent + 2), param)?;
+                writeln!(f, "{ind}If").unwrap();
+                writeln!(f, "{}Condition:", indent(level + 1)).unwrap();
+                condition.fmt_with_indent(f, level + 2);
+                writeln!(f, "{}Then:", indent(level + 1)).unwrap();
+                then_branch.fmt_with_indent(f, level + 2);
+                if let Some(else_branch) = else_branch {
+                    writeln!(f, "{}Else:", indent(level + 1)).unwrap();
+                    else_branch.fmt_with_indent(f, level + 2);
                 }
-                writeln!(f, "{}Body:", "  ".repeat(self.indent + 1))?;
-                for stmt in body {
-                    write!(f, "{}", PrettyPrint::new(stmt, self.indent + 2))?;
-                }
-                Ok(())
             }
-            Stmt::Return { value, line } => {
-                writeln!(f, "{indent}Return Statement [line {line}]")?;
-                if let Some(value) = value {
-                    write!(f, "{}Value: ", "  ".repeat(self.indent + 1))?;
-                    write!(f, "{}", PrettyPrint::new(value, self.indent + 2))?;
+            Self::Function(func) => {
+                writeln!(f, "{ind}Function {}", func.name.lexeme).unwrap();
+                writeln!(f, "{}Parameters:", indent(level + 1)).unwrap();
+                for param in func.params.keys() {
+                    writeln!(f, "{}{}", indent(level + 2), param.lexeme).unwrap();
                 }
-                Ok(())
+                if let Some(ret_type) = &func.return_type {
+                    writeln!(f, "{}Return Type: {}", indent(level + 1), ret_type.lexeme).unwrap();
+                }
+                if !func.error_types.is_empty() {
+                    writeln!(f, "{}Error Types:", indent(level + 1)).unwrap();
+                    for err_type in &func.error_types {
+                        writeln!(f, "{}{}", indent(level + 2), err_type.lexeme).unwrap();
+                    }
+                }
+                writeln!(f, "{}Body:", indent(level + 1)).unwrap();
+                for stmt in &func.body {
+                    stmt.fmt_with_indent(f, level + 2);
+                }
             }
-            Stmt::Class {
-                name,
-                superclass,
-                methods,
-                line,
+            Self::Return { value, .. } => {
+                writeln!(f, "{ind}Return").unwrap();
+                if let Some(val) = value {
+                    val.fmt_with_indent(f, level + 1);
+                }
+            }
+            Self::Loop {
+                condition,
+                body,
+                increment,
+                ..
             } => {
-                writeln!(f, "{indent}Class Statement [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                if let Some(superclass) = superclass {
-                    write!(f, "{}Superclass: ", "  ".repeat(self.indent + 1))?;
-                    write!(f, "{}", PrettyPrint::new(superclass, self.indent + 2))?;
+                writeln!(f, "{ind}Loop").unwrap();
+                writeln!(f, "{}Condition:", indent(level + 1)).unwrap();
+                condition.fmt_with_indent(f, level + 2);
+                if let Some(inc) = increment {
+                    writeln!(f, "{}Increment:", indent(level + 1)).unwrap();
+                    inc.fmt_with_indent(f, level + 2);
                 }
-                writeln!(f, "{}Methods:", "  ".repeat(self.indent + 1))?;
-                for method in methods {
-                    write!(f, "{}", PrettyPrint::new(method, self.indent + 2))?;
-                }
-                Ok(())
+                writeln!(f, "{}Body:", indent(level + 1)).unwrap();
+                body.fmt_with_indent(f, level + 2);
             }
-            Stmt::Agent { name, line, .. } => {
-                writeln!(f, "{indent}Agent Statement [line {line}]")?;
-                writeln!(f, "{}Name: {:?}", "  ".repeat(self.indent + 1), name)?;
-                writeln!(f, "{}Fields:", "  ".repeat(self.indent + 1))?;
-                Ok(())
+            Self::Break { .. } => writeln!(f, "{ind}Break").unwrap(),
+            Self::Continue { .. } => writeln!(f, "{ind}Continue").unwrap(),
+            Self::Class(class) => {
+                writeln!(f, "{ind}Class {}", class.name.lexeme).unwrap();
+                if let Some(superclass) = &class.superclass {
+                    writeln!(f, "{}Superclass:", indent(level + 1)).unwrap();
+                    superclass.fmt_with_indent(f, level + 2);
+                }
+                writeln!(f, "{}Methods:", indent(level + 1)).unwrap();
+                for method in &class.methods {
+                    method.fmt_with_indent(f, level + 2);
+                }
+            }
+            Self::Enum(e) => {
+                writeln!(f, "{ind}Enum {}", e.name.lexeme).unwrap();
+                writeln!(f, "{}Variants:", indent(level + 1)).unwrap();
+                for v in &e.variants {
+                    writeln!(f, "{}{} = {}", indent(level + 2), v.name.lexeme, v.value).unwrap();
+                }
+            }
+            Self::Const {
+                name, initializer, ..
+            } => {
+                writeln!(f, "{ind}Const {}", name.lexeme).unwrap();
+                initializer.fmt_with_indent(f, level + 1);
+            }
+            Self::Agent(agent) => {
+                writeln!(f, "{ind}Agent {}", agent.name.lexeme).unwrap();
+                writeln!(f, "{}Tools:", indent(level + 1)).unwrap();
+                for tool in &agent.tools {
+                    tool.fmt_with_indent(f, level + 2);
+                }
+            }
+            Self::Raise { error, .. } => {
+                writeln!(f, "{ind}Raise").unwrap();
+                error.fmt_with_indent(f, level + 1);
             }
         }
+    }
+}
+
+impl<'gc> Expr<'gc> {
+    fn fmt_with_indent(&self, f: &mut String, level: usize) {
+        let ind = indent(level);
+        match self {
+            Self::Literal { value, .. } => writeln!(f, "{ind}Literal({value})").unwrap(),
+            Self::Binary {
+                left,
+                operator,
+                right,
+                ..
+            } => {
+                writeln!(f, "{ind}Binary {}", operator.lexeme).unwrap();
+                left.fmt_with_indent(f, level + 1);
+                right.fmt_with_indent(f, level + 1);
+            }
+            Self::Unary {
+                operator, right, ..
+            } => {
+                writeln!(f, "{ind}Unary {}", operator.lexeme).unwrap();
+                right.fmt_with_indent(f, level + 1);
+            }
+            Self::Variable { name, .. } => writeln!(f, "{ind}Variable({})", name.lexeme).unwrap(),
+            Self::Assign { name, value, .. } => {
+                writeln!(f, "{ind}Assign {}", name.lexeme).unwrap();
+                value.fmt_with_indent(f, level + 1);
+            }
+            Self::Call {
+                callee,
+                arguments,
+                keyword_args,
+                error_handler,
+                ..
+            } => {
+                writeln!(f, "{ind}Call").unwrap();
+                writeln!(f, "{}Callee:", indent(level + 1)).unwrap();
+                callee.fmt_with_indent(f, level + 2);
+                if !arguments.is_empty() {
+                    writeln!(f, "{}Arguments:", indent(level + 1)).unwrap();
+                    for arg in arguments {
+                        arg.fmt_with_indent(f, level + 2);
+                    }
+                }
+                if !keyword_args.is_empty() {
+                    writeln!(f, "{}Keyword Arguments:", indent(level + 1)).unwrap();
+                    for (name, value) in keyword_args {
+                        writeln!(f, "{}{}:", indent(level + 2), name).unwrap();
+                        value.fmt_with_indent(f, level + 3);
+                    }
+                }
+                if let Some(handler) = error_handler {
+                    write_error_handler(f, handler, level + 1);
+                }
+            }
+            Self::Invoke {
+                object,
+                method,
+                arguments,
+                keyword_args,
+                error_handler,
+                ..
+            } => {
+                writeln!(f, "{ind}Invoke").unwrap();
+                writeln!(f, "{}Object:", indent(level + 1)).unwrap();
+                writeln!(f, "{}Method({})", indent(level + 1), method.lexeme).unwrap();
+                object.fmt_with_indent(f, level + 2);
+                if !arguments.is_empty() {
+                    writeln!(f, "{}Arguments:", indent(level + 1)).unwrap();
+                    for arg in arguments {
+                        arg.fmt_with_indent(f, level + 2);
+                    }
+                }
+                if !keyword_args.is_empty() {
+                    writeln!(f, "{}Keyword Arguments:", indent(level + 1)).unwrap();
+                    for (name, value) in keyword_args {
+                        writeln!(f, "{}{}:", indent(level + 2), name).unwrap();
+                        value.fmt_with_indent(f, level + 3);
+                    }
+                }
+                if let Some(handler) = error_handler {
+                    write_error_handler(f, handler, level + 1);
+                }
+            }
+            Self::Get { object, name, .. } => {
+                writeln!(f, "{ind}Get {}", name.lexeme).unwrap();
+                object.fmt_with_indent(f, level + 1);
+            }
+            Self::Set {
+                object,
+                name,
+                value,
+                ..
+            } => {
+                writeln!(f, "{ind}Set {}", name.lexeme).unwrap();
+                writeln!(f, "{}Object:", indent(level + 1)).unwrap();
+                object.fmt_with_indent(f, level + 2);
+                writeln!(f, "{}Value:", indent(level + 1)).unwrap();
+                value.fmt_with_indent(f, level + 2);
+            }
+            Self::Self_ { .. } => writeln!(f, "{ind}Self").unwrap(),
+            Self::Super { method, .. } => writeln!(f, "{ind}Super {}", method.lexeme).unwrap(),
+            Self::Array { elements, .. } => {
+                writeln!(f, "{ind}Array").unwrap();
+                for elem in elements {
+                    elem.fmt_with_indent(f, level + 1);
+                }
+            }
+            Self::Object { properties, .. } => {
+                writeln!(f, "{ind}Object").unwrap();
+                for prop in properties {
+                    match prop {
+                        ObjectProperty::Literal { key, value } => {
+                            writeln!(f, "{}Property {}", indent(level + 1), key.lexeme).unwrap();
+                            value.fmt_with_indent(f, level + 2);
+                        }
+                        ObjectProperty::Computed { key_expr, value } => {
+                            writeln!(f, "{}Computed Property:", indent(level + 1)).unwrap();
+                            key_expr.fmt_with_indent(f, level + 2);
+                            writeln!(f, "{}Value:", indent(level + 1)).unwrap();
+                            value.fmt_with_indent(f, level + 2);
+                        }
+                    }
+                }
+            }
+            Self::Lambda { params, body, .. } => {
+                writeln!(f, "{ind}Lambda").unwrap();
+                writeln!(f, "{}Parameters:", indent(level + 1)).unwrap();
+                for param in params {
+                    writeln!(f, "{}{}", indent(level + 2), param.lexeme).unwrap();
+                }
+                writeln!(f, "{}Body:", indent(level + 1)).unwrap();
+                body.fmt_with_indent(f, level + 2);
+            }
+            Self::Block { statements, .. } => {
+                writeln!(f, "{ind}Block").unwrap();
+                for stmt in statements {
+                    stmt.fmt_with_indent(f, level + 1);
+                }
+            }
+            Self::EnumVariant {
+                enum_name, variant, ..
+            } => writeln!(
+                f,
+                "{ind}EnumVariant {}::{}",
+                enum_name.lexeme, variant.lexeme
+            )
+            .unwrap(),
+            Self::EvaluateVariant { expr, .. } => {
+                writeln!(f, "{ind}EvaluateVariant").unwrap();
+                expr.fmt_with_indent(f, level + 1);
+            }
+            Self::Index {
+                object, key, value, ..
+            } => {
+                if value.is_some() {
+                    writeln!(f, "{ind}SetIndex").unwrap();
+                } else {
+                    writeln!(f, "{ind}GetIndex").unwrap();
+                }
+                writeln!(f, "{}Object:", indent(level + 1)).unwrap();
+                object.fmt_with_indent(f, level + 2);
+                writeln!(f, "{}Key:", indent(level + 1)).unwrap();
+                key.fmt_with_indent(f, level + 2);
+                if let Some(val) = value {
+                    writeln!(f, "{}Value:", indent(level + 1)).unwrap();
+                    val.fmt_with_indent(f, level + 2);
+                }
+            }
+            Self::InlineIf {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                writeln!(f, "{ind}InlineIf").unwrap();
+                writeln!(f, "{}Condition:", indent(level + 1)).unwrap();
+                condition.fmt_with_indent(f, level + 2);
+                writeln!(f, "{}Then:", indent(level + 1)).unwrap();
+                then_branch.fmt_with_indent(f, level + 2);
+                writeln!(f, "{}Else:", indent(level + 1)).unwrap();
+                else_branch.fmt_with_indent(f, level + 2);
+            }
+            Self::Prompt { expression, .. } => {
+                writeln!(f, "{ind}Prompt").unwrap();
+                expression.fmt_with_indent(f, level + 1);
+            }
+            Self::And { left, right, .. } => {
+                writeln!(f, "{ind}And").unwrap();
+                left.fmt_with_indent(f, level + 1);
+                right.fmt_with_indent(f, level + 1);
+            }
+            Self::Or { left, right, .. } => {
+                writeln!(f, "{ind}Or").unwrap();
+                left.fmt_with_indent(f, level + 1);
+                right.fmt_with_indent(f, level + 1);
+            }
+            _ => writeln!(f, "{ind}...").unwrap(),
+        }
+    }
+}
+
+// For easier printing in debug scenarios
+impl<'gc> fmt::Display for Program<'gc> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.pretty_print())
     }
 }
