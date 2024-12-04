@@ -254,9 +254,6 @@ impl<'gc> State<'gc> {
         function: Gc<'gc, Function<'gc>>,
         params: &[Value<'gc>],
     ) -> Result<(), VmError> {
-        #[cfg(feature = "debug")]
-        function.disassemble("script");
-
         let closure = Gc::new(self.mc, Closure::new(self.mc, function));
         self.push_stack(Value::from(closure));
         for param in params {
@@ -862,6 +859,9 @@ impl<'gc> State<'gc> {
                 if value.is_error() {
                     // Jump to error handler
                     self.current_frame().ip += offset as usize;
+                    // Must push the error value to stack top,
+                    // because in the error handler err will be set as local variable
+                    self.push_stack(value);
                 }
             }
         }
@@ -1344,6 +1344,8 @@ impl<'gc> State<'gc> {
             slot_start,
         };
 
+        #[cfg(feature = "debug")]
+        call_frame.disassemble();
         self.frames.push(call_frame);
         self.frame_count += 1;
 

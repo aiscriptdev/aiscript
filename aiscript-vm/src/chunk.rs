@@ -108,6 +108,9 @@ impl OpCode {
             OpCode::Loop(j) => {
                 *j = jump;
             }
+            OpCode::JumpIfError(j) => {
+                *j = jump;
+            }
             _ => {}
         }
     }
@@ -317,7 +320,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);
                 }
-                OpCode::JumpIfError(jump) => self.jump_instruction("JUMP_IF_ERROR", 1, offset, jump),
+                OpCode::JumpIfError(jump) => {
+                    self.jump_instruction("JUMP_IF_ERROR", 1, offset, jump)
+                }
             }
         } else {
             println!("Invalid opcode at offset: {offset}");

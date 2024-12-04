@@ -978,23 +978,19 @@ impl<'gc> CodeGen<'gc> {
     }
 
     fn generate_error_handler(&mut self, handler: ErrorHandler<'gc>) -> Result<(), VmError> {
-        let error_check = self.emit_jump(OpCode::JumpIfError(0));
+        let error_jump = self.emit_jump(OpCode::JumpIfError(0));
         let end_jump = self.emit_jump(OpCode::Jump(0));
 
-        self.patch_jump(error_check);
+        self.patch_jump(error_jump);
         if handler.propagate {
             // For ? operator, return error directly
             self.emit(OpCode::Return);
-
-            self.patch_jump(end_jump);
         } else {
             // Begin scope for error variable
             self.begin_scope();
-
             // Store error in handler variable
-            let error_slot = self.add_local(handler.error_var, Mutability::Mutable);
+            self.declare_variable(handler.error_var, Mutability::Mutable);
             self.mark_initialized();
-            self.emit(OpCode::SetLocal(error_slot as u8));
 
             let has_return = matches!(handler.handler_body.last(), Some(Stmt::Return { .. }));
             // Generate handler body - any return here will return from entire function
@@ -1005,12 +1001,10 @@ impl<'gc> CodeGen<'gc> {
             // If no return in handler, set nil as value and continue
             if !has_return {
                 self.emit(OpCode::Nil);
-                self.end_scope();
-                self.patch_jump(end_jump);
-            } else {
-                self.end_scope();
             }
+            self.end_scope();
         }
+        self.patch_jump(end_jump);
         Ok(())
     }
     fn generate_class(
