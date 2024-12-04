@@ -184,10 +184,7 @@ impl<'gc> Parser<'gc> {
 
     fn statement(&mut self) -> Option<Stmt<'gc>> {
         if self.match_token(TokenType::OpenBrace) {
-            Some(Stmt::Block {
-                statements: self.block(),
-                line: self.previous.line,
-            })
+            self.block_statement()
         } else if self.match_token(TokenType::If) {
             self.if_statement()
         } else if self.match_token(TokenType::Raise) {

@@ -55,8 +55,9 @@ impl<'gc> Stmt<'gc> {
             }
             Self::Let(var) => {
                 writeln!(f, "{ind}Let {}", var.name.lexeme).unwrap();
+                writeln!(f, "{}Expr", indent(level + 1)).unwrap();
                 if let Some(init) = &var.initializer {
-                    init.fmt_with_indent(f, level + 1);
+                    init.fmt_with_indent(f, level + 2);
                 }
             }
             Self::Block { statements, .. } => {

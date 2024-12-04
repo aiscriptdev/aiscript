@@ -997,16 +997,58 @@ impl<'gc> CodeGen<'gc> {
             for stmt in handler.handler_body {
                 self.generate_stmt(stmt)?;
             }
+            self.end_scope();
+            // Pop the error value on the stack top.
+            // Also refer to JumpIfError in VM.
+            /*
+               enum ArithError! {
+                   DivideZero
+               }
 
+               fn divide(a, b) -> int, ArithError! {
+                   if b == 0 {
+                       raise ArithError!::DivideZero;
+                   }
+
+                   return a / b;
+               }
+               let v = divide(1, 0) |err| {
+                   print("error:", err);
+               };
+
+               Here are the disassembley bytecodes for above:
+               0007    | OP_CONSTANT         4 'error:'
+                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ <native fn> ][ error: ]
+               0008    | OP_GET_LOCAL        2
+                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ <native fn> ][ error: ][ ArithError!::DivideZero ]
+               0009    | OP_CALL             2    0
+               error: ArithError!::DivideZero
+                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ nil ]
+               0010    | OP_POP              1
+                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ]
+               0011    | OP_POP              1
+                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ]
+               0012    | OP_POP              1
+                       [ <fn script> ][ <fn do_math> ]
+               0013    | OP_NIL
+                       [ <fn script> ][ <fn do_math> ][ nil ]
+               0014   38 OP_GET_GLOBAL       5 'print'
+                       [ <fn script> ][ <fn do_math> ][ nil ][ <native fn> ]
+               0015    | OP_GET_LOCAL        1
+                       [ <fn script> ][ <fn do_math> ][ nil ][ <native fn> ][ nil ]
+               0016    | OP_CALL             1    0
+               nil
+            */
+            self.emit(OpCode::Pop(1));
             // If no return in handler, set nil as value and continue
             if !has_return {
                 self.emit(OpCode::Nil);
             }
-            self.end_scope();
         }
         self.patch_jump(end_jump);
         Ok(())
     }
+
     fn generate_class(
         &mut self,
         ClassDecl {
@@ -1460,10 +1502,10 @@ impl<'gc> CodeGen<'gc> {
         self.add_local(name, mutability);
     }
 
-    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) -> usize {
+    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) {
         if self.local_count == MAX_LOCALS {
             self.error_at(name, "Too many local variables in function.");
-            return 0;
+            return;
         }
 
         self.locals[self.local_count] = Local {
@@ -1472,9 +1514,8 @@ impl<'gc> CodeGen<'gc> {
             is_captured: false,
             mutability,
         };
-        let slot = self.local_count;
+        self.local_count;
         self.local_count += 1;
-        slot // Return the slot index
     }
 
     fn mark_initialized(&mut self) {
