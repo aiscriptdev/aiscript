@@ -459,6 +459,14 @@ impl<'gc> State<'gc> {
                     frame.ip += offset as usize;
                 }
             }
+            OpCode::JumpPopIfFalse(offset) => {
+                let is_falsy = self.pop_stack().is_falsy();
+                // Alwasy jump to the next instruction, do not move this line into if block
+                if is_falsy {
+                    let frame = self.current_frame();
+                    frame.ip += offset as usize;
+                }
+            }
             OpCode::Jump(offset) => {
                 frame.ip += offset as usize;
             }

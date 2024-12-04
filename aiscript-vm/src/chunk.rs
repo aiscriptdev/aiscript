@@ -42,6 +42,7 @@ pub enum OpCode {
     GetLocal(u8),
     SetLocal(u8),
     JumpIfFalse(u16),
+    JumpPopIfFalse(u16),
     Jump(u16),
     Loop(u16),
     Call {
@@ -98,6 +99,9 @@ pub enum OpCode {
 impl OpCode {
     pub fn putch_jump(&mut self, jump: u16) {
         match self {
+            OpCode::JumpPopIfFalse(j) => {
+                *j = jump;
+            }
             OpCode::JumpIfFalse(j) => {
                 *j = jump;
             }
@@ -239,6 +243,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SetLocal(c) => self.byte_instruction("SET_LOCAL", c),
                 OpCode::JumpIfFalse(jump) => {
                     self.jump_instruction("JUMP_IF_FALSE", 1, offset, jump)
+                }
+                OpCode::JumpPopIfFalse(jump) => {
+                    self.jump_instruction("JUMP_POP_IF_FALSE", 1, offset, jump)
                 }
                 OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
                 OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
