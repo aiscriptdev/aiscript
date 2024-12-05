@@ -1,9 +1,16 @@
-use std::{iter::Peekable, mem, str::CharIndices};
+use std::{
+    iter::Peekable,
+    mem,
+    ops::{Deref, DerefMut},
+    str::CharIndices,
+};
+
+pub use error_reporter::ErrorReporter;
 
 mod character_tests;
+mod error_reporter;
 mod peakable;
 mod tests;
-
 /// Represents different types of tokens in the language
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
@@ -187,10 +194,23 @@ struct Lexer<'a> {
 
 pub struct Scanner<'a> {
     lexer: peakable::Peekable<Lexer<'a>>,
+    error_reporter: ErrorReporter,
     pub current: Token<'a>,
     pub previous: Token<'a>,
-    pub had_error: bool,
-    pub panic_mode: bool,
+}
+
+impl<'a> Deref for Scanner<'a> {
+    type Target = ErrorReporter;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error_reporter
+    }
+}
+
+impl<'a> DerefMut for Scanner<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.error_reporter
+    }
 }
 
 impl<'a> Lexer<'a> {
@@ -642,8 +662,7 @@ impl<'a> Scanner<'a> {
             lexer: peakable::Peekable::new(Lexer::new(source)),
             current: Token::default(),
             previous: Token::default(),
-            had_error: false,
-            panic_mode: false,
+            error_reporter: ErrorReporter::new(),
         }
     }
 
@@ -721,28 +740,13 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn error_at_current(&mut self, message: &str) {
-        self.error_at(self.current, message);
+        let current = self.current;
+        self.error_at(current, message);
     }
 
     pub fn error(&mut self, message: &str) {
-        self.error_at(self.previous, message);
-    }
-
-    pub fn error_at(&mut self, token: Token<'a>, message: &str) {
-        if self.panic_mode {
-            return;
-        }
-        self.panic_mode = true;
-        eprint!("[line {}] Error", token.line);
-        if token.kind == TokenType::Eof {
-            eprint!(" at end");
-        } else if token.kind == TokenType::Invalid {
-            // Do nothing.
-        } else {
-            eprint!(" at '{}'", token.lexeme);
-        }
-        eprintln!(": {message}");
-        self.had_error = true;
+        let previous = self.previous;
+        self.error_at(previous, message);
     }
 
     pub fn synchronize(&mut self) {

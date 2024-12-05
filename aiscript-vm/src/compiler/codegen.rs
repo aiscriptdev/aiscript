@@ -18,6 +18,7 @@ use crate::{
     ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
     lexer::{Token, TokenType},
 };
+use aiscript_lexer::ErrorReporter;
 use gc_arena::{Gc, GcRefLock, RefLock};
 use indexmap::IndexMap;
 
@@ -59,7 +60,7 @@ pub struct CodeGen<'gc> {
     const_globals: HashSet<&'gc str>,
     enclosing: Option<Box<CodeGen<'gc>>>,
     current_line: u32,
-    had_error: bool,
+    error_reporter: ErrorReporter,
 }
 
 impl<'gc> CodeGen<'gc> {
@@ -100,7 +101,7 @@ impl<'gc> CodeGen<'gc> {
             const_globals: HashSet::new(),
             enclosing: None,
             current_line: 0,
-            had_error: false,
+            error_reporter: ErrorReporter::new(),
         });
 
         generator
@@ -132,7 +133,7 @@ impl<'gc> CodeGen<'gc> {
 
         generator.emit_return();
 
-        if generator.had_error {
+        if generator.error_reporter.had_error {
             Err(VmError::CompileError)
         } else {
             let function = mem::take(&mut generator.function);
@@ -697,7 +698,7 @@ impl<'gc> CodeGen<'gc> {
                 self.end_scope();
 
                 // Check for errors
-                if self.had_error {
+                if self.error_reporter.had_error {
                     return Err(VmError::CompileError);
                 }
 
@@ -1223,7 +1224,7 @@ impl<'gc> CodeGen<'gc> {
         self.emit_return();
 
         // Restore the original compiler
-        if self.had_error {
+        if self.error_reporter.had_error {
             return Err(VmError::CompileError);
         }
         let mut chunk_id = 0;
@@ -1492,18 +1493,18 @@ impl<'gc> CodeGen<'gc> {
     }
 
     fn error(&mut self, message: &str) {
-        if self.had_error {
+        if self.error_reporter.had_error {
             return;
         }
-        self.had_error = true;
+        self.error_reporter.had_error = true;
         eprintln!("[line {}] Error: {}", self.current_line, message);
     }
 
     fn error_at_value(&mut self, value: Value<'gc>, message: &str) {
-        if self.had_error {
+        if self.error_reporter.had_error {
             return;
         }
-        self.had_error = true;
+        self.error_reporter.had_error = true;
         eprintln!(
             "[line {}] Error at '{}': {}",
             self.current_line, value, message
@@ -1511,18 +1512,6 @@ impl<'gc> CodeGen<'gc> {
     }
 
     fn error_at(&mut self, token: Token<'gc>, message: &str) {
-        if self.had_error {
-            return;
-        }
-        eprint!("[line {}] Error", token.line);
-        if token.kind == TokenType::Eof {
-            eprint!(" at end");
-        } else if token.kind == TokenType::Invalid {
-            // Do nothing.
-        } else {
-            eprint!(" at '{}'", token.lexeme);
-        }
-        eprintln!(": {message}");
-        self.had_error = true;
+        self.error_reporter.error_at(token, message);
     }
 }

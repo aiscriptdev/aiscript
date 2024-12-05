@@ -464,6 +464,16 @@ impl<'gc> State<'gc> {
                     frame.ip += offset as usize;
                 }
             }
+            OpCode::JumpIfError(offset) => {
+                let value = *self.peek(0);
+                if value.is_error() {
+                    // Jump to error handler
+                    self.current_frame().ip += offset as usize;
+                    // Must push the error value to stack top,
+                    // because in the error handler err will be set as local variable
+                    self.push_stack(value);
+                }
+            }
             OpCode::Jump(offset) => {
                 frame.ip += offset as usize;
             }
@@ -860,16 +870,6 @@ impl<'gc> State<'gc> {
                         )
                         .into(),
                     ));
-                }
-            }
-            OpCode::JumpIfError(offset) => {
-                let value = *self.peek(0);
-                if value.is_error() {
-                    // Jump to error handler
-                    self.current_frame().ip += offset as usize;
-                    // Must push the error value to stack top,
-                    // because in the error handler err will be set as local variable
-                    self.push_stack(value);
                 }
             }
         }

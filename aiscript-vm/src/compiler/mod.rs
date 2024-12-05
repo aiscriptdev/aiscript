@@ -11,12 +11,10 @@ pub fn compile<'gc>(
     ctx: Context<'gc>,
     source: &'gc str,
 ) -> Result<BTreeMap<ChunkId, Gc<'gc, Function<'gc>>>, VmError> {
-    // Step 1: Parse source into AST
     let mut parser = Parser::new(ctx, source);
     let program = parser.parse()?;
     #[cfg(feature = "debug")]
     println!("AST: {}", program);
-    // Step 2: Generate bytecode from AST
     CodeGen::generate(program, ctx).map(|chunks| {
         chunks
             .into_iter()
