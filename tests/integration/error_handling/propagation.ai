@@ -1,0 +1,19 @@
+enum ArithError! {
+    DivideZero
+}
+
+fn divide(a, b) -> int | ArithError! {
+    if b == 0 {
+        raise ArithError!::DivideZero;
+    }
+    return a / b;
+}
+
+fn do_math(n) -> ArithError! {
+    // use ? to propagate error
+    let v = divide(1, n)?;
+    print("[value]", v);
+}
+
+do_math(1); // expect: [value] 1
+print(do_math(0)); // expect: ArithError!::DivideZero

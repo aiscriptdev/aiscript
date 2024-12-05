@@ -1,0 +1,37 @@
+// Every enum or class ends with ! is an error type
+enum ArithError! {
+    DivideZero = "Can not divide zero"
+}
+// Declare error type this function would throw
+// Multiple error types are supported, like this:
+// fn divide(a, b) -> int, ArithError!, AnotherError! {}
+fn divide(a, b) -> int | ArithError! {
+    if b == 0 {
+        raise ArithError!::DivideZero;
+    }
+
+    return a / b;
+}
+// Catch error and early return
+fn do_math1(n) {
+    // use syntax `|err| {}` after function call to handle error
+    let v = divide(1, n) |err| {
+        print("[error]", err);
+        return;
+    };
+    print("[value]", v);
+}
+do_math1(1); // expect: [value] 1
+do_math1(0); // expect: [error] ArithError!::DivideZero(Can not divide zero)
+
+// Catch error and no early return
+fn do_math2(n) {
+    let v = divide(1, n) |err| {
+        print("[error]", err);
+    };
+    print("[value]", v);
+}
+do_math2(1); // expect: [value] 1
+do_math2(0);
+// expect: [error] ArithError!::DivideZero(Can not divide zero)
+// expect: [value] nil

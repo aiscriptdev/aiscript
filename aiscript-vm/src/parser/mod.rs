@@ -867,7 +867,7 @@ impl<'gc> Parser<'gc> {
             }
 
             // Parse additional types (must be error types)
-            while self.match_token(TokenType::Comma) {
+            while self.match_token(TokenType::Pipe) {
                 if self.check(TokenType::OpenBrace) {
                     break; // Handle optional trailing comma
                 }

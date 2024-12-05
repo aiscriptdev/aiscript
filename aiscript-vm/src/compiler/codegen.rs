@@ -1510,7 +1510,6 @@ impl<'gc> CodeGen<'gc> {
             is_captured: false,
             mutability,
         };
-        self.local_count;
         self.local_count += 1;
     }
 
