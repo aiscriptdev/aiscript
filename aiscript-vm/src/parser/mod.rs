@@ -1334,27 +1334,38 @@ impl<'gc> Parser<'gc> {
                 // Report each error with its own line number
                 for error in errors {
                     match error {
-                        ValidationError::MissingFields(fields) => {
+                        ValidationError::ClassNotFound(token) => {
+                            self.error_at(token, &format!("Class '{}' not found", token.lexeme));
+                        }
+                        ValidationError::MissingFields(token, fields) => {
                             self.error_at(
-                                name,
+                                token,
                                 &format!("Missing required fields: {}", fields.join(", ")),
                             );
                         }
-                        ValidationError::InvalidFields(fields) => {
-                            for (field, line) in fields {
-                                self.error_with_line(line, &format!("Invalid field '{}'", field));
-                            }
+                        ValidationError::InvalidField(class_token, field_token) => {
+                            self.error_at(
+                                class_token,
+                                &format!("Invalid field '{}'", field_token.lexeme),
+                            );
                         }
                         ValidationError::TypeError {
-                            field,
-                            line,
-                            message,
+                            class_token,
+                            field_token,
+                            expected_type,
                         } => {
-                            self.error_with_line(line, &format!("Field '{}': {}", field, message));
+                            self.error_at(
+                                class_token,
+                                &format!(
+                                    "Field '{}': Type mismatch: expected {}",
+                                    field_token.lexeme,
+                                    expected_type.type_name()
+                                ),
+                            );
                         }
-                        ValidationError::ComputedPropertyError(line) => {
-                            self.error_with_line(
-                                line,
+                        ValidationError::ComputedPropertyError(token) => {
+                            self.error_at(
+                                token,
                                 "Computed properties not allowed in class initialization",
                             );
                         }

@@ -1,0 +1,77 @@
+class Person {
+    name: str,
+    age: int = 18,
+    email: str,
+}
+
+let p1 = A {};  // Error at 'A': Class 'A' not found
+
+let p2 = Person {};  // Error at 'Person': Missing required fields: name, email
+
+let p3 = Person {  // Error at 'Person': Missing required fields: email
+    name: "Alice"
+};
+
+let p4 = Person {  // Error at 'Person': Field 'name': Type mismatch: expected str
+    name: 42,
+    email: "test@example.com"
+};
+
+let p5 = Person {  // Error at 'Person': Field 'age': Type mismatch: expected int
+    name: "Alice",
+    age: "wrong",  
+    email: "test@example.com"
+};
+
+let p6 = Person {  // Error at 'Person': Invalid field 'invalid'
+    name: "Alice",
+    age: 25,
+    email: "test@example.com",
+    invalid: true  
+};
+
+let key = "name";
+let p7 = Person {  // Error at 'Person': Computed properties not allowed in class initialization
+    [key]: "Alice"
+};
+
+let name = "Alice";
+let extra = true;
+let p8 = Person {  // Error at 'Person': Invalid field 'extra'
+    name,
+    extra
+};
+
+class Address {
+    street: str,
+    city: str,
+}
+
+class Contact {
+    name: str,
+    address: Address,
+}
+
+let c1 = Contact {  // Error at 'Contact': Field 'address': Type mismatch: expected Address
+    name: "Alice",
+    address: "invalid",
+};
+
+let c2 = Contact {};  // Error at 'Contact': Missing required fields: name, address
+
+// These should work fine:
+let validPerson = Person {
+    name: "Alice",
+    age: 25,
+    email: "alice@example.com",
+};
+
+let validAddress = Address {
+    street: "123 Main St",
+    city: "Springfield",
+};
+
+let validContact = Contact {
+    name: "Alice",
+    address: validAddress,
+};

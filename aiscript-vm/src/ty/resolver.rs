@@ -21,14 +21,15 @@ pub(crate) struct ClassInfo<'gc> {
 
 #[derive(Debug)]
 pub(crate) enum ValidationError<'gc> {
-    MissingFields(Vec<&'gc str>),
-    InvalidFields(Vec<(&'gc str, u32)>), // (field_name, line_number)
+    ClassNotFound(Token<'gc>),
+    MissingFields(Token<'gc>, Vec<&'gc str>),
+    InvalidField(Token<'gc>, Token<'gc>), // (class_name, field_token)
     TypeError {
-        field: &'gc str,
-        line: u32,
-        message: String,
+        class_token: Token<'gc>,
+        field_token: Token<'gc>,
+        expected_type: Type<'gc>,
     },
-    ComputedPropertyError(u32), // line number
+    ComputedPropertyError(Token<'gc>), // class token
 }
 
 #[derive(Debug)]
@@ -143,35 +144,13 @@ impl<'gc> TypeResolver<'gc> {
         class_name: Token<'gc>,
         properties: &[ObjectProperty<'gc>],
     ) -> Result<(), Vec<ValidationError<'gc>>> {
-        let class_info = self.class_info.get(class_name.lexeme).ok_or_else(|| {
-            vec![ValidationError::TypeError {
-                field: class_name.lexeme,
-                line: class_name.line,
-                message: format!("Class '{}' not found", class_name.lexeme),
-            }]
-        })?;
+        let class_info = self
+            .class_info
+            .get(class_name.lexeme)
+            .ok_or_else(|| vec![ValidationError::ClassNotFound(class_name)])?;
 
         let mut errors = Vec::new();
         let mut provided_fields = HashSet::new();
-
-        // Handle empty object case
-        if properties.is_empty() {
-            let missing_fields: Vec<_> = class_info
-                .fields
-                .iter()
-                .filter(|field| field.required)
-                .map(|field| field.name.lexeme)
-                .collect();
-
-            if !missing_fields.is_empty() {
-                errors.push(ValidationError::MissingFields(missing_fields));
-            }
-            return if errors.is_empty() {
-                Ok(())
-            } else {
-                Err(errors)
-            };
-        }
 
         // Check each property
         for prop in properties {
@@ -183,21 +162,20 @@ impl<'gc> TypeResolver<'gc> {
                         .find(|f| f.name.lexeme == key.lexeme)
                     {
                         // Type check
-                        if let Err(message) = self.check_type(value, field.ty) {
+                        if self.check_type(value, field.ty).is_err() {
                             errors.push(ValidationError::TypeError {
-                                field: key.lexeme,
-                                line: key.line,
-                                message,
+                                class_token: class_name,
+                                field_token: *key,
+                                expected_type: field.ty,
                             });
                         }
                     } else {
-                        errors.push(ValidationError::InvalidFields(vec![(key.lexeme, key.line)]));
+                        errors.push(ValidationError::InvalidField(class_name, *key));
                     }
                     provided_fields.insert(key.lexeme);
                 }
-                ObjectProperty::Computed { key_expr, .. } => {
-                    // Use the line number from the expression
-                    errors.push(ValidationError::ComputedPropertyError(key_expr.line()));
+                ObjectProperty::Computed { .. } => {
+                    errors.push(ValidationError::ComputedPropertyError(class_name));
                 }
             }
         }
@@ -211,7 +189,7 @@ impl<'gc> TypeResolver<'gc> {
             .collect();
 
         if !missing_fields.is_empty() {
-            errors.push(ValidationError::MissingFields(missing_fields));
+            errors.push(ValidationError::MissingFields(class_name, missing_fields));
         }
 
         if errors.is_empty() {
