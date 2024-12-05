@@ -18,7 +18,7 @@ use crate::{
         ObjectProperty, VariableDecl, Visibility,
     },
     object::FunctionType,
-    ty::{EnumVariantChecker, Type, TypeResolver},
+    ty::{ClassField, EnumVariantChecker, Type, TypeResolver, ValidationError},
     vm::Context,
     VmError,
 };
@@ -486,6 +486,7 @@ impl<'gc> Parser<'gc> {
         };
         self.class_compiler = Some(Box::new(class_compiler));
 
+        self.type_resolver.register_class(name);
         self.consume(TokenType::OpenBrace, "Expect '{' before class body.");
 
         let mut fields = Vec::new();
@@ -497,6 +498,14 @@ impl<'gc> Parser<'gc> {
             }
             if self.check(TokenType::Identifier) && !self.check_next(TokenType::OpenParen) {
                 let mut field = self.parse_class_field()?;
+                self.type_resolver.add_class_field(
+                    name.lexeme,
+                    ClassField {
+                        name: field.name,
+                        ty: Type::from_token(field.type_hint),
+                        required: field.default_value.is_none(),
+                    },
+                );
                 field.validators = validators;
                 fields.push(field);
             } else {
@@ -575,16 +584,18 @@ impl<'gc> Parser<'gc> {
                     }
                 } else {
                     // No constructor exists, create synthetic one that declare all fields as keyword arguments:
-                    // class Foo {
-                    //   x: int = 0,
-                    //   y: int = 0,
-                    //
-                    //  // Auto-generated constructor
-                    //  fn new(x: int = 0, y: int = 0) {
-                    //      self.x = x;
-                    //      self.y = y;
-                    //  }
-                    // }
+                    /*
+                        class Foo {
+                            x: int = 0,
+                            y: int = 0,
+
+                            // Auto-generated constructor
+                            fn new(x: int = 0, y: int = 0) {
+                                self.x = x;
+                                self.y = y;
+                            }
+                        }
+                    */
                     let mut params = IndexMap::with_capacity(fields.len());
                     let mut body = Vec::with_capacity(fields.len());
                     for field in fields {
@@ -1250,86 +1261,107 @@ impl<'gc> Parser<'gc> {
         let previous_expr = self.previous_expr.take();
         let mut properties = Vec::new();
 
-        // Empty object
-        if self.check(TokenType::CloseBrace) {
-            self.advance();
-
-            return if let Some(Expr::Variable { .. }) = previous_expr {
-                Some(Expr::Call {
-                    callee: Box::new(previous_expr.unwrap()),
-                    arguments: vec![],
-                    keyword_args: HashMap::new(),
-                    error_handler: None,
-                    line,
-                })
-            } else {
-                Some(Expr::Object { properties, line })
-            };
-        }
-
-        loop {
-            let property = if self.match_token(TokenType::OpenBracket) {
-                // Computed property name: [expr]
-                let key_expr = Box::new(self.expression()?);
-                self.consume(
-                    TokenType::CloseBracket,
-                    "Expect ']' after computed property name.",
-                );
-                self.consume(TokenType::Colon, "Expect ':' after computed property name.");
-                let value = Box::new(self.expression()?);
-
-                ObjectProperty::Computed { key_expr, value }
-            } else if self.check(TokenType::String) {
-                // String literal key
-                self.advance();
-                let key = Token::new(
-                    TokenType::Identifier,
-                    self.previous.lexeme.trim_matches('"'),
-                    self.previous.line,
-                );
-                self.consume(TokenType::Colon, "Expect ':' after property name.");
-                let value = Box::new(self.expression()?);
-
-                ObjectProperty::Literal { key, value }
-            } else if self.check(TokenType::Identifier) {
-                // Could be either shorthand {a} or regular {a: expr}
-                self.advance();
-                let key = self.previous;
-
-                if self.match_token(TokenType::Colon) {
-                    // Regular property
+        if !self.check(TokenType::CloseBrace) {
+            loop {
+                let property = if self.match_token(TokenType::OpenBracket) {
+                    // Computed property name: [expr]
+                    let key_expr = Box::new(self.expression()?);
+                    self.consume(
+                        TokenType::CloseBracket,
+                        "Expect ']' after computed property name.",
+                    );
+                    self.consume(TokenType::Colon, "Expect ':' after computed property name.");
                     let value = Box::new(self.expression()?);
+
+                    ObjectProperty::Computed { key_expr, value }
+                } else if self.check(TokenType::String) {
+                    // String literal key
+                    self.advance();
+                    let key = Token::new(
+                        TokenType::Identifier,
+                        self.previous.lexeme.trim_matches('"'),
+                        self.previous.line,
+                    );
+                    self.consume(TokenType::Colon, "Expect ':' after property name.");
+                    let value = Box::new(self.expression()?);
+
                     ObjectProperty::Literal { key, value }
+                } else if self.check(TokenType::Identifier) {
+                    // Could be either shorthand {a} or regular {a: expr}
+                    self.advance();
+                    let key = self.previous;
+
+                    if self.match_token(TokenType::Colon) {
+                        // Regular property
+                        let value = Box::new(self.expression()?);
+                        ObjectProperty::Literal { key, value }
+                    } else {
+                        // Shorthand property {a} -> {a: a}
+                        let value = Box::new(Expr::Variable {
+                            name: key,
+                            line: key.line,
+                        });
+                        ObjectProperty::Literal { key, value }
+                    }
                 } else {
-                    // Shorthand property {a} -> {a: a}
-                    let value = Box::new(Expr::Variable {
-                        name: key,
-                        line: key.line,
-                    });
-                    ObjectProperty::Literal { key, value }
+                    self.error_at_current(
+                        "Expect property name string, identifier, or computed [expression].",
+                    );
+                    return None;
+                };
+
+                properties.push(property);
+
+                if !self.match_token(TokenType::Comma) {
+                    break;
                 }
-            } else {
-                self.error_at_current(
-                    "Expect property name string, identifier, or computed [expression].",
-                );
-                return None;
-            };
 
-            properties.push(property);
-
-            if !self.match_token(TokenType::Comma) {
-                break;
-            }
-
-            // Allow trailing comma
-            if self.check(TokenType::CloseBrace) {
-                break;
+                // Allow trailing comma
+                if self.check(TokenType::CloseBrace) {
+                    break;
+                }
             }
         }
 
         self.consume(TokenType::CloseBrace, "Expect '}' after object literal.");
 
-        if let Some(Expr::Variable { .. }) = previous_expr {
+        if let Some(Expr::Variable { name, .. }) = previous_expr {
+            // Validate class initialization
+            if let Err(errors) = self
+                .type_resolver
+                .validate_object_literal(name, &properties)
+            {
+                // Report each error with its own line number
+                for error in errors {
+                    match error {
+                        ValidationError::MissingFields(fields) => {
+                            self.error_at(
+                                name,
+                                &format!("Missing required fields: {}", fields.join(", ")),
+                            );
+                        }
+                        ValidationError::InvalidFields(fields) => {
+                            for (field, line) in fields {
+                                self.error_with_line(line, &format!("Invalid field '{}'", field));
+                            }
+                        }
+                        ValidationError::TypeError {
+                            field,
+                            line,
+                            message,
+                        } => {
+                            self.error_with_line(line, &format!("Field '{}': {}", field, message));
+                        }
+                        ValidationError::ComputedPropertyError(line) => {
+                            self.error_with_line(
+                                line,
+                                "Computed properties not allowed in class initialization",
+                            );
+                        }
+                    }
+                }
+                return None;
+            }
             // Convert to constructor call
             let mut keyword_args = HashMap::new();
             for prop in properties {

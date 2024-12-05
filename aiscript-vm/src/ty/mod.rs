@@ -4,7 +4,7 @@ mod resolver;
 use crate::lexer::Token;
 use gc_arena::Collect;
 pub(crate) use r#enum::EnumVariantChecker;
-pub(crate) use resolver::TypeResolver;
+pub(crate) use resolver::{ClassField, TypeResolver, ValidationError};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
 #[collect(require_static)]

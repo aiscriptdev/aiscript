@@ -14,6 +14,15 @@ impl ErrorReporter {
         }
     }
 
+    pub fn error_with_line(&mut self, line: u32, message: &str) {
+        if self.panic_mode {
+            return;
+        }
+        self.panic_mode = true;
+        self.had_error = true;
+        eprintln!("[line {}] Error: {}", line, message);
+    }
+
     pub fn error_at(&mut self, token: Token<'_>, message: &str) {
         if self.panic_mode {
             return;
