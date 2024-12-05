@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     iter::{self},
+    mem,
     ops::{Add, Deref, DerefMut},
 };
 
@@ -17,7 +18,7 @@ use crate::{
         ObjectProperty, VariableDecl, Visibility,
     },
     object::FunctionType,
-    ty::EnumVariantChecker,
+    ty::{EnumVariantChecker, Type, TypeResolver},
     vm::Context,
     VmError,
 };
@@ -43,6 +44,7 @@ pub struct Parser<'gc> {
     // since we omit the paren around,
     // it is hard to handle the '{' conflict without this flag.
     stop_at_brace: bool,
+    type_resolver: TypeResolver<'gc>,
 }
 
 #[derive(Default, Debug)]
@@ -78,6 +80,7 @@ impl<'gc> Parser<'gc> {
             scopes: Vec::new(),
             loop_depth: 0,
             stop_at_brace: false,
+            type_resolver: TypeResolver::new(),
         }
     }
 
@@ -88,8 +91,23 @@ impl<'gc> Parser<'gc> {
 
         while !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
+                match &stmt {
+                    Stmt::Class(ClassDecl { name, .. }) | Stmt::Enum(EnumDecl { name, .. }) => {
+                        self.type_resolver
+                            .register_type(name.lexeme, Type::Custom(*name));
+                    }
+                    _ => {}
+                }
                 program.statements.push(stmt);
             }
+        }
+
+        if !self.had_error {
+            let type_resolver = mem::take(&mut self.type_resolver);
+            // Validate all type usages
+            type_resolver.validate_all_types(|token, err| {
+                self.error_at(token, &err);
+            });
         }
 
         if self.had_error {
@@ -105,6 +123,8 @@ impl<'gc> Parser<'gc> {
         }
         // Parse either builtin type or custom type (identifier)
         self.advance();
+        // Record type usage for later validation
+        self.type_resolver.add_type_usage(self.previous);
         self.previous
     }
 
@@ -852,14 +872,12 @@ impl<'gc> Parser<'gc> {
         let mut error_types = Vec::new();
 
         if self.match_token(TokenType::Arrow) {
-            // Check if first type is an error type
-            self.consume_either(
-                TokenType::Error,
-                TokenType::Identifier,
-                "Expect type after '->'.",
-            );
-            let first_type = self.previous;
+            if !self.check_either(TokenType::Error, TokenType::Identifier) {
+                self.error_at_current("Expect type after '->'.");
+            }
+            let first_type = self.parse_type();
 
+            // Check if first type is an error type
             if first_type.is_error_type() {
                 error_types.push(first_type);
             } else {

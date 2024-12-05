@@ -17,9 +17,8 @@ use crate::{
 use crate::{
     ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
     lexer::{Token, TokenType},
-    ty::{Type, TypeResolver},
 };
-use gc_arena::{Gc, RefLock};
+use gc_arena::{Gc, GcRefLock, RefLock};
 use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;
@@ -47,7 +46,9 @@ pub struct CodeGen<'gc> {
     chunks: HashMap<ChunkId, Function<'gc>>,
     // <function mangled name, chunk_id>
     named_id_map: HashMap<String, FnDef>,
-    type_resolver: TypeResolver<'gc>,
+    // Keep track user defiend enums, help to allow
+    // declare enum variant as default function arguments
+    defined_enums: HashMap<&'gc str, GcRefLock<'gc, Enum<'gc>>>,
     function: Function<'gc>,
     fn_type: FunctionType,
     locals: [Local<'gc>; MAX_LOCALS],
@@ -67,7 +68,7 @@ impl<'gc> CodeGen<'gc> {
             ctx,
             chunks: HashMap::new(),
             named_id_map: HashMap::new(),
-            type_resolver: TypeResolver::new(),
+            defined_enums: HashMap::new(),
             function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: std::array::from_fn(|i| {
@@ -105,6 +106,14 @@ impl<'gc> CodeGen<'gc> {
         generator
     }
 
+    pub fn register_enum(&mut self, name: &'gc str, enum_: GcRefLock<'gc, Enum<'gc>>) {
+        self.defined_enums.insert(name, enum_);
+    }
+
+    pub fn get_enum(&self, name: &str) -> Option<GcRefLock<'gc, Enum<'gc>>> {
+        self.defined_enums.get(name).copied()
+    }
+
     pub fn generate(
         program: Program<'gc>,
         ctx: Context<'gc>,
@@ -112,10 +121,6 @@ impl<'gc> CodeGen<'gc> {
         // Reset CHUNK_ID initial value to get the same id for repeat compile
         CHUNK_ID.store(0, Ordering::Relaxed);
         let mut generator = Self::new(ctx, FunctionType::Script, "script");
-
-        for stmt in &program.statements {
-            generator.declare_class_and_enum(stmt)?;
-        }
 
         for stmt in &program.statements {
             generator.declare_functions(stmt)?;
@@ -136,17 +141,6 @@ impl<'gc> CodeGen<'gc> {
                 .insert(CHUNK_ID.fetch_add(1, Ordering::AcqRel), function);
             Ok(generator.chunks)
         }
-    }
-
-    fn declare_class_and_enum(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
-        match stmt {
-            Stmt::Class(ClassDecl { name, .. }) | Stmt::Enum(EnumDecl { name, .. }) => {
-                self.type_resolver
-                    .register_type(name.lexeme, Type::Custom(*name));
-            }
-            _ => (),
-        }
-        Ok(())
     }
 
     fn declare_functions(&mut self, stmt: &Stmt<'gc>) -> Result<(), VmError> {
@@ -441,7 +435,7 @@ impl<'gc> CodeGen<'gc> {
                         static_methods: HashMap::default(),
                     }),
                 );
-                self.type_resolver.register_enum(name.lexeme, enum_);
+                self.register_enum(name.lexeme, enum_);
                 let enum_constant = self.make_constant(Value::Enum(enum_));
                 self.emit(OpCode::Enum(enum_constant as u8));
 
@@ -1143,39 +1137,16 @@ impl<'gc> CodeGen<'gc> {
         name: &'gc str,
         mangle_name: &str,
         params: &IndexMap<Token<'gc>, Parameter<'gc>>,
-        return_type: Option<Token<'gc>>,
+        _return_type: Option<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         fn_type: FunctionType,
     ) -> Result<ChunkId, VmError> {
-        // Validate parameter types
-        for (param_token, param) in params {
-            if let Some(param_type) = param.type_hint.as_ref().copied() {
-                let ty = Type::from_token(param_type);
-                if let Err(err) = self.type_resolver.validate_type(ty) {
-                    self.error_at(
-                        *param_token,
-                        &format!("Invalid parameter type '{}': {}.", ty.type_name(), err),
-                    );
-                }
-            }
-        }
-
-        // Validate return type if present
-        if let Some(ret_type) = return_type.as_ref().copied() {
-            let ty = Type::from_token(ret_type);
-            if let Err(err) = self.type_resolver.validate_type(ty) {
-                self.error_at(
-                    ret_type,
-                    &format!("Invalid return type '{}': {}.", ty.type_name(), err),
-                );
-            }
-        }
         let compiler = Self::new(self.ctx, fn_type, name);
 
         // Create a new compiler taking ownership of current one
         let mut enclosing = mem::replace(self, *compiler);
         self.named_id_map = mem::take(&mut enclosing.named_id_map);
-        self.type_resolver = mem::take(&mut enclosing.type_resolver);
+        self.defined_enums = mem::take(&mut enclosing.defined_enums);
         self.enclosing = Some(Box::new(enclosing));
 
         self.begin_scope();
@@ -1202,7 +1173,7 @@ impl<'gc> CodeGen<'gc> {
                     Expr::EnumVariant {
                         enum_name, variant, ..
                     } => {
-                        if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
+                        if let Some(enum_) = self.get_enum(enum_name.lexeme) {
                             let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
                             let variant_value = match enum_.borrow().get_variant_value(variant_name)
                             {
@@ -1267,7 +1238,7 @@ impl<'gc> CodeGen<'gc> {
             // TODO: Duplicate function name?
             self.chunks.insert(chunk_id, function);
             enclosing.named_id_map = mem::take(&mut self.named_id_map);
-            enclosing.type_resolver = mem::take(&mut self.type_resolver);
+            enclosing.defined_enums = mem::take(&mut self.defined_enums);
             let chunks = mem::take(&mut self.chunks);
             *self = *enclosing;
             self.chunks.extend(chunks);
@@ -1278,7 +1249,7 @@ impl<'gc> CodeGen<'gc> {
 
     fn validate_enum_variant(&mut self, enum_name: Token<'gc>, variant: Token<'gc>) {
         // Validate enums and variants
-        if let Some(enum_) = self.type_resolver.get_enum(enum_name.lexeme) {
+        if let Some(enum_) = self.get_enum(enum_name.lexeme) {
             let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
             if enum_.borrow().get_variant_value(variant_name).is_none() {
                 self.error_at(

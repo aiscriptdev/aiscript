@@ -1,0 +1,2 @@
+fn test() -> { // Error at '{': Expect type after '->'.
+}

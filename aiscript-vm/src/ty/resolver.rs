@@ -1,25 +1,22 @@
 use std::collections::HashMap;
 
-use gc_arena::GcRefLock;
-
-use crate::object::Enum;
+use crate::lexer::Token;
 
 use super::Type;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct TypeResolver<'gc> {
     // Keep track of defined types (classes) in the current scope
     defined_types: HashMap<&'gc str, Type<'gc>>,
-    // Keep track user defiend enums, help to allow
-    // declare enum variant as default function arguments
-    defined_enums: HashMap<&'gc str, GcRefLock<'gc, Enum<'gc>>>,
+    // Track type tokens that need validation
+    pending_validations: Vec<Token<'gc>>,
 }
 
 impl<'gc> TypeResolver<'gc> {
     pub fn new() -> Self {
         let mut resolver = Self {
             defined_types: HashMap::new(),
-            defined_enums: HashMap::new(),
+            pending_validations: Vec::new(),
         };
 
         // Register built-in types
@@ -32,17 +29,25 @@ impl<'gc> TypeResolver<'gc> {
         resolver
     }
 
-    /// Register a new custom type (called when processing class definitions)
+    pub fn add_type_usage(&mut self, token: Token<'gc>) {
+        self.pending_validations.push(token);
+    }
+
+    pub fn validate_all_types<F>(&self, mut f: F)
+    where
+        F: FnMut(Token<'gc>, String),
+    {
+        for token in &self.pending_validations {
+            let ty = Type::from_token(*token);
+            if let Err(err) = self.validate_type(ty) {
+                f(*token, err);
+            }
+        }
+    }
+
+    /// Register a new custom type
     pub fn register_type(&mut self, name: &'gc str, typ: Type<'gc>) {
         self.defined_types.insert(name, typ);
-    }
-
-    pub fn register_enum(&mut self, name: &'gc str, enum_: GcRefLock<'gc, Enum<'gc>>) {
-        self.defined_enums.insert(name, enum_);
-    }
-
-    pub fn get_enum(&mut self, name: &str) -> Option<GcRefLock<'gc, Enum<'gc>>> {
-        self.defined_enums.get(name).copied()
     }
 
     /// Resolve a type reference, returning None if the type is not defined
@@ -58,7 +63,7 @@ impl<'gc> TypeResolver<'gc> {
         match self.resolve_type(typ) {
             Some(_) => Ok(()),
             None => match typ {
-                Type::Custom(token) => Err(format!("Undefined type '{}'", token.lexeme)),
+                Type::Custom(token) => Err(format!("Undefined type '{}'.", token.lexeme)),
                 _ => Ok(()),
             },
         }

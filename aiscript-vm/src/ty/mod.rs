@@ -40,6 +40,7 @@ impl<'gc> Type<'gc> {
     }
 
     /// Get a human-readable name for the type
+    #[allow(unused)]
     pub fn type_name(&self) -> String {
         match self {
             Type::Int => "int".to_string(),

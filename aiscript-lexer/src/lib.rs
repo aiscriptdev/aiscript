@@ -681,7 +681,7 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn consume_either(&mut self, k1: TokenType, k2: TokenType, message: &str) {
-        if self.check(k1) || self.check(k2) {
+        if self.check_either(k1, k2) {
             self.advance();
             return;
         }
@@ -703,6 +703,9 @@ impl<'a> Scanner<'a> {
 
     pub fn check(&self, kind: TokenType) -> bool {
         self.current.kind == kind
+    }
+    pub fn check_either(&self, k1: TokenType, k2: TokenType) -> bool {
+        self.check(k1) || self.check(k2)
     }
 
     pub fn check_identifier(&self, lexme: &str) -> bool {
