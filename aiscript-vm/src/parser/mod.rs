@@ -1228,13 +1228,25 @@ impl<'gc> Parser<'gc> {
             return None;
         }
 
-        let mut properties = Vec::new();
         let line = self.previous.line;
+        let previous_expr = self.previous_expr.take();
+        let mut properties = Vec::new();
 
         // Empty object
         if self.check(TokenType::CloseBrace) {
             self.advance();
-            return Some(Expr::Object { properties, line });
+
+            return if let Some(Expr::Variable { .. }) = previous_expr {
+                Some(Expr::Call {
+                    callee: Box::new(previous_expr.unwrap()),
+                    arguments: vec![],
+                    keyword_args: HashMap::new(),
+                    error_handler: None,
+                    line,
+                })
+            } else {
+                Some(Expr::Object { properties, line })
+            };
         }
 
         loop {
@@ -1299,7 +1311,30 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::CloseBrace, "Expect '}' after object literal.");
 
-        Some(Expr::Object { properties, line })
+        if let Some(Expr::Variable { .. }) = previous_expr {
+            // Convert to constructor call
+            let mut keyword_args = HashMap::new();
+            for prop in properties {
+                match prop {
+                    ObjectProperty::Literal { key, value } => {
+                        keyword_args.insert(key.lexeme.to_string(), *value);
+                    }
+                    ObjectProperty::Computed { .. } => {
+                        self.error("Computed properties not allowed in class initialization");
+                        return None;
+                    }
+                }
+            }
+            Some(Expr::Call {
+                callee: Box::new(previous_expr.unwrap()),
+                arguments: vec![],
+                keyword_args,
+                error_handler: None,
+                line,
+            })
+        } else {
+            Some(Expr::Object { properties, line })
+        }
     }
 
     fn grouping(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -1789,7 +1824,11 @@ impl<'gc> ParseRule<'gc> {
 
 fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
     match kind {
-        TokenType::OpenBrace => ParseRule::new(Some(Parser::object), None, Precedence::Primary),
+        TokenType::OpenBrace => ParseRule::new(
+            Some(Parser::object),
+            Some(Parser::object),
+            Precedence::Primary,
+        ),
         TokenType::OpenParen => {
             ParseRule::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
         }

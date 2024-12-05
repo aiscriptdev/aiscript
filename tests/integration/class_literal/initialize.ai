@@ -1,0 +1,18 @@
+class Person {
+  name: str,
+  age: int = 18,
+}
+
+let p = Person { name: "Alice" };
+print(p.name, p.age); // expect: Alice 18
+
+let p = Person { name: "Alice", age: 20 };
+print(p.name, p.age); // expect: Alice 20
+
+let name = "Alice";
+let age = 30;
+let p = Person { name, age };
+print(p.name, p.age); // expect: Alice 30
+
+let name = "Alice";
+let p = Person { name, age: 40 };
