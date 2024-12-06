@@ -1,0 +1,33 @@
+let p = |x| {};
+print(p(100)); // expect: nil
+
+let p = |x| {
+    print(x);
+};
+print(p(100));
+// expect: 100
+// expect: nil
+
+let p = |x| {
+    print(x);
+    99;
+};
+print(p(100));
+// expect: 100
+// expect: ni
+
+let p = |x| {
+    print(x);
+    99
+};
+print(p(100));
+// expect: 100
+// expect: 99
+
+let p = |x| {
+    print(x);
+    return 99;
+};
+print(p(100));
+// expect: 100
+// expect: 99

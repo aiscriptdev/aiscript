@@ -856,7 +856,7 @@ impl<'gc> Parser<'gc> {
             None
         };
 
-        let body = self.block();
+        let body = self.block_expr();
 
         let mangled_name = self.scopes.join("$");
         self.scopes.pop();
@@ -941,20 +941,9 @@ impl<'gc> Parser<'gc> {
             self.consume(TokenType::Pipe, "Expect '|' after lambda parameters.");
         }
 
-        // Parse body
         let body = if self.match_token(TokenType::OpenBrace) {
-            // Block body
-            let mut statements = Vec::new();
-            while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
-                if let Some(declaration) = self.declaration() {
-                    statements.push(declaration);
-                }
-            }
-            self.consume(TokenType::CloseBrace, "Expect '}' after lambda body.");
-
-            // Create block expression
             Box::new(Expr::Block {
-                statements,
+                statements: self.block_expr(),
                 line: self.previous.line,
             })
         } else {
@@ -1190,6 +1179,48 @@ impl<'gc> Parser<'gc> {
 
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             if let Some(declaration) = self.declaration() {
+                statements.push(declaration);
+            }
+        }
+
+        self.consume(TokenType::CloseBrace, "Expect '}' after block.");
+        statements
+    }
+
+    // Parse block expression. The different between block_expr() and block()
+    // is block_expr() will has an implicit return value:
+    // - if the last line is an expression (not ends with semicolon), it will be the return value.
+    // - if the last line is a statement (ends with semicolon), it will return Nil implicitly.
+    fn block_expr(&mut self) -> Vec<Stmt<'gc>> {
+        let mut statements = Vec::new();
+
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            // Check if we're looking at a potential expression
+            if self.current.is_expr_start() {
+                // Parse as expression
+                if let Some(expr) = self.expression() {
+                    // If we hit a closing brace, treat it as tail expression
+                    if self.check(TokenType::CloseBrace) {
+                        statements.push(Stmt::Return {
+                            value: Some(expr),
+                            line: self.previous.line,
+                        });
+                        break;
+                    } else {
+                        // Not a tail expression, must have semicolon
+                        if self.check(TokenType::Semicolon) {
+                            self.advance();
+                        } else {
+                            self.error("Expect ';' after expression.");
+                        }
+
+                        statements.push(Stmt::Expression {
+                            expression: expr,
+                            line: self.previous.line,
+                        });
+                    }
+                }
+            } else if let Some(declaration) = self.declaration() {
                 statements.push(declaration);
             }
         }
@@ -1660,7 +1691,7 @@ impl<'gc> Parser<'gc> {
                 "Expect '{' before error handler body.",
             );
 
-            let handler_body = self.block();
+            let handler_body = self.block_expr();
 
             handler = Some(ErrorHandler {
                 error_var,

@@ -1,0 +1,32 @@
+fn f0() {
+    true
+}
+fn f1() {
+    "hi"
+}
+fn f2() {
+   1 + 2 * 3 - 4
+}
+fn f3() {
+    let a = "hi";
+    a
+}
+fn f4() {
+    let a = "hi";
+    [a, 1]
+}
+fn f5(x) {
+    || x + 1
+}
+fn f6() {
+    print("f6");
+}
+
+print(f1()); // expect: hi
+print(f2()); // expect: 3
+print(f3()); // expect: hi
+print(f4()); // expect: [hi, 1]
+print(f5(1)()); // expect: 2
+print(f6());
+// expect: f6
+// expect: nil

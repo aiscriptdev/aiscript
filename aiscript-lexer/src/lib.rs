@@ -174,6 +174,27 @@ impl<'a> Token<'a> {
                 | TokenType::While
         )
     }
+
+    /// Check if the token could start as an expression.
+    pub fn is_expr_start(&self) -> bool {
+        // Exclude TokenType::OpenBrace to avoid syntax conflict with object literal.
+        matches!(
+            self.kind,
+            TokenType::Number
+                | TokenType::String
+                | TokenType::True
+                | TokenType::False
+                | TokenType::Nil
+                | TokenType::Identifier
+                | TokenType::OpenParen
+                | TokenType::OpenBracket
+                | TokenType::Minus
+                | TokenType::Not
+                | TokenType::Self_
+                | TokenType::Super
+                | TokenType::Pipe
+        )
+    }
 }
 
 // Lexer for tokenizing source code
