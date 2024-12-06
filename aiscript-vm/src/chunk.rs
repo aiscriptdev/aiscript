@@ -11,7 +11,7 @@ use crate::{
     Value,
 };
 
-#[derive(Copy, Clone, Debug, Collect)]
+#[derive(Copy, Clone, Debug, Collect, PartialEq)]
 #[collect(require_static)]
 pub enum OpCode {
     Constant(u8),

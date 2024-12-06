@@ -77,7 +77,7 @@ mod tests {
         let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
-        let doc_token = dbg!(&tokens)
+        let doc_token = &tokens
             .iter()
             .find(|t| t.kind == TokenType::Doc)
             .expect("Docstring token not found");

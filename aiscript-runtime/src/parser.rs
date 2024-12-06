@@ -399,7 +399,6 @@ mod tests {
         assert_eq!(endpoint.body.fields[1].name, "b");
 
         // Verify script capture
-        println!("{:?}", endpoint.statements);
         assert!(endpoint.statements.contains("let greeting"));
         assert!(endpoint.statements.contains("return greeting"));
 
