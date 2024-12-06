@@ -22,7 +22,9 @@ chrono = "0.4.38"
 regex = "1.11.1"
 
 [features]
-# Enable debug features.
+# Enable debug features
 debug = []
+# Enable optimizer features
+optimizer = []
 # For testing AI
 ai_test = []
