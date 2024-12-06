@@ -1,5 +1,6 @@
 use crate::chunk::Chunk;
 
+mod dead_code;
 mod pop_combine;
 
 /// Defines a single optimization strategy
@@ -22,6 +23,7 @@ impl ChunkOptimizer {
 
         // Add default optimization strategies
         optimizer.add_strategy(Box::new(pop_combine::PopCombiner));
+        optimizer.add_strategy(Box::new(dead_code::DeadCodeEliminator));
 
         optimizer
     }

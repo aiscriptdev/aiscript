@@ -127,7 +127,7 @@ pub struct Chunk<'gc> {
     pub code: Vec<OpCode>,
     constans: Vec<Value<'gc>>,
     #[collect(require_static)]
-    lines: Vec<u32>,
+    pub(crate) lines: Vec<u32>,
 }
 
 impl<'gc> Default for Chunk<'gc> {
