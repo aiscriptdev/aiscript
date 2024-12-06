@@ -1334,6 +1334,12 @@ impl<'gc> Parser<'gc> {
                 // Report each error with its own line number
                 for error in errors {
                     match error {
+                        ValidationError::DuplicateField(class_token, field_token) => {
+                            self.error_at(
+                                class_token,
+                                &format!("Duplicate field '{}'", field_token.lexeme),
+                            );
+                        }
                         ValidationError::ClassNotFound(token) => {
                             self.error_at(token, &format!("Class '{}' not found", token.lexeme));
                         }

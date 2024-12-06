@@ -59,6 +59,18 @@ let c1 = Contact {  // Error at 'Contact': Field 'address': Type mismatch: expec
 
 let c2 = Contact {};  // Error at 'Contact': Missing required fields: name, address
 
+let c3 = Contact {  // Error at 'Contact': Duplicate field 'name'
+    name: "Alice",
+    name: "Bob",
+    address: validAddress
+};
+
+let c4 = Contact {  // Error at 'Contact': Invalid field 'namee'
+    namee: "Alice",
+    namee: "Bob",
+    address: validAddress
+};
+
 // These should work fine:
 let validPerson = Person {
     name: "Alice",

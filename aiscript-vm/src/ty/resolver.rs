@@ -24,6 +24,7 @@ pub(crate) enum ValidationError<'gc> {
     ClassNotFound(Token<'gc>),
     MissingFields(Token<'gc>, Vec<&'gc str>),
     InvalidField(Token<'gc>, Token<'gc>), // (class_name, field_token)
+    DuplicateField(Token<'gc>, Token<'gc>), // (class_token, field_token)
     TypeError {
         class_token: Token<'gc>,
         field_token: Token<'gc>,
@@ -161,6 +162,10 @@ impl<'gc> TypeResolver<'gc> {
                         .iter()
                         .find(|f| f.name.lexeme == key.lexeme)
                     {
+                        if !provided_fields.insert(key.lexeme) {
+                            errors.push(ValidationError::DuplicateField(class_name, *key));
+                            continue;
+                        }
                         // Type check
                         if self.check_type(value, field.ty).is_err() {
                             errors.push(ValidationError::TypeError {
