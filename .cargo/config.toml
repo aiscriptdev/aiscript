@@ -1,2 +1,5 @@
 [alias]
 xtask = "run --package xtask --"
+debug = "run --package xtask -- debug"
+optimizer = "run --package xtask -- optimizer"
+xtest = "run --package xtask -- test"

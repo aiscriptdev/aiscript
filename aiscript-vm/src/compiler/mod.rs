@@ -18,17 +18,16 @@ pub fn compile<'gc>(
     #[cfg(feature = "debug")]
     println!("AST: {}", program);
     #[cfg(feature = "optimizer")]
-    let optimizer = otpimizer::ChunkOptimizer::new();
+    let optimizer = optimizer::ChunkOptimizer::new();
 
     CodeGen::generate(program, ctx).map(|chunks| {
         chunks
             .into_iter()
             .map(|(id, function)| {
                 #[cfg(feature = "optimizer")]
-                {
-                    let mut function = function;
-                    optimizer.optimize(&mut function.chunk);
-                }
+                let mut function = function;
+                #[cfg(feature = "optimizer")]
+                optimizer.optimize(&mut function.chunk);
                 (id, Gc::new(&ctx, function))
             })
             .collect()
