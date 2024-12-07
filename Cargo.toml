@@ -7,6 +7,7 @@ members = [
     "aiscript-runtime",
     "aiscript-vm",
     "tests",
+    "xtask",
 ]
 exclude = []
 resolver = "2"
