@@ -10,7 +10,7 @@ fn divide(a, b) -> int | ArithError! {
     return a / b;
 }
 
-fn do_math() {
+fn do_math1() {
     let v = divide(1, 0) |err| {
         let a = 1;
         print("error:", err); // expect: error: ArithError!::DivideZero
@@ -19,5 +19,19 @@ fn do_math() {
     print(v); // expect: 999
 }
 
-let x = do_math();
+let x = do_math1();
+print(x); // expect: nil
+
+fn do_math2() {
+    let a = 0;
+    print(a); // expect: 0
+    let v = divide(1, 0) |err| {
+        let a = 1;
+        print("error:", err); // expect: error: ArithError!::DivideZero
+        999 // The last expression is function call result
+    };
+    print(v); // expect: 999
+}
+
+let x = do_math2();
 print(x); // expect: nil

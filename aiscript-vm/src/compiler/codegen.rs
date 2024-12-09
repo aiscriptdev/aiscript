@@ -970,7 +970,7 @@ impl<'gc> CodeGen<'gc> {
             // Begin scope for error variable
             self.begin_scope();
             // Store error in handler variable
-            self.declare_variable(handler.error_var, Mutability::Mutable);
+            let err_local_pos = self.declare_variable(handler.error_var, Mutability::Mutable);
             self.mark_initialized();
 
             let has_return = matches!(
@@ -981,7 +981,10 @@ impl<'gc> CodeGen<'gc> {
             for stmt in handler.handler_body {
                 self.generate_stmt(stmt)?;
             }
-            self.emit(OpCode::SetLocal(1));
+            // Set the last expression of error handle block (aka, stack top value)
+            // to the faield function call return value.
+            // The correct slot is err_local_pos - 1
+            self.emit(OpCode::SetLocal(err_local_pos as u8 - 1));
             self.end_scope();
             // Pop the error value on the stack top.
             // Also refer to JumpIfError in VM.
@@ -1462,9 +1465,9 @@ impl<'gc> CodeGen<'gc> {
         self.make_constant(Value::from(s))
     }
 
-    fn declare_variable(&mut self, name: Token<'gc>, mutability: Mutability) {
+    fn declare_variable(&mut self, name: Token<'gc>, mutability: Mutability) -> usize {
         if self.scope_depth == 0 {
-            return;
+            return 0;
         }
 
         for i in (0..self.local_count).rev() {
@@ -1479,13 +1482,13 @@ impl<'gc> CodeGen<'gc> {
             }
         }
 
-        self.add_local(name, mutability);
+        self.add_local(name, mutability)
     }
 
-    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) {
+    fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) -> usize {
         if self.local_count == MAX_LOCALS {
             self.error_at(name, "Too many local variables in function.");
-            return;
+            return 0;
         }
 
         self.locals[self.local_count] = Local {
@@ -1494,7 +1497,9 @@ impl<'gc> CodeGen<'gc> {
             is_captured: false,
             mutability,
         };
+        let pos = self.local_count;
         self.local_count += 1;
+        pos
     }
 
     fn mark_initialized(&mut self) {
