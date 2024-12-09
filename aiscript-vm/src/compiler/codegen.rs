@@ -973,11 +973,15 @@ impl<'gc> CodeGen<'gc> {
             self.declare_variable(handler.error_var, Mutability::Mutable);
             self.mark_initialized();
 
-            let has_return = matches!(handler.handler_body.last(), Some(Stmt::Return { .. }));
+            let has_return = matches!(
+                handler.handler_body.last(),
+                Some(Stmt::Return { .. }) | Some(Stmt::BlockReturn { .. })
+            );
             // Generate handler body - any return here will return from entire function
             for stmt in handler.handler_body {
                 self.generate_stmt(stmt)?;
             }
+            self.emit(OpCode::SetLocal(1));
             self.end_scope();
             // Pop the error value on the stack top.
             // Also refer to JumpIfError in VM.

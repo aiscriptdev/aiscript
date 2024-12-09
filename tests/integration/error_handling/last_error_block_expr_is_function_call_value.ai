@@ -1,0 +1,23 @@
+enum ArithError! {
+    DivideZero,
+}
+
+fn divide(a, b) -> int | ArithError! {
+    if b == 0 {
+        raise ArithError!::DivideZero;
+    }
+
+    return a / b;
+}
+
+fn do_math() {
+    let v = divide(1, 0) |err| {
+        let a = 1;
+        print("error:", err); // expect: error: ArithError!::DivideZero
+        999 // The last expression is function call result
+    };
+    print(v); // expect: 999
+}
+
+let x = do_math();
+print(x); // expect: nil
