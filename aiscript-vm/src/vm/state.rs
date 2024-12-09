@@ -50,7 +50,7 @@ macro_rules! binary_op {
     }};
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 struct CallFrame<'gc> {
     closure: Gc<'gc, Closure<'gc>>,

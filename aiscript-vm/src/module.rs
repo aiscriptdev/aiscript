@@ -9,7 +9,7 @@ pub enum ModuleSource {
     New { source: String, path: PathBuf },
 }
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub enum ModuleKind<'gc> {
     Script {
@@ -63,7 +63,7 @@ impl<'gc> ModuleKind<'gc> {
     }
 }
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct ModuleManager<'gc> {
     pub modules: HashMap<InternedString<'gc>, ModuleKind<'gc>>,

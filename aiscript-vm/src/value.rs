@@ -10,7 +10,7 @@ use crate::{
     NativeFn, ReturnValue,
 };
 
-#[derive(Debug, Copy, Clone, Default, Collect)]
+#[derive(Copy, Clone, Default, Collect)]
 #[collect(no_drop)]
 pub enum Value<'gc> {
     Number(f64),
@@ -140,7 +140,7 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Number(value) => Ok(value),
             a => Err(VmError::RuntimeError(format!(
-                "cannot convert to number: {:?}",
+                "cannot convert to number: {}",
                 a
             ))),
         }
@@ -168,7 +168,7 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Closure(closure) => Ok(closure),
             v => Err(VmError::RuntimeError(format!(
-                "cannot convert to closure, the value is {v:?}"
+                "cannot convert to closure, the value is {v}"
             ))),
         }
     }

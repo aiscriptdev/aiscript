@@ -11,7 +11,7 @@ use crate::{
     Value,
 };
 
-#[derive(Copy, Clone, Debug, Collect, PartialEq)]
+#[derive(Copy, Clone, Collect, PartialEq)]
 #[collect(require_static)]
 pub enum OpCode {
     Constant(u8),
@@ -120,7 +120,7 @@ impl OpCode {
     }
 }
 
-#[derive(Clone, Debug, Collect)]
+#[derive(Collect)]
 #[collect[no_drop]]
 pub struct Chunk<'gc> {
     #[collect(require_static)]

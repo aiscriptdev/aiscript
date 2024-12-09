@@ -14,7 +14,7 @@ use gc_arena::{
 
 use crate::{string::InternedString, Chunk, Value};
 
-#[derive(Debug, Copy, Clone, Collect)]
+#[derive(Collect)]
 #[collect[no_drop]]
 pub struct UpvalueObj<'gc> {
     pub location: usize,
@@ -28,14 +28,14 @@ impl<'gc> Default for UpvalueObj<'gc> {
     }
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Collect)]
 #[collect[no_drop]]
 pub struct Closure<'gc> {
     pub function: Gc<'gc, Function<'gc>>,
     pub upvalues: Box<[GcRefLock<'gc, UpvalueObj<'gc>>]>,
 }
 
-#[derive(Debug, Clone, Collect, Default)]
+#[derive(Collect, Default)]
 #[collect[no_drop]]
 pub struct Function<'gc> {
     pub arity: u8,
@@ -47,7 +47,7 @@ pub struct Function<'gc> {
     pub upvalues: Vec<Upvalue>,
 }
 
-#[derive(Debug, Clone, Collect, Default)]
+#[derive(Collect, Default)]
 #[collect[no_drop]]
 pub struct Parameter<'gc> {
     // parameter order index
@@ -64,7 +64,7 @@ impl<'gc> Parameter<'gc> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Collect)]
+#[derive(Debug, Collect)]
 #[collect(require_static)]
 pub struct Upvalue {
     pub index: usize,
@@ -122,7 +122,7 @@ impl FunctionType {
     }
 }
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct Class<'gc> {
     pub name: InternedString<'gc>,
@@ -130,27 +130,27 @@ pub struct Class<'gc> {
     pub static_methods: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct Instance<'gc> {
     pub class: GcRefLock<'gc, Class<'gc>>,
     pub fields: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct BoundMethod<'gc> {
     pub receiver: Value<'gc>,
     pub method: Gc<'gc, Closure<'gc>>,
 }
 
-#[derive(Debug, Collect, Default)]
+#[derive(Collect, Default)]
 #[collect(no_drop)]
 pub struct Object<'gc> {
     pub fields: HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct Enum<'gc> {
     pub name: InternedString<'gc>,
@@ -161,7 +161,7 @@ pub struct Enum<'gc> {
     pub static_methods: HashMap<InternedString<'gc>, Value<'gc>>,
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct EnumVariant<'gc> {
     // Reference to enum definition

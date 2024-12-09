@@ -23,7 +23,7 @@ use crate::{
     Chunk, ReturnValue, Value,
 };
 
-#[derive(Debug, Collect)]
+#[derive(Collect)]
 #[collect(no_drop)]
 pub struct Agent<'gc> {
     pub name: InternedString<'gc>,
@@ -49,7 +49,7 @@ pub enum ToolChoice {
 }
 
 #[cfg(not(feature = "ai_test"))]
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct Response<'gc> {
     agent: Option<Gc<'gc, Agent<'gc>>>,
     messages: Vec<ChatCompletionMessage>,
@@ -321,9 +321,9 @@ pub async fn _run_agent<'gc>(
                     if let Some(handoff_agent) = response.agent {
                         agent = handoff_agent;
                     }
-                    if debug {
-                        println!("tool function call response: {:?}", response);
-                    }
+                    // if debug {
+                    //     println!("tool function call response: {:?}", response);
+                    // }
                     history.extend(response.messages);
                 }
                 Err(message) => return make_response_object(state, agent, message),
