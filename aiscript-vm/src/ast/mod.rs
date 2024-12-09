@@ -391,6 +391,11 @@ pub enum Stmt<'gc> {
         value: Option<Expr<'gc>>,
         line: u32,
     },
+    // Block return just provides the block's value
+    BlockReturn {
+        value: Expr<'gc>,
+        line: u32,
+    },
     Class(ClassDecl<'gc>),
     Agent(AgentDecl<'gc>),
 }
@@ -411,6 +416,7 @@ impl<'gc> Stmt<'gc> {
             | Self::Function(FunctionDecl { line, .. })
             | Self::Raise { line, .. }
             | Self::Return { line, .. }
+            | Self::BlockReturn { line, .. }
             | Self::Class(ClassDecl { line, .. })
             | Self::Agent(AgentDecl { line, .. }) => *line,
         }

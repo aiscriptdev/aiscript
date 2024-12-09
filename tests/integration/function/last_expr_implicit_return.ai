@@ -22,6 +22,7 @@ fn f6() {
     print("f6");
 }
 
+print(f0()); // expect: true
 print(f1()); // expect: hi
 print(f2()); // expect: 3
 print(f3()); // expect: hi

@@ -1187,10 +1187,9 @@ impl<'gc> Parser<'gc> {
         statements
     }
 
-    // Parse block expression. The different between block_expr() and block()
-    // is block_expr() will has an implicit return value:
-    // - if the last line is an expression (not ends with semicolon), it will be the return value.
-    // - if the last line is a statement (ends with semicolon), it will return Nil implicitly.
+    // Parse block expression. The different between block_expr() and block() are:
+    // - block_expr() will treat the last line as an expression if it not ends with semicolon.
+    // - block_expr() nornamlly wrapped in Expr::Block while block() wraped in Stmt::Block
     fn block_expr(&mut self) -> Vec<Stmt<'gc>> {
         let mut statements = Vec::new();
 
@@ -1199,10 +1198,11 @@ impl<'gc> Parser<'gc> {
             if self.current.is_expr_start() {
                 // Parse as expression
                 if let Some(expr) = self.expression() {
-                    // If we hit a closing brace, treat it as tail expression
                     if self.check(TokenType::CloseBrace) {
-                        statements.push(Stmt::Return {
-                            value: Some(expr),
+                        // It's a tail expression - create special BlockReturn statement
+                        // This is different from Return in that it only returns from the block
+                        statements.push(Stmt::BlockReturn {
+                            value: expr,
                             line: self.previous.line,
                         });
                         break;

@@ -108,6 +108,10 @@ impl<'gc> Stmt<'gc> {
                     val.fmt_with_indent(f, level + 1);
                 }
             }
+            Self::BlockReturn { value, .. } => {
+                writeln!(f, "{ind}BlockReturn").unwrap();
+                value.fmt_with_indent(f, level + 1);
+            }
             Self::Loop {
                 condition,
                 body,

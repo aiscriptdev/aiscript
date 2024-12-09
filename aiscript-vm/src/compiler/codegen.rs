@@ -411,6 +411,10 @@ impl<'gc> CodeGen<'gc> {
                     self.emit_return();
                 }
             }
+            Stmt::BlockReturn { value, .. } => {
+                self.generate_expr(value)?;
+                // Don't emit Return - block value stays on stack
+            }
             Stmt::Enum(EnumDecl {
                 name,
                 variants,
@@ -652,19 +656,7 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(value)?;
                 self.named_variable(name, true)?;
             }
-            Expr::Block { statements, .. } => {
-                let last_is_return = matches!(statements.last(), Some(Stmt::Return { .. }));
-                // Generate code for each statement in the block
-                for stmt in statements {
-                    self.generate_stmt(stmt)?;
-                }
-
-                // If the block doesn't end with a return statement,
-                // implicitly return nil
-                if !last_is_return {
-                    self.emit(OpCode::Nil);
-                }
-            }
+            Expr::Block { statements, .. } => self.generate_block_expr(statements)?,
             Expr::Lambda { params, body, .. } => {
                 // Create a new compiler for the lambda
                 let name = format!("lambda_{}", CHUNK_ID.load(Ordering::Relaxed));
@@ -692,10 +684,8 @@ impl<'gc> CodeGen<'gc> {
                 // Generate code for the body (which is a Block expression)
                 self.generate_expr(body)?;
 
-                // Always end with return
-                self.emit(OpCode::Return);
-
-                self.end_scope();
+                // self.emit(OpCode::Return);
+                // self.end_scope();
 
                 // Check for errors
                 if self.error_reporter.had_error {
@@ -1217,17 +1207,7 @@ impl<'gc> CodeGen<'gc> {
         }
 
         // Compile function body
-        let last_is_return = matches!(
-            body.last(),
-            Some(Stmt::Return { .. }) | Some(Stmt::Raise { .. })
-        );
-        for stmt in body {
-            self.generate_stmt(stmt)?;
-        }
-        // Don't re-emit return instruction if we already have
-        if !last_is_return {
-            self.emit_return();
-        }
+        self.generate_block_expr(body)?;
 
         // Restore the original compiler
         if self.error_reporter.had_error {
@@ -1252,6 +1232,28 @@ impl<'gc> CodeGen<'gc> {
             self.emit(OpCode::Closure { chunk_id });
         }
         Ok(chunk_id)
+    }
+
+    fn generate_block_expr(&mut self, mut statements: Vec<Stmt<'gc>>) -> Result<(), VmError> {
+        let last_stmt = statements.pop();
+        for stmt in statements {
+            self.generate_stmt(stmt)?;
+        }
+        // Special handle the last statement to determine how to emit Return
+        match last_stmt {
+            Some(stmt) if matches!(stmt, Stmt::BlockReturn { .. }) => {
+                self.generate_stmt(stmt)?;
+                self.emit(OpCode::Return);
+            }
+            Some(s) if !matches!(s, Stmt::Return { .. }) => {
+                self.generate_stmt(s)?;
+                // Emit return instruction if the last stmt isn't return
+                self.emit_return();
+            }
+            Some(stmt) => self.generate_stmt(stmt)?,
+            None => self.emit_return(),
+        }
+        Ok(())
     }
 
     fn validate_enum_variant(&mut self, enum_name: Token<'gc>, variant: Token<'gc>) {
