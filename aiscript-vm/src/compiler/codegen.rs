@@ -1217,11 +1217,17 @@ impl<'gc> CodeGen<'gc> {
         }
 
         // Compile function body
+        let last_is_return = matches!(
+            body.last(),
+            Some(Stmt::Return { .. }) | Some(Stmt::Raise { .. })
+        );
         for stmt in body {
             self.generate_stmt(stmt)?;
         }
-
-        self.emit_return();
+        // Don't re-emit return instruction if we already have
+        if !last_is_return {
+            self.emit_return();
+        }
 
         // Restore the original compiler
         if self.error_reporter.had_error {

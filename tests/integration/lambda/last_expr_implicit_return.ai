@@ -14,7 +14,7 @@ let p = |x| {
 };
 print(p(100));
 // expect: 100
-// expect: ni
+// expect: nil
 
 let p = |x| {
     print(x);
