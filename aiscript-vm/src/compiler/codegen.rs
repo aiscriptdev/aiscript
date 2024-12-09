@@ -11,6 +11,7 @@ use crate::{
         ObjectProperty, VariableDecl,
     },
     object::{Enum, EnumVariant, Function, FunctionType, Parameter, Upvalue},
+    ty::PrimitiveType,
     vm::{Context, VmError},
     OpCode, Value,
 };
@@ -174,8 +175,19 @@ impl<'gc> CodeGen<'gc> {
             }) => {
                 if !self.named_id_map.contains_key(mangled_name) {
                     let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
-                    self.named_id_map
-                        .insert(mangled_name.to_owned(), FnDef::new(chunk_id, doc, params));
+                    let primitive_params = params
+                        .iter()
+                        .map(|(name, param)| {
+                            (
+                                name.lexeme.to_owned(),
+                                PrimitiveType::from(param.type_hint.unwrap_or_default()),
+                            )
+                        })
+                        .collect();
+                    self.named_id_map.insert(
+                        mangled_name.to_owned(),
+                        FnDef::new(chunk_id, doc, primitive_params),
+                    );
                 } else {
                     self.error_at(*name, "A function with same name already exists.");
                 }
@@ -385,7 +397,7 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_function(
                     name.lexeme,
                     &mangled_name,
-                    &params,
+                    params,
                     return_type,
                     body,
                     fn_type,
@@ -432,7 +444,7 @@ impl<'gc> CodeGen<'gc> {
                             .map(|v| {
                                 (
                                     self.ctx.intern(v.name.lexeme.as_bytes()),
-                                    Value::from(&v.value),
+                                    Value::from(v.value),
                                 )
                             })
                             .collect(),
@@ -509,18 +521,31 @@ impl<'gc> CodeGen<'gc> {
                         ..
                     }) = tool
                     {
+                        let primitive_params = params
+                            .iter()
+                            .map(|(name, param)| {
+                                (
+                                    name.lexeme.to_owned(),
+                                    PrimitiveType::from(param.type_hint.unwrap_or_default()),
+                                )
+                            })
+                            .collect();
                         let fn_type = FunctionType::Tool;
                         let chunk_id = self.generate_function(
                             name.lexeme,
                             &mangled_name,
-                            &params,
+                            params,
                             return_type,
                             body,
                             fn_type,
                         )?;
+
                         if agent
                             .tools
-                            .insert(name.lexeme.to_string(), FnDef::new(chunk_id, &doc, &params))
+                            .insert(
+                                name.lexeme.to_string(),
+                                FnDef::new(chunk_id, &doc, primitive_params),
+                            )
                             .is_some()
                         {
                             self.error_at(name, &format!("Duplicate tool name: {}", name.lexeme));
@@ -1117,7 +1142,7 @@ impl<'gc> CodeGen<'gc> {
         self.generate_function(
             name.lexeme,
             &mangled_name,
-            &params,
+            params,
             return_type,
             body,
             fn_type,
@@ -1134,7 +1159,7 @@ impl<'gc> CodeGen<'gc> {
         &mut self,
         name: &'gc str,
         mangle_name: &str,
-        params: &IndexMap<Token<'gc>, ParameterDecl<'gc>>,
+        mut params: IndexMap<Token<'gc>, ParameterDecl<'gc>>,
         _return_type: Option<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         fn_type: FunctionType,
@@ -1159,13 +1184,13 @@ impl<'gc> CodeGen<'gc> {
         self.function.max_arity = param_count as u8;
 
         // Compile parameters and their default values
-        for (index, param) in params.values().enumerate() {
+        for (index, param) in params.values_mut().enumerate() {
             self.declare_variable(param.name, Mutability::Mutable);
             self.mark_initialized();
 
             let name = self.ctx.intern(param.name.lexeme.as_bytes());
             // Store default value if present
-            if let Some(expr) = &param.default_value {
+            if let Some(expr) = mem::take(&mut param.default_value) {
                 let default_value = match expr {
                     Expr::Literal { value, .. } => Value::from(value),
                     Expr::EnumVariant {
@@ -1178,7 +1203,7 @@ impl<'gc> CodeGen<'gc> {
                                 Some(value) => value,
                                 None => {
                                     self.error_at(
-                                        *variant,
+                                        variant,
                                         &format!(
                                             "No variant called '{}' in enum '{}'.",
                                             variant.lexeme, enum_name.lexeme
@@ -1197,7 +1222,7 @@ impl<'gc> CodeGen<'gc> {
                             ))
                         } else {
                             self.error_at(
-                                *enum_name,
+                                enum_name,
                                 &format!("Invalid enum '{}'.", enum_name.lexeme),
                             );
                             Value::default()
@@ -1205,13 +1230,17 @@ impl<'gc> CodeGen<'gc> {
                     }
                     _ => unreachable!(),
                 };
-                self.function
-                    .params
-                    .insert(name, Parameter::new(index as u8, default_value));
+                self.function.params.insert(
+                    name,
+                    Parameter::new(index as u8, default_value)
+                        .validators(mem::take(&mut param.validators)),
+                );
             } else {
-                self.function
-                    .params
-                    .insert(name, Parameter::new(index as u8, Value::Nil));
+                self.function.params.insert(
+                    name,
+                    Parameter::new(index as u8, Value::Nil)
+                        .validators(mem::take(&mut param.validators)),
+                );
             }
         }
 

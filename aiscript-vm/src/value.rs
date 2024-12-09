@@ -360,3 +360,27 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
         }
     }
 }
+
+impl<'gc> From<&Value<'gc>> for serde_json::Value {
+    fn from(value: &Value<'gc>) -> Self {
+        match value {
+            Value::Number(n) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*n).unwrap())
+            }
+            Value::Boolean(b) => serde_json::Value::Bool(*b),
+            Value::String(s) => serde_json::Value::String(s.to_string()),
+            Value::IoString(s) => serde_json::Value::String(s.to_string()),
+            Value::Array(vec) => {
+                serde_json::Value::Array(vec.borrow().iter().map(serde_json::Value::from).collect())
+            }
+            Value::Object(obj) => serde_json::Value::Object(
+                obj.borrow()
+                    .fields
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), serde_json::Value::from(v)))
+                    .collect(),
+            ),
+            _ => serde_json::Value::Null,
+        }
+    }
+}

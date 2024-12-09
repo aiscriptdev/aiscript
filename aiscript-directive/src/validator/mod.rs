@@ -3,10 +3,15 @@ use serde_json::Value;
 use crate::Directive;
 
 pub trait Validator: Send + Sync + 'static {
+    fn name(&self) -> &'static str;
     fn validate(&self, value: &Value) -> Result<(), String>;
 }
 
 impl Validator for Box<dyn Validator> {
+    fn name(&self) -> &'static str {
+        self.as_ref().name()
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         self.as_ref().validate(value)
     }
@@ -34,6 +39,10 @@ pub struct NumberValidator {
 pub struct InValidator(Vec<Value>);
 
 impl<V: Validator> Validator for AnyValidator<V> {
+    fn name(&self) -> &'static str {
+        "@any"
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         for validator in &self.0 {
             validator.validate(value)?
@@ -43,6 +52,10 @@ impl<V: Validator> Validator for AnyValidator<V> {
 }
 
 impl<V: Validator> Validator for NotValidator<V> {
+    fn name(&self) -> &'static str {
+        "@not"
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         let validator = &self.0;
         if validator.validate(value).is_ok() {
@@ -53,6 +66,10 @@ impl<V: Validator> Validator for NotValidator<V> {
 }
 
 impl Validator for StringValidator {
+    fn name(&self) -> &'static str {
+        "@string"
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         let value = value.as_str().unwrap();
         if let Some(min_len) = self.min_len {
@@ -114,6 +131,10 @@ impl Validator for StringValidator {
 }
 
 impl Validator for NumberValidator {
+    fn name(&self) -> &'static str {
+        "@number"
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         let value = value.as_f64().unwrap();
         if let Some(min) = self.min {
@@ -142,6 +163,10 @@ impl Validator for NumberValidator {
 }
 
 impl Validator for InValidator {
+    fn name(&self) -> &'static str {
+        "@in"
+    }
+
     fn validate(&self, value: &Value) -> Result<(), String> {
         if self.0.contains(value) {
             Ok(())

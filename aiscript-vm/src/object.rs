@@ -7,6 +7,7 @@ use std::{
 };
 
 use ahash::AHasher;
+use aiscript_directive::Validator;
 use gc_arena::{
     lock::{GcRefLock, RefLock},
     Collect, Gc, Mutation,
@@ -53,6 +54,8 @@ pub struct Parameter<'gc> {
     // parameter order index
     pub position: u8,
     pub default_value: Value<'gc>,
+    #[collect(require_static)]
+    pub validators: Vec<Box<dyn Validator>>,
 }
 
 impl<'gc> Parameter<'gc> {
@@ -60,7 +63,13 @@ impl<'gc> Parameter<'gc> {
         Parameter {
             position,
             default_value,
+            validators: Vec::new(),
         }
+    }
+
+    pub fn validators(mut self, validators: Vec<Box<dyn Validator>>) -> Self {
+        self.validators = validators;
+        self
     }
 }
 

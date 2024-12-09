@@ -85,8 +85,19 @@ impl<'gc> Stmt<'gc> {
             Self::Function(func) => {
                 writeln!(f, "{ind}Function {}", func.name.lexeme).unwrap();
                 writeln!(f, "{}Parameters:", indent(level + 1)).unwrap();
-                for param in func.params.keys() {
-                    writeln!(f, "{}{}", indent(level + 2), param.lexeme).unwrap();
+                for (name, decl) in &func.params {
+                    writeln!(
+                        f,
+                        "{}{} [{}]",
+                        indent(level + 2),
+                        name.lexeme,
+                        decl.validators
+                            .iter()
+                            .map(|v| v.name())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
+                    .unwrap();
                 }
                 if let Some(ret_type) = &func.return_type {
                     writeln!(f, "{}Return Type: {}", indent(level + 1), ret_type.lexeme).unwrap();

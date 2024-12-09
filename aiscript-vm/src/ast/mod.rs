@@ -163,23 +163,15 @@ pub struct FnDef {
 }
 
 impl FnDef {
-    pub fn new<'gc>(
+    pub fn new(
         chunk_id: ChunkId,
-        doc: &Option<Token<'gc>>,
-        params: &IndexMap<Token<'gc>, ParameterDecl<'gc>>,
+        doc: &Option<Token>,
+        params: IndexMap<String, PrimitiveType>,
     ) -> Self {
         FnDef {
             chunk_id,
             doc: doc.map(|t| t.lexeme.to_owned()).unwrap_or_default(),
-            params: params
-                .iter()
-                .map(|(name, param)| {
-                    (
-                        name.lexeme.to_owned(),
-                        PrimitiveType::from(param.type_hint.unwrap_or_default()),
-                    )
-                })
-                .collect(),
+            params,
         }
     }
 }
@@ -479,12 +471,12 @@ impl<'gc> Program<'gc> {
     }
 }
 
-impl<'gc> From<&Literal<'gc>> for Value<'gc> {
-    fn from(value: &Literal<'gc>) -> Self {
+impl<'gc> From<Literal<'gc>> for Value<'gc> {
+    fn from(value: Literal<'gc>) -> Self {
         match value {
-            Literal::Number(value) => Value::Number(*value),
-            Literal::String(value) => Value::String(*value),
-            Literal::Boolean(value) => Value::Boolean(*value),
+            Literal::Number(value) => Value::Number(value),
+            Literal::String(value) => Value::String(value),
+            Literal::Boolean(value) => Value::Boolean(value),
             Literal::Nil => Value::Nil,
         }
     }

@@ -1323,6 +1323,12 @@ impl<'gc> State<'gc> {
                 }
                 final_args[pos] = param.default_value;
             }
+
+            for validator in &param.validators {
+                if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos])) {
+                    println!("validate error: {err}");
+                }
+            }
         }
 
         Ok(final_args)
