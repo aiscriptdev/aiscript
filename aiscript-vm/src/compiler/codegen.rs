@@ -10,12 +10,12 @@ use crate::{
         AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, FunctionDecl, Mutability,
         ObjectProperty, VariableDecl,
     },
-    object::{Enum, EnumVariant, Function, FunctionType, Upvalue},
+    object::{Enum, EnumVariant, Function, FunctionType, Parameter, Upvalue},
     vm::{Context, VmError},
     OpCode, Value,
 };
 use crate::{
-    ast::{Expr, FnDef, Literal, Parameter, Program, Stmt},
+    ast::{Expr, FnDef, Literal, ParameterDecl, Program, Stmt},
     lexer::{Token, TokenType},
 };
 use aiscript_lexer::ErrorReporter;
@@ -1134,7 +1134,7 @@ impl<'gc> CodeGen<'gc> {
         &mut self,
         name: &'gc str,
         mangle_name: &str,
-        params: &IndexMap<Token<'gc>, Parameter<'gc>>,
+        params: &IndexMap<Token<'gc>, ParameterDecl<'gc>>,
         _return_type: Option<Token<'gc>>,
         body: Vec<Stmt<'gc>>,
         fn_type: FunctionType,
@@ -1207,9 +1207,11 @@ impl<'gc> CodeGen<'gc> {
                 };
                 self.function
                     .params
-                    .insert(name, (index as u8, default_value));
+                    .insert(name, Parameter::new(index as u8, default_value));
             } else {
-                self.function.params.insert(name, (index as u8, Value::Nil));
+                self.function
+                    .params
+                    .insert(name, Parameter::new(index as u8, Value::Nil));
             }
         }
 

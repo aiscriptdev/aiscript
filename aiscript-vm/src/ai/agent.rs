@@ -16,7 +16,7 @@ use tokio::runtime::Handle;
 use crate::{
     ast::{Expr, FnDef, Literal},
     lexer::Token,
-    object::{Function, Object},
+    object::{Function, Object, Parameter},
     string::InternedString,
     ty::PrimitiveType,
     vm::{Context, State},
@@ -84,7 +84,10 @@ fn agent_methods<'gc>(ctx: &Context<'gc>) -> HashMap<InternedString<'gc>, Gc<'gc
                     .into_iter()
                     .enumerate()
                     .map(|(i, (name, default))| {
-                        (InternedString::from_static(ctx, name), (i as u8, default))
+                        (
+                            InternedString::from_static(ctx, name),
+                            Parameter::new(i as u8, default),
+                        )
                     })
                     .collect(),
                 chunk: Chunk::new(),

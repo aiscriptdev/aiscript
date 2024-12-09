@@ -1295,8 +1295,8 @@ impl<'gc> State<'gc> {
                 })?;
                 let value = self.stack[idx + 1];
 
-                if let Some(&(pos, _)) = function.params.get(&name) {
-                    let pos = pos as usize;
+                if let Some(param) = function.params.get(&name) {
+                    let pos = param.position as usize;
                     if pos < total_args {
                         return Err(self.runtime_error(
                             format!("Keyword argument '{}' was already specified as positional argument.", name)
@@ -1313,15 +1313,15 @@ impl<'gc> State<'gc> {
         }
 
         // Fill in default values and check required parameters
-        for (name, (pos, default)) in &function.params {
-            let pos = *pos as usize;
+        for (name, param) in &function.params {
+            let pos = param.position as usize;
             if final_args[pos].equals(&Value::Nil) {
-                if pos < function.arity as usize && default.is_nil() {
+                if pos < function.arity as usize && param.default_value.is_nil() {
                     return Err(
                         self.runtime_error(format!("Missing required argument '{}'.", name).into())
                     );
                 }
-                final_args[pos] = *default;
+                final_args[pos] = param.default_value;
             }
         }
 

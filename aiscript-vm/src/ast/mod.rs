@@ -52,7 +52,7 @@ impl<'gc> Display for Literal<'gc> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EnumDecl<'gc> {
     pub name: Token<'gc>,
     pub variants: Vec<EnumVariant<'gc>>,
@@ -68,12 +68,12 @@ pub struct EnumVariant<'gc> {
     pub value: Literal<'gc>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionDecl<'gc> {
     pub name: Token<'gc>,
     pub mangled_name: String,
     pub doc: Option<Token<'gc>>,
-    pub params: IndexMap<Token<'gc>, Parameter<'gc>>,
+    pub params: IndexMap<Token<'gc>, ParameterDecl<'gc>>,
     pub return_type: Option<Token<'gc>>,
     pub error_types: Vec<Token<'gc>>,
     pub body: Vec<Stmt<'gc>>,
@@ -82,7 +82,7 @@ pub struct FunctionDecl<'gc> {
     pub line: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VariableDecl<'gc> {
     pub name: Token<'gc>,
     pub initializer: Option<Expr<'gc>>,
@@ -98,7 +98,7 @@ pub struct ClassFieldDecl<'gc> {
     pub line: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ClassDecl<'gc> {
     pub name: Token<'gc>,
     pub superclass: Option<Expr<'gc>>,
@@ -108,7 +108,7 @@ pub struct ClassDecl<'gc> {
     pub line: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AgentDecl<'gc> {
     pub name: Token<'gc>,
     pub mangled_name: String,
@@ -118,24 +118,36 @@ pub struct AgentDecl<'gc> {
     pub line: u32,
 }
 
-#[derive(Debug, Clone)]
-pub struct Parameter<'gc> {
+pub struct ParameterDecl<'gc> {
     pub name: Token<'gc>,
     pub type_hint: Option<Token<'gc>>,
     pub default_value: Option<Expr<'gc>>,
+    pub validators: Vec<Box<dyn Validator>>,
 }
 
-impl<'gc> Parameter<'gc> {
+impl<'gc> std::fmt::Debug for ParameterDecl<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Parameter")
+            .field("name", &self.name)
+            .field("type_hint", &self.type_hint)
+            .field("default_value", &self.default_value)
+            .field("validators", &self.validators.len())
+            .finish()
+    }
+}
+
+impl<'gc> ParameterDecl<'gc> {
     pub fn new(name: Token<'gc>) -> Self {
         Self {
             name,
             type_hint: None,
             default_value: None,
+            validators: Vec::new(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ErrorHandler<'gc> {
     pub error_var: Token<'gc>,
     pub handler_body: Vec<Stmt<'gc>>,
@@ -154,7 +166,7 @@ impl FnDef {
     pub fn new<'gc>(
         chunk_id: ChunkId,
         doc: &Option<Token<'gc>>,
-        params: &IndexMap<Token<'gc>, Parameter<'gc>>,
+        params: &IndexMap<Token<'gc>, ParameterDecl<'gc>>,
     ) -> Self {
         FnDef {
             chunk_id,
@@ -172,7 +184,7 @@ impl FnDef {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ObjectProperty<'gc> {
     // Regular property with literal name
     Literal {
@@ -186,7 +198,7 @@ pub enum ObjectProperty<'gc> {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Expr<'gc> {
     Object {
         properties: Vec<ObjectProperty<'gc>>,
@@ -341,7 +353,7 @@ impl<'gc> Expr<'gc> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Stmt<'gc> {
     Use {
         path: Token<'gc>,
@@ -454,7 +466,7 @@ impl<'gc> std::hash::Hash for Literal<'gc> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Program<'gc> {
     pub statements: Vec<Stmt<'gc>>,
 }

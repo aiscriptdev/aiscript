@@ -40,11 +40,28 @@ pub struct Closure<'gc> {
 pub struct Function<'gc> {
     pub arity: u8,
     pub max_arity: u8,
-    // <name, (parameter order index, default value)>
-    pub params: HashMap<InternedString<'gc>, (u8, Value<'gc>)>,
+    // <name, parameter>
+    pub params: HashMap<InternedString<'gc>, Parameter<'gc>>,
     pub chunk: Chunk<'gc>,
     pub name: Option<InternedString<'gc>>,
     pub upvalues: Vec<Upvalue>,
+}
+
+#[derive(Debug, Clone, Collect, Default)]
+#[collect[no_drop]]
+pub struct Parameter<'gc> {
+    // parameter order index
+    pub position: u8,
+    pub default_value: Value<'gc>,
+}
+
+impl<'gc> Parameter<'gc> {
+    pub fn new(position: u8, default_value: Value<'gc>) -> Self {
+        Parameter {
+            position,
+            default_value,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Collect)]

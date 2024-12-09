@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::{
-    ast::{Expr, Literal, Parameter, Program, Stmt},
+    ast::{Expr, Literal, ParameterDecl, Program, Stmt},
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{
@@ -527,20 +527,15 @@ impl<'gc> Parser<'gc> {
             None
         }
 
-        fn create_field_init<'gc>(field: &ClassFieldDecl<'gc>) -> Stmt<'gc> {
+        fn create_field_init(field: ClassFieldDecl) -> Stmt {
             Stmt::Expression {
                 expression: Expr::Set {
                     object: Box::new(Expr::Self_ { line: field.line }),
                     name: field.name,
-                    value: Box::new(
-                        field
-                            .default_value
-                            .clone()
-                            .unwrap_or_else(|| Expr::Literal {
-                                value: Literal::Nil,
-                                line: field.line,
-                            }),
-                    ),
+                    value: Box::new(field.default_value.unwrap_or_else(|| Expr::Literal {
+                        value: Literal::Nil,
+                        line: field.line,
+                    })),
                     line: field.line,
                 },
                 line: field.line,
@@ -554,87 +549,90 @@ impl<'gc> Parser<'gc> {
                 |m| matches!(m, Stmt::Function(FunctionDecl { fn_type, .. }) if fn_type.is_constructor()),
             );
             methods = other_methods;
-            let constructor =
-                if let Some(Stmt::Function(constructor_decl)) = constructor.into_iter().next() {
-                    // Track which fields are initialized in constructor through self.field = ...
-                    let initialized_fields: HashSet<_> = constructor_decl
-                        .body
-                        .iter()
-                        .filter_map(is_self_field_init)
-                        .collect();
+            let constructor = if let Some(Stmt::Function(mut constructor_decl)) =
+                constructor.into_iter().next()
+            {
+                // Track which fields are initialized in constructor through self.field = ...
+                let initialized_fields: HashSet<_> = constructor_decl
+                    .body
+                    .iter()
+                    .filter_map(is_self_field_init)
+                    .collect();
 
-                    // Create initialization statements for declared fields that aren't initialized
-                    let field_inits = fields
-                        .iter()
-                        .filter(|field| !initialized_fields.contains(field.name.lexeme))
-                        .map(create_field_init)
-                        .collect::<Vec<_>>();
+                // Create initialization statements for declared fields that aren't initialized
+                let field_inits = fields
+                    .into_iter()
+                    .filter(|field| !initialized_fields.contains(field.name.lexeme))
+                    .map(create_field_init)
+                    .collect::<Vec<_>>();
 
-                    if !field_inits.is_empty() {
-                        let mut new_body = field_inits;
-                        // Keep all original statements, including assignments to non-declared fields
-                        new_body.extend_from_slice(&constructor_decl.body);
-                        Stmt::Function(FunctionDecl {
-                            body: new_body,
-                            ..constructor_decl
-                        })
-                    } else {
-                        // No declared fields need initialization, use original constructor as-is
-                        Stmt::Function(constructor_decl)
-                    }
-                } else {
-                    // No constructor exists, create synthetic one that declare all fields as keyword arguments:
-                    /*
-                        class Foo {
-                            x: int = 0,
-                            y: int = 0,
-
-                            // Auto-generated constructor
-                            fn new(x: int = 0, y: int = 0) {
-                                self.x = x;
-                                self.y = y;
-                            }
-                        }
-                    */
-                    let mut params = IndexMap::with_capacity(fields.len());
-                    let mut body = Vec::with_capacity(fields.len());
-                    for field in fields {
-                        // Note: the line is not real, we just give the field's line.
-                        let line = field.line;
-                        body.push(Stmt::Expression {
-                            expression: Expr::Set {
-                                object: Box::new(Expr::Self_ { line }),
-                                name: field.name,
-                                value: Box::new(Expr::Variable {
-                                    name: field.name,
-                                    line,
-                                }),
-                                line,
-                            },
-                            line,
-                        });
-                        params.insert(
-                            field.name,
-                            Parameter {
-                                name: field.name,
-                                type_hint: Some(field.type_hint),
-                                default_value: field.default_value,
-                            },
-                        );
-                    }
+                if !field_inits.is_empty() {
+                    let mut new_body = field_inits;
+                    // Keep all original statements, including assignments to non-declared fields
+                    new_body.extend(mem::take(&mut constructor_decl.body));
+                    // TODO: add validators for parameters
                     Stmt::Function(FunctionDecl {
-                        name: Token::new(TokenType::Identifier, "new", name.line),
-                        mangled_name: format!("{}$new", self.scopes.join("$")),
-                        params,
-                        doc: None,
-                        return_type: None,
-                        error_types: Vec::new(),
-                        body,
-                        fn_type: FunctionType::Constructor,
-                        visibility: Visibility::Public,
-                        line: name.line,
+                        body: new_body,
+                        ..constructor_decl
                     })
-                };
+                } else {
+                    // No declared fields need initialization, use original constructor as-is
+                    Stmt::Function(constructor_decl)
+                }
+            } else {
+                // No constructor exists, create synthetic one that declare all fields as keyword arguments:
+                /*
+                    class Foo {
+                        x: int = 0,
+                        y: int = 0,
+
+                        // Auto-generated constructor
+                        fn new(x: int = 0, y: int = 0) {
+                            self.x = x;
+                            self.y = y;
+                        }
+                    }
+                */
+                let mut params = IndexMap::with_capacity(fields.len());
+                let mut body = Vec::with_capacity(fields.len());
+                for field in fields {
+                    // Note: the line is not real, we just give the field's line.
+                    let line = field.line;
+                    body.push(Stmt::Expression {
+                        expression: Expr::Set {
+                            object: Box::new(Expr::Self_ { line }),
+                            name: field.name,
+                            value: Box::new(Expr::Variable {
+                                name: field.name,
+                                line,
+                            }),
+                            line,
+                        },
+                        line,
+                    });
+                    params.insert(
+                        field.name,
+                        ParameterDecl {
+                            name: field.name,
+                            type_hint: Some(field.type_hint),
+                            default_value: field.default_value,
+                            validators: field.validators,
+                        },
+                    );
+                }
+                Stmt::Function(FunctionDecl {
+                    name: Token::new(TokenType::Identifier, "new", name.line),
+                    mangled_name: format!("{}$new", self.scopes.join("$")),
+                    params,
+                    doc: None,
+                    return_type: None,
+                    error_types: Vec::new(),
+                    body,
+                    fn_type: FunctionType::Constructor,
+                    visibility: Visibility::Public,
+                    line: name.line,
+                })
+            };
             methods.push(constructor);
         }
 
@@ -816,10 +814,11 @@ impl<'gc> Parser<'gc> {
 
             params.insert(
                 param_name,
-                Parameter {
+                ParameterDecl {
                     name: param_name,
                     type_hint,
                     default_value,
+                    validators: Vec::new(), // TODO: support validator for normal function?
                 },
             );
 
