@@ -1,7 +1,7 @@
 enum ArithError! {
     DivideZero
 }
-class AnotherError {
+class AnotherError! {
     msg: str = "another error",
 }
 
@@ -39,7 +39,7 @@ fn do_math3(n) -> ArithError! {
     // use raise to re-raise error
     let v = divide(1, n) |err| {
         print(err);
-        raise AnotherError();
+        raise AnotherError!();
     };
     print("[value]", v);
 }
@@ -47,4 +47,4 @@ fn do_math3(n) -> ArithError! {
 do_math3(1); // expect: [value] 1
 print(do_math3(0));
 // expect: ArithError!::DivideZero
-// expect: AnotherError {msg: another error}
+// expect: AnotherError! {msg: another error}

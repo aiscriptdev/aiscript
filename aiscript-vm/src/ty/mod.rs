@@ -1,8 +1,11 @@
+use gc_arena::Collect;
+
 mod r#enum;
+mod error;
 mod resolver;
 
 use crate::lexer::Token;
-use gc_arena::Collect;
+pub(crate) use error::FunctionErrorResolver;
 pub(crate) use r#enum::EnumVariantChecker;
 pub(crate) use resolver::{ClassField, TypeResolver, ValidationError};
 

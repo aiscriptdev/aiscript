@@ -1,0 +1,19 @@
+class FooError! {}
+
+fn foo() {
+    raise FooError! {}; // Error at 'raise': Cannot use 'raise' outside of a function that declares error types.
+}
+
+enum ArithError! {
+    DivideZero
+}
+fn divide(a, b) -> int | ArithError! {
+    if b == 0 {
+        raise ArithError!::DivideZero;
+    }
+    return a / b;
+}
+fn do_math(n) {
+    let v = divide(1, n)?; // Error at '?': Cannot use '?' operator in function that doesn't declare error types.
+    print("[value]", v);
+}

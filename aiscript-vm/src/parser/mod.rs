@@ -18,7 +18,9 @@ use crate::{
         ObjectProperty, VariableDecl, Visibility,
     },
     object::FunctionType,
-    ty::{ClassField, EnumVariantChecker, Type, TypeResolver, ValidationError},
+    ty::{
+        ClassField, EnumVariantChecker, FunctionErrorResolver, Type, TypeResolver, ValidationError,
+    },
     vm::Context,
     VmError,
 };
@@ -45,6 +47,7 @@ pub struct Parser<'gc> {
     // it is hard to handle the '{' conflict without this flag.
     stop_at_brace: bool,
     type_resolver: TypeResolver<'gc>,
+    error_resolver: Option<FunctionErrorResolver<'gc>>,
 }
 
 #[derive(Default, Debug)]
@@ -81,6 +84,7 @@ impl<'gc> Parser<'gc> {
             loop_depth: 0,
             stop_at_brace: false,
             type_resolver: TypeResolver::new(),
+            error_resolver: None,
         }
     }
 
@@ -735,6 +739,9 @@ impl<'gc> Parser<'gc> {
         if self.fn_type.is_method() && name.lexeme == "new" {
             self.fn_type = FunctionType::Constructor;
         }
+        // Store the previous function info and create new one for this function
+        let previous_error_resolver = self.error_resolver.take();
+        self.error_resolver = Some(FunctionErrorResolver::new(name));
 
         self.consume(TokenType::OpenParen, "Expect '(' after function name.");
 
@@ -860,6 +867,14 @@ impl<'gc> Parser<'gc> {
         let mangled_name = self.scopes.join("$");
         self.scopes.pop();
 
+        // if let Some(resolver) = &self.error_resolver {
+        //     if let Err(err) = resolver.validate() {
+        //         self.error_at(name, &err);
+        //     }
+        // }
+        // Restore the previous function context
+        self.error_resolver = previous_error_resolver;
+
         let func = Stmt::Function(FunctionDecl {
             name,
             mangled_name,
@@ -877,6 +892,14 @@ impl<'gc> Parser<'gc> {
         Some(func)
     }
 
+    // Helper method to check if we're inside a function that can handle errors
+    fn in_error_function(&self) -> bool {
+        self.error_resolver
+            .as_ref()
+            .map(|f| f.in_error_function)
+            .unwrap_or(false)
+    }
+
     fn parse_function_return(&mut self) -> (Option<Token<'gc>>, Vec<Token<'gc>>) {
         let mut return_type = None;
         let mut error_types = Vec::new();
@@ -884,34 +907,50 @@ impl<'gc> Parser<'gc> {
         if self.match_token(TokenType::Arrow) {
             if !self.check_either(TokenType::Error, TokenType::Identifier) {
                 self.error_at_current("Expect type after '->'.");
+                return (None, Vec::new());
             }
             let first_type = self.parse_type();
 
             // Check if first type is an error type
             if first_type.is_error_type() {
+                if let Some(resolver) = self.error_resolver.as_mut() {
+                    resolver.add_declared_error(first_type);
+                }
                 error_types.push(first_type);
             } else {
                 return_type = Some(first_type);
             }
 
             // Parse additional types (must be error types)
-            while self.match_token(TokenType::Pipe) {
+            loop {
                 if self.check(TokenType::OpenBrace) {
-                    break; // Handle optional trailing comma
+                    break;
                 }
-                self.consume_either(
-                    TokenType::Error,
-                    TokenType::Identifier,
-                    "Expect error type.",
-                );
-                let error_type = self.previous;
-                if !error_type.is_error_type() {
-                    self.error_at(
-                        error_type,
-                        "Only error types can be listed after return type.",
+                // Handle separator
+                if self.check(TokenType::Comma) {
+                    self.error_at_current(
+                        "Expected '|' to separate return type and error types, found ','.",
                     );
+                    self.advance(); // Consume the comma
+                } else if self.check(TokenType::Pipe) {
+                    self.advance(); // Consume the pipe
+                } else {
+                    // If we see anything else without a separator, that's an error
+                    if !self.check(TokenType::OpenBrace) {
+                        self.error_at_current("Expected '|' before error type.");
+                    }
                 }
-                error_types.push(error_type);
+
+                if self.match_token(TokenType::Error) {
+                    let error_type = self.previous;
+                    if let Some(resolver) = self.error_resolver.as_mut() {
+                        resolver.add_declared_error(error_type);
+                    }
+                    error_types.push(error_type);
+                } else {
+                    self.error_at_current("Only error types can be listed after return type.");
+                    self.advance();
+                }
             }
         }
 
@@ -1698,18 +1737,29 @@ impl<'gc> Parser<'gc> {
                 propagate: false,
             });
         } else if self.match_token(TokenType::Question) {
-            // If we saw a ? but no handler, create an implicit propagation handler
-            handler = Some(ErrorHandler {
-                error_var: Token::default(), // Dummy token since we don't need a variable name
-                handler_body: Vec::new(),    // Empty body since we're just propagating
-                propagate: true,
-            });
+            // Validate ? operator usage
+            if !self.in_error_function() {
+                self.error("Cannot use '?' operator in function that doesn't declare error types.");
+            } else {
+                // If we saw a ? but no handler, create an implicit propagation handler
+                handler = Some(ErrorHandler {
+                    error_var: Token::default(), // Dummy token since we don't need a variable name
+                    handler_body: Vec::new(),    // Empty body since we're just propagating
+                    propagate: true,
+                });
+            }
         }
 
         handler
     }
 
     fn raise_statement(&mut self) -> Option<Stmt<'gc>> {
+        if !self.in_error_function() {
+            self.error("Cannot use 'raise' outside of a function that declares error types.");
+            return None;
+        }
+
+        // TODO: check raise error type
         let error = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after raise expression.");
         Some(Stmt::Raise {

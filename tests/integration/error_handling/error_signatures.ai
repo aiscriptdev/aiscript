@@ -1,0 +1,9 @@
+class FooError! {}
+
+fn f1() -> {} // Error at '{': Expect type after '->'.
+
+fn f2() -> FooError! | int {} // Error at 'int': Only error types can be listed after return type.
+
+fn f3() -> int FooError! {} //  Error at 'FooError!': Expected '|' before error type.
+
+fn f4() -> int, FooError! {} // Error at ',': Expected '|' to separate return type and error types, found ','.
