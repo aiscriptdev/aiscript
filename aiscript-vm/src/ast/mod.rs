@@ -265,6 +265,7 @@ pub enum Expr<'gc> {
     },
     Call {
         callee: Box<Expr<'gc>>,
+        is_constructor: bool,
         arguments: Vec<Expr<'gc>>,
         keyword_args: HashMap<String, Expr<'gc>>,
         error_handler: Option<ErrorHandler<'gc>>,

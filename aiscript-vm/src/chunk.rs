@@ -47,6 +47,10 @@ pub enum OpCode {
     JumpIfError(u16), // Jump to error handler if top of stack is error
     Jump(u16),
     Loop(u16),
+    Constructor {
+        positional_count: u8,
+        keyword_count: u8,
+    },
     Call {
         positional_count: u8,
         keyword_count: u8,
@@ -255,6 +259,15 @@ impl<'gc> Chunk<'gc> {
                 }
                 OpCode::Jump(jump) => self.jump_instruction("JUMP", 1, offset, jump),
                 OpCode::Loop(jump) => self.jump_instruction("LOOP", -1, offset, jump),
+                OpCode::Constructor {
+                    positional_count,
+                    keyword_count,
+                } => {
+                    println!(
+                        "{:-16} {:4} {:4}",
+                        "OP_CONSTRUCTOR", positional_count, keyword_count
+                    );
+                }
                 OpCode::Call {
                     positional_count,
                     keyword_count,

@@ -1028,6 +1028,7 @@ impl<'gc> Parser<'gc> {
         // Create call expression with left being first argument
         Some(Expr::Call {
             callee,
+            is_constructor: false,
             arguments: std::iter::once(*left).chain(arguments).collect(),
             keyword_args,
             error_handler: self.parse_error_handling(),
@@ -1463,6 +1464,7 @@ impl<'gc> Parser<'gc> {
             }
             Some(Expr::Call {
                 callee: Box::new(previous_expr.unwrap()),
+                is_constructor: true,
                 arguments: vec![],
                 keyword_args,
                 error_handler: None,
@@ -1610,8 +1612,11 @@ impl<'gc> Parser<'gc> {
         let (arguments, keyword_args) = self.argument_list()?;
         self.consume(TokenType::CloseParen, "Expect ')' after arguments.");
 
+        let is_constructor =
+            matches!(&*callee, Expr::Variable { name, .. } if self.type_resolver.check_class(name));
         Some(Expr::Call {
             callee,
+            is_constructor,
             arguments,
             keyword_args,
             error_handler: self.parse_error_handling(),

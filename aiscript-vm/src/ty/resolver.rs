@@ -78,6 +78,11 @@ impl<'gc> TypeResolver<'gc> {
         }
     }
 
+    // Check the token whether a registerd class or not.
+    pub fn check_class(&mut self, token: &Token<'gc>) -> bool {
+        self.class_info.contains_key(token.lexeme)
+    }
+
     pub fn add_type_usage(&mut self, token: Token<'gc>) {
         self.pending_validations.push(token);
     }

@@ -7,17 +7,14 @@ use std::{
 use crate::{
     ai::Agent,
     ast::{
-        AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, FunctionDecl, Mutability,
-        ObjectProperty, VariableDecl,
+        AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, Expr, FnDef, FunctionDecl, Literal,
+        Mutability, ObjectProperty, ParameterDecl, Program, Stmt, VariableDecl,
     },
+    lexer::{Token, TokenType},
     object::{Enum, EnumVariant, Function, FunctionType, Parameter, Upvalue},
     ty::PrimitiveType,
     vm::{Context, VmError},
     OpCode, Value,
-};
-use crate::{
-    ast::{Expr, FnDef, Literal, ParameterDecl, Program, Stmt},
-    lexer::{Token, TokenType},
 };
 use aiscript_lexer::ErrorReporter;
 use gc_arena::{Gc, GcRefLock, RefLock};
@@ -475,9 +472,7 @@ impl<'gc> CodeGen<'gc> {
                 // Pop the enum
                 self.emit(OpCode::Pop(1));
             }
-            Stmt::Class(class_decl) => {
-                self.generate_class(class_decl)?;
-            }
+            Stmt::Class(class_decl) => self.generate_class(class_decl)?,
             Stmt::Agent(AgentDecl {
                 name,
                 mangled_name,
@@ -650,9 +645,7 @@ impl<'gc> CodeGen<'gc> {
                     }
                 }
             }
-            Expr::Grouping { expression, .. } => {
-                self.generate_expr(expression)?;
-            }
+            Expr::Grouping { expression, .. } => self.generate_expr(expression)?,
             Expr::Literal { value, .. } => match value {
                 Literal::Number(n) => self.emit_constant(Value::from(n)),
                 Literal::String(s) => self.emit_constant(Value::from(s)),
@@ -674,75 +667,27 @@ impl<'gc> CodeGen<'gc> {
                     }
                 }
             }
-            Expr::Variable { name, .. } => {
-                self.named_variable(name, false)?;
-            }
+            Expr::Variable { name, .. } => self.named_variable(name, false)?,
             Expr::Assign { name, value, .. } => {
                 self.generate_expr(value)?;
                 self.named_variable(name, true)?;
             }
             Expr::Block { statements, .. } => self.generate_block_expr(statements)?,
-            Expr::Lambda { params, body, .. } => {
-                // Create a new compiler for the lambda
-                let name = format!("lambda_{}", CHUNK_ID.load(Ordering::Relaxed));
-                let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
-
-                // Create the lambda compiler and swap with self
-                let mut lambda_compiler = Self::new(self.ctx, FunctionType::Lambda, &name);
-                lambda_compiler.named_id_map = self.named_id_map.clone();
-
-                // Store current compiler as enclosing and set enclosing for lambda
-                let current_compiler = mem::replace(self, *lambda_compiler);
-                self.enclosing = Some(Box::new(current_compiler));
-
-                // Set up function parameters
-                self.function.arity = params.len() as u8;
-                self.function.max_arity = params.len() as u8;
-
-                // Add parameters as locals
-                self.begin_scope();
-                for param in params {
-                    self.declare_variable(param, Mutability::Mutable);
-                    self.mark_initialized();
-                }
-
-                // Generate code for the body (which is a Block expression)
-                self.generate_expr(body)?;
-
-                // self.emit(OpCode::Return);
-                // self.end_scope();
-
-                // Check for errors
-                if self.error_reporter.had_error {
-                    return Err(VmError::CompileError);
-                }
-
-                // Get the generated function and chunks
-                self.function.shrink_to_fit();
-                let generated_function = mem::take(&mut self.function);
-                let generated_chunks = mem::take(&mut self.chunks);
-
-                // Get the enclosing compiler back
-                if let Some(enclosing) = self.enclosing.take() {
-                    let _ = mem::replace(self, *enclosing);
-                }
-
-                // Store the generated function and extend chunks
-                self.chunks.insert(chunk_id, generated_function);
-                self.chunks.extend(generated_chunks);
-
-                // Emit closure instruction
-                self.emit(OpCode::Closure { chunk_id });
-            }
+            Expr::Lambda { params, body, .. } => self.generate_lambda(params, body)?,
             Expr::Call {
                 callee,
+                is_constructor,
                 arguments,
                 keyword_args,
                 error_handler,
                 ..
-            } => {
-                self.generate_call(callee, arguments, keyword_args, error_handler)?;
-            }
+            } => self.generate_call(
+                callee,
+                is_constructor,
+                arguments,
+                keyword_args,
+                error_handler,
+            )?,
             Expr::Invoke {
                 object,
                 method,
@@ -750,9 +695,7 @@ impl<'gc> CodeGen<'gc> {
                 keyword_args,
                 error_handler,
                 ..
-            } => {
-                self.generate_invoke(object, method, arguments, keyword_args, error_handler)?;
-            }
+            } => self.generate_invoke(object, method, arguments, keyword_args, error_handler)?,
             Expr::Index {
                 object, key, value, ..
             } => {
@@ -925,9 +868,68 @@ impl<'gc> CodeGen<'gc> {
 }
 
 impl<'gc> CodeGen<'gc> {
+    fn generate_lambda(
+        &mut self,
+        params: Vec<Token<'gc>>,
+        body: Box<Expr<'gc>>,
+    ) -> Result<(), VmError> {
+        // Create a new compiler for the lambda
+        let name = format!("lambda_{}", CHUNK_ID.load(Ordering::Relaxed));
+        let chunk_id = CHUNK_ID.fetch_add(1, Ordering::AcqRel);
+
+        // Create the lambda compiler and swap with self
+        let mut lambda_compiler = Self::new(self.ctx, FunctionType::Lambda, &name);
+        lambda_compiler.named_id_map = self.named_id_map.clone();
+
+        // Store current compiler as enclosing and set enclosing for lambda
+        let current_compiler = mem::replace(self, *lambda_compiler);
+        self.enclosing = Some(Box::new(current_compiler));
+
+        // Set up function parameters
+        self.function.arity = params.len() as u8;
+        self.function.max_arity = params.len() as u8;
+
+        // Add parameters as locals
+        self.begin_scope();
+        for param in params {
+            self.declare_variable(param, Mutability::Mutable);
+            self.mark_initialized();
+        }
+
+        // Generate code for the body (which is a Block expression)
+        self.generate_expr(body)?;
+
+        // self.emit(OpCode::Return);
+        // self.end_scope();
+
+        // Check for errors
+        if self.error_reporter.had_error {
+            return Err(VmError::CompileError);
+        }
+
+        // Get the generated function and chunks
+        self.function.shrink_to_fit();
+        let generated_function = mem::take(&mut self.function);
+        let generated_chunks = mem::take(&mut self.chunks);
+
+        // Get the enclosing compiler back
+        if let Some(enclosing) = self.enclosing.take() {
+            let _ = mem::replace(self, *enclosing);
+        }
+
+        // Store the generated function and extend chunks
+        self.chunks.insert(chunk_id, generated_function);
+        self.chunks.extend(generated_chunks);
+
+        // Emit closure instruction
+        self.emit(OpCode::Closure { chunk_id });
+        Ok(())
+    }
+
     fn generate_call(
         &mut self,
         callee: Box<Expr<'gc>>,
+        is_constructor: bool,
         arguments: Vec<Expr<'gc>>,
         keyword_args: HashMap<String, Expr<'gc>>,
         error_handler: Option<ErrorHandler<'gc>>,
@@ -940,11 +942,18 @@ impl<'gc> CodeGen<'gc> {
         }
         self.generate_keyword_args(keyword_args)?;
 
-        // Emit call instruction - result will be on stack
-        self.emit(OpCode::Call {
-            positional_count: arg_count,
-            keyword_count: kw_count,
-        });
+        if is_constructor {
+            self.emit(OpCode::Constructor {
+                positional_count: arg_count,
+                keyword_count: kw_count,
+            });
+        } else {
+            // Emit call instruction - result will be on stack
+            self.emit(OpCode::Call {
+                positional_count: arg_count,
+                keyword_count: kw_count,
+            });
+        }
 
         if let Some(handler) = error_handler {
             self.generate_error_handler(handler)?;

@@ -486,6 +486,17 @@ impl<'gc> State<'gc> {
             OpCode::Loop(offset) => {
                 frame.ip -= offset as usize;
             }
+            OpCode::Constructor {
+                positional_count,
+                keyword_count,
+            } => {
+                // *2 because each keyword arg has name and value
+                // Get the actual function from the correct stack position
+                // Need to peek past all args (both positional and keyword) to get to the function
+                let arg_slot_count = positional_count + keyword_count * 2;
+                let callee = *self.peek(arg_slot_count as usize);
+                self.call_constructor(callee, positional_count, keyword_count)?;
+            }
             OpCode::Call {
                 positional_count,
                 keyword_count,
@@ -967,7 +978,6 @@ impl<'gc> State<'gc> {
         }
 
         // Do not use peek() to get value! the slot would be incorrect offset to peek.
-        // let local = &self.stack[slot].clone();
         // create a new upvalue for our local slot and insert it into the list at the right location.
         let created_upvalue = Gc::new(
             self.mc,
@@ -1054,6 +1064,45 @@ impl<'gc> State<'gc> {
         }
     }
 
+    fn call_constructor(
+        &mut self,
+        callee: Value<'gc>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<(), VmError> {
+        let args_slot_count = (args_count + keyword_args_count * 2) as usize;
+        if let Value::Class(class) = callee {
+            let instance = Instance::new(class);
+            self.stack[self.stack_top - args_slot_count - 1] =
+                Value::from(Gc::new(self.mc, RefLock::new(instance)));
+            if let Some(constructor) = class.borrow().methods.get(&self.intern(b"new")) {
+                let closure = constructor.as_closure()?;
+                match self.validate_args(closure, args_count, keyword_args_count)? {
+                    CheckArgsResult::ValidationError(error) => {
+                        // Pop arguments and push error
+                        self.stack_top -= args_count as usize + keyword_args_count as usize * 2 + 1; // we need +1 to pop the instance too
+                        self.push_stack(error);
+                    }
+                    CheckArgsResult::Args(final_args) => {
+                        self.call_inner(closure, args_count, keyword_args_count, final_args)?;
+                    }
+                }
+            } else if (args_count + keyword_args_count) != 0 {
+                return Err(self.runtime_error(
+                    format!(
+                        "Expected 0 arguments but got {}.",
+                        args_count + keyword_args_count
+                    )
+                    .into(),
+                ));
+            }
+        } else {
+            unreachable!();
+        }
+
+        Ok(())
+    }
+
     fn call_value(
         &mut self,
         callee: Value<'gc>,
@@ -1084,24 +1133,6 @@ impl<'gc> State<'gc> {
                 */
                 self.stack[self.stack_top - args_slot_count - 1] = bound.receiver;
                 self.call(bound.method, args_count, keyword_args_count)
-            }
-            Value::Class(class) => {
-                let instance = Instance::new(class);
-                self.stack[self.stack_top - args_slot_count - 1] =
-                    Value::from(Gc::new(self.mc, RefLock::new(instance)));
-                if let Some(constructor) = class.borrow().methods.get(&self.intern(b"new")) {
-                    self.call(constructor.as_closure()?, args_count, keyword_args_count)
-                } else if (args_count + keyword_args_count) != 0 {
-                    Err(self.runtime_error(
-                        format!(
-                            "Expected 0 arguments but got {}.",
-                            args_count + keyword_args_count
-                        )
-                        .into(),
-                    ))
-                } else {
-                    Ok(())
-                }
             }
             Value::Closure(closure) => self.call(closure, args_count, keyword_args_count),
             Value::NativeFunction(function) => {
@@ -1235,12 +1266,8 @@ impl<'gc> State<'gc> {
             }
             Value::Agent(agent) => {
                 if let Some(method) = agent.methods.get(&name) {
-                    let args = match self.check_args(method, args_count, keyword_args_count)? {
-                        CheckArgsResult::Args(args) => args,
-                        CheckArgsResult::ValidationError(_) => {
-                            unreachable!()
-                        }
-                    };
+                    let args = self.check_args(method, args_count, keyword_args_count)?;
+
                     // Pop the arguments from the stack.
                     // The stack before call run_agent:
                     // [ <fn script> ][ agent Triage ][ debug ][ true ][ input ][ some message ]
@@ -1260,12 +1287,12 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn check_args(
+    fn prepare_args(
         &mut self,
         function: &Gc<'gc, Function<'gc>>,
         args_count: u8,
         keyword_args_count: u8,
-    ) -> Result<CheckArgsResult<'gc>, VmError> {
+    ) -> Result<Vec<Value<'gc>>, VmError> {
         let total_args = args_count + keyword_args_count; // Count keyword args too
 
         // For functions without keyword args or default values
@@ -1322,7 +1349,43 @@ impl<'gc> State<'gc> {
                 }
             }
         }
+        Ok(final_args)
+    }
 
+    fn check_args(
+        &mut self,
+        function: &Gc<'gc, Function<'gc>>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<Vec<Value<'gc>>, VmError> {
+        let mut final_args = self.prepare_args(function, args_count, keyword_args_count)?;
+        // Fill in default values and check required parameters
+        for (name, param) in &function.params {
+            let pos = param.position as usize;
+            if final_args[pos].equals(&Value::Nil) {
+                if pos < function.arity as usize && param.default_value.is_nil() {
+                    return Err(
+                        self.runtime_error(format!("Missing required argument '{}'.", name).into())
+                    );
+                }
+                final_args[pos] = param.default_value;
+            }
+        }
+        Ok(final_args)
+    }
+
+    fn validate_args(
+        &mut self,
+        closure: Gc<'gc, Closure<'gc>>,
+        args_count: u8,
+        keyword_args_count: u8,
+    ) -> Result<CheckArgsResult<'gc>, VmError> {
+        let function = &closure.function;
+        let mut final_args = self.prepare_args(function, args_count, keyword_args_count)?;
+        let ctx = Context {
+            mutation: self.mc,
+            strings: self.strings,
+        };
         let mut validation_errors = Vec::new();
         // Fill in default values and check required parameters
         for (name, param) in &function.params {
@@ -1336,10 +1399,6 @@ impl<'gc> State<'gc> {
                 final_args[pos] = param.default_value;
             }
 
-            let ctx = Context {
-                mutation: self.mc,
-                strings: self.strings,
-            };
             for validator in &param.validators {
                 if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos])) {
                     validation_errors.push(crate::builtins::create_error_info(
@@ -1351,26 +1410,26 @@ impl<'gc> State<'gc> {
                     ));
                 }
             }
+        }
 
-            if !validation_errors.is_empty() {
-                // Create single ValidationError! instance with all errors
-                let error_class = crate::builtins::create_validation_error(ctx);
-                let mut instance = Instance::new(error_class);
-                instance.fields.insert(
-                    self.intern(b"errors"),
-                    Value::Array(Gc::new(self.mc, RefLock::new(validation_errors))),
-                );
-                return Ok(CheckArgsResult::ValidationError(Value::Instance(Gc::new(
-                    self.mc,
-                    RefLock::new(instance),
-                ))));
-            }
+        if !validation_errors.is_empty() {
+            // Create single ValidationError! instance with all errors
+            let error_class = crate::builtins::create_validation_error(ctx);
+            let mut instance = Instance::new(error_class);
+            instance.fields.insert(
+                self.intern(b"errors"),
+                Value::Array(Gc::new(self.mc, RefLock::new(validation_errors))),
+            );
+            return Ok(CheckArgsResult::ValidationError(Value::Instance(Gc::new(
+                self.mc,
+                RefLock::new(instance),
+            ))));
         }
 
         Ok(CheckArgsResult::Args(final_args))
     }
 
-    pub fn call(
+    fn call(
         &mut self,
         closure: Gc<'gc, Closure<'gc>>,
         args_count: u8,
@@ -1378,36 +1437,58 @@ impl<'gc> State<'gc> {
     ) -> Result<(), VmError> {
         let function = &closure.function;
 
-        match self.check_args(function, args_count, keyword_args_count)? {
-            CheckArgsResult::ValidationError(error) => {
-                // Pop arguments and push error
-                self.stack_top -= args_count as usize + keyword_args_count as usize * 2 + 1; // we need +1 to pop the instance too
-                self.push_stack(error);
-            }
-            CheckArgsResult::Args(final_args) => {
-                self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
-                let slot_start = self.stack_top - 1; // -1 for the function itself
+        let final_args = self.check_args(function, args_count, keyword_args_count)?;
+        self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
+        let slot_start = self.stack_top - 1; // -1 for the function itself
 
-                for arg in final_args {
-                    self.push_stack(arg);
-                }
-
-                // Create the call frame
-                let call_frame = CallFrame {
-                    closure,
-                    ip: 0,
-                    slot_start,
-                };
-
-                #[cfg(feature = "debug")]
-                call_frame.disassemble();
-                self.frames.push(call_frame);
-                self.frame_count += 1;
-            }
+        for arg in final_args {
+            self.push_stack(arg);
         }
+
+        // Create the call frame
+        let call_frame = CallFrame {
+            closure,
+            ip: 0,
+            slot_start,
+        };
+
+        #[cfg(feature = "debug")]
+        call_frame.disassemble();
+        self.frames.push(call_frame);
+        self.frame_count += 1;
 
         Ok(())
     }
+
+    fn call_inner(
+        &mut self,
+        closure: Gc<'gc, Closure<'gc>>,
+        args_count: u8,
+        keyword_args_count: u8,
+        args: Vec<Value<'gc>>,
+    ) -> Result<(), VmError> {
+        self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
+        let slot_start = self.stack_top - 1; // -1 for the function itself
+
+        for arg in args {
+            self.push_stack(arg);
+        }
+
+        // Create the call frame
+        let call_frame = CallFrame {
+            closure,
+            ip: 0,
+            slot_start,
+        };
+
+        #[cfg(feature = "debug")]
+        call_frame.disassemble();
+        self.frames.push(call_frame);
+        self.frame_count += 1;
+
+        Ok(())
+    }
+
     #[inline(always)]
     pub fn push_stack(&mut self, value: Value<'gc>) {
         debug_assert!(self.stack_top < STACK_MAX_SIZE, "Stack overflow");
