@@ -992,6 +992,14 @@ impl<'gc> CodeGen<'gc> {
             // For ? operator, return error directly
             self.emit(OpCode::Return);
         } else {
+            let is_local_scope = self.scope_depth > 0;
+            if is_local_scope {
+                // since the assign value isn't a local variable
+                // Give this:
+                // let x = function_call() |err| {}
+                // 'x' is a globa variable which don't occupy a local variable slot
+                self.emit(OpCode::Dup);
+            }
             // Begin scope for error variable
             self.begin_scope();
             // Store error in handler variable
@@ -1009,7 +1017,7 @@ impl<'gc> CodeGen<'gc> {
 
             // Set the last expression of error handle block (aka, stack top value)
             // to the faield function call return value.
-            if self.scope_depth > 1 {
+            if is_local_scope {
                 // We are in local scope, the slot is err_local_pos - 1
                 self.emit(OpCode::SetLocal(err_local_pos as u8 - 1));
             } else {
@@ -1017,48 +1025,10 @@ impl<'gc> CodeGen<'gc> {
                 self.emit(OpCode::SetLocal(err_local_pos as u8));
             }
             self.end_scope();
-            // Pop the error value on the stack top.
-            // Also refer to JumpIfError in VM.
-            /*
-               enum ArithError! {
-                   DivideZero
-               }
-
-               fn divide(a, b) -> int, ArithError! {
-                   if b == 0 {
-                       raise ArithError!::DivideZero;
-                   }
-
-                   return a / b;
-               }
-               let v = divide(1, 0) |err| {
-                   print("error:", err);
-               };
-
-               Here are the disassembley bytecodes for above:
-               0007    | OP_CONSTANT         4 'error:'
-                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ <native fn> ][ error: ]
-               0008    | OP_GET_LOCAL        2
-                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ <native fn> ][ error: ][ ArithError!::DivideZero ]
-               0009    | OP_CALL             2    0
-               error: ArithError!::DivideZero
-                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ][ nil ]
-               0010    | OP_POP              1
-                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ][ ArithError!::DivideZero ]
-               0011    | OP_POP              1
-                       [ <fn script> ][ <fn do_math> ][ ArithError!::DivideZero ]
-               0012    | OP_POP              1
-                       [ <fn script> ][ <fn do_math> ]
-               0013    | OP_NIL
-                       [ <fn script> ][ <fn do_math> ][ nil ]
-               0014   38 OP_GET_GLOBAL       5 'print'
-                       [ <fn script> ][ <fn do_math> ][ nil ][ <native fn> ]
-               0015    | OP_GET_LOCAL        1
-                       [ <fn script> ][ <fn do_math> ][ nil ][ <native fn> ][ nil ]
-               0016    | OP_CALL             1    0
-               nil
-            */
-            self.emit(OpCode::Pop(1));
+            if is_local_scope {
+                // Pop the stack top we duplicated before
+                self.emit(OpCode::Pop(1));
+            }
             // If no return in handler, set nil as value and continue
             if !has_return {
                 self.emit(OpCode::Nil);

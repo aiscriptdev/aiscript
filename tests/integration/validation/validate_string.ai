@@ -1,0 +1,17 @@
+class Person {
+    @string(min_len=3)
+    name: str,
+    age: int = 18,
+}
+
+let x = Person(name="aa") |err| {
+    let errors = 11111;
+    print(errors); // expect: 11111
+    let error_item = err.errors[0];
+    print(error_item.input); // expect: aa
+    print(error_item.msg);   // expect: String length is less than the minimum length of 3
+    print(error_item.loc);   // expect: [name]
+    Person { name: "Anonymouse" }
+};
+print(x.name); // expect: Anonymouse
+print(x.age); // expect: 18

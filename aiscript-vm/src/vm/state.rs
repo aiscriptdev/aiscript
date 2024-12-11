@@ -412,6 +412,10 @@ impl<'gc> State<'gc> {
             OpCode::LessEqual => {
                 binary_op!(self, <=);
             }
+            OpCode::Dup => {
+                let value = *self.peek(0);
+                self.push_stack(value);
+            }
             OpCode::Pop(count) => {
                 self.stack_top = self.stack_top.saturating_sub(count as usize);
             }
@@ -474,9 +478,6 @@ impl<'gc> State<'gc> {
                 if value.is_error() {
                     // Jump to error handler
                     self.current_frame().ip += offset as usize;
-                    // Must push the error value to stack top,
-                    // because in the error handler err will be set as local variable
-                    self.push_stack(value);
                 }
             }
             OpCode::Jump(offset) => {
