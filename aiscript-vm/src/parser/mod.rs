@@ -1189,7 +1189,7 @@ impl<'gc> Parser<'gc> {
     fn return_statement(&mut self) -> Option<Stmt<'gc>> {
         let value = if !self.check(TokenType::Semicolon) {
             if self.fn_type == FunctionType::Constructor {
-                self.error("Can't return a value from an initializer.");
+                self.error("Can't return a value from an constructor.");
             }
             Some(self.expression()?)
         } else {

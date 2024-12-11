@@ -6,7 +6,7 @@ class Foo {
 }
 
 fn new() {
-  print("not initializer");
+  print("not constructor");
 }
 
-new(); // expect: not initializer
+new(); // expect: not constructor
