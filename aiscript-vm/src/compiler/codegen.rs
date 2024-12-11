@@ -1006,10 +1006,16 @@ impl<'gc> CodeGen<'gc> {
             for stmt in handler.handler_body {
                 self.generate_stmt(stmt)?;
             }
+
             // Set the last expression of error handle block (aka, stack top value)
             // to the faield function call return value.
-            // The correct slot is err_local_pos - 1
-            self.emit(OpCode::SetLocal(err_local_pos as u8 - 1));
+            if self.scope_depth > 1 {
+                // We are in local scope, the slot is err_local_pos - 1
+                self.emit(OpCode::SetLocal(err_local_pos as u8 - 1));
+            } else {
+                // We are in global scope, don't need to minus 1
+                self.emit(OpCode::SetLocal(err_local_pos as u8));
+            }
             self.end_scope();
             // Pop the error value on the stack top.
             // Also refer to JumpIfError in VM.
