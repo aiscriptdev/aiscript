@@ -50,6 +50,11 @@ macro_rules! binary_op {
     }};
 }
 
+enum CheckArgsResult<'gc> {
+    Args(Vec<Value<'gc>>),
+    ValidationError(Value<'gc>),
+}
+
 #[derive(Collect)]
 #[collect(no_drop)]
 struct CallFrame<'gc> {
@@ -1229,7 +1234,12 @@ impl<'gc> State<'gc> {
             }
             Value::Agent(agent) => {
                 if let Some(method) = agent.methods.get(&name) {
-                    let args = self.check_args(method, args_count, keyword_args_count)?;
+                    let args = match self.check_args(method, args_count, keyword_args_count)? {
+                        CheckArgsResult::Args(args) => args,
+                        CheckArgsResult::ValidationError(_) => {
+                            unreachable!()
+                        }
+                    };
                     // Pop the arguments from the stack.
                     // The stack before call run_agent:
                     // [ <fn script> ][ agent Triage ][ debug ][ true ][ input ][ some message ]
@@ -1254,7 +1264,7 @@ impl<'gc> State<'gc> {
         function: &Gc<'gc, Function<'gc>>,
         args_count: u8,
         keyword_args_count: u8,
-    ) -> Result<Vec<Value<'gc>>, VmError> {
+    ) -> Result<CheckArgsResult<'gc>, VmError> {
         let total_args = args_count + keyword_args_count; // Count keyword args too
 
         // For functions without keyword args or default values
@@ -1312,6 +1322,7 @@ impl<'gc> State<'gc> {
             }
         }
 
+        let mut validation_errors = Vec::new();
         // Fill in default values and check required parameters
         for (name, param) in &function.params {
             let pos = param.position as usize;
@@ -1324,14 +1335,38 @@ impl<'gc> State<'gc> {
                 final_args[pos] = param.default_value;
             }
 
+            let ctx = Context {
+                mutation: self.mc,
+                strings: self.strings,
+            };
             for validator in &param.validators {
                 if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos])) {
-                    println!("validate error: {err}");
+                    validation_errors.push(crate::builtins::create_error_info(
+                        ctx,
+                        *name,
+                        "validation_error",
+                        &err,
+                        final_args[pos],
+                    ));
                 }
+            }
+
+            if !validation_errors.is_empty() {
+                // Create single ValidationError! instance with all errors
+                let error_class = crate::builtins::create_validation_error(ctx);
+                let mut instance = Instance::new(error_class);
+                instance.fields.insert(
+                    self.intern(b"errors"),
+                    Value::Array(Gc::new(self.mc, RefLock::new(validation_errors))),
+                );
+                return Ok(CheckArgsResult::ValidationError(Value::Instance(Gc::new(
+                    self.mc,
+                    RefLock::new(instance),
+                ))));
             }
         }
 
-        Ok(final_args)
+        Ok(CheckArgsResult::Args(final_args))
     }
 
     pub fn call(
@@ -1342,26 +1377,33 @@ impl<'gc> State<'gc> {
     ) -> Result<(), VmError> {
         let function = &closure.function;
 
-        let final_args = self.check_args(function, args_count, keyword_args_count)?;
+        match self.check_args(function, args_count, keyword_args_count)? {
+            CheckArgsResult::ValidationError(error) => {
+                // Pop arguments and push error
+                self.stack_top -= args_count as usize + keyword_args_count as usize * 2 + 1; // we need +1 to pop the instance too
+                self.push_stack(error);
+            }
+            CheckArgsResult::Args(final_args) => {
+                self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
+                let slot_start = self.stack_top - 1; // -1 for the function itself
 
-        self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
-        let slot_start = self.stack_top - 1; // -1 for the function itself
+                for arg in final_args {
+                    self.push_stack(arg);
+                }
 
-        for arg in final_args {
-            self.push_stack(arg);
+                // Create the call frame
+                let call_frame = CallFrame {
+                    closure,
+                    ip: 0,
+                    slot_start,
+                };
+
+                #[cfg(feature = "debug")]
+                call_frame.disassemble();
+                self.frames.push(call_frame);
+                self.frame_count += 1;
+            }
         }
-
-        // Create the call frame
-        let call_frame = CallFrame {
-            closure,
-            ip: 0,
-            slot_start,
-        };
-
-        #[cfg(feature = "debug")]
-        call_frame.disassemble();
-        self.frames.push(call_frame);
-        self.frame_count += 1;
 
         Ok(())
     }

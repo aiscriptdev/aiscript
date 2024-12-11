@@ -59,6 +59,11 @@ impl Vm {
                 strings: state.strings,
             };
 
+            state.globals.insert(
+                ctx.intern(b"ValidationError!"),
+                Value::Class(builtins::create_validation_error(ctx)),
+            );
+
             // Initialize standard library modules
             state
                 .module_manager

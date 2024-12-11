@@ -3,11 +3,13 @@ use gc_arena::Gc;
 use std::io::{self, Write};
 
 mod convert;
+mod error;
 mod format;
 mod function;
 mod print;
 
 use convert::*;
+pub use error::*;
 use format::format;
 use function::*;
 use print::print;
