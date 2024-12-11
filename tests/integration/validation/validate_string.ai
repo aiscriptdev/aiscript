@@ -5,12 +5,26 @@ class Person {
 }
 
 // No validation for class literal syntax
-let o = Person {
+let o1 = Person {
     name: "aa",
     age: 20,
 };
-print(o.name); // expect: aa
-print(o.age); // expect: 20
+print(o1.name); // expect: aa
+print(o1.age); // expect: 20
+
+// Declare error handler for class literal
+let o2 = Person {
+    name: "aa",
+    age: 20,
+} |err| {
+    let error_item = err.errors[0];
+    print(error_item.input); // expect: aa
+    print(error_item.msg);   // expect: String length is less than the minimum length of 3
+    print(error_item.loc);   // expect: [name]
+    Person { name: "Anonymouse" }
+};
+print(o2.name); // expect: Anonymouse
+print(o2.age); // expect: 18
 
 // No validation if no error handler
 let p = Person(name="aa");

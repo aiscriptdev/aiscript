@@ -1,0 +1,5 @@
+let lambda = |x| {
+    x + 1
+} |err| { // Error at '|': Lambda doesn't support declare error handler.
+    print(err);
+};

@@ -980,8 +980,13 @@ impl<'gc> Parser<'gc> {
         }
 
         let body = if self.match_token(TokenType::OpenBrace) {
+            let statements = self.block_expr();
+            let next_token = self.current;
+            if self.parse_error_handling().is_some() {
+                self.error_at(next_token, "Lambda doesn't support declare error handler.");
+            }
             Box::new(Expr::Block {
-                statements: self.block_expr(),
+                statements,
                 line: self.previous.line,
             })
         } else {
@@ -999,7 +1004,7 @@ impl<'gc> Parser<'gc> {
         Some(Expr::Lambda { params, body, line })
     }
 
-    fn pipe(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+    fn pipe_arrow(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         // Save the left side of the pipe
         let left = Box::new(self.previous_expr.take()?);
 
@@ -1467,7 +1472,7 @@ impl<'gc> Parser<'gc> {
                 is_constructor: true,
                 arguments: vec![],
                 keyword_args,
-                error_handler: None,
+                error_handler: self.parse_error_handling(),
                 line,
             })
         } else {
@@ -1989,7 +1994,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         }
         TokenType::ColonColon => ParseRule::new(None, Some(Parser::enum_variant), Precedence::Call),
         TokenType::Pipe => ParseRule::new(Some(Parser::lambda), None, Precedence::None),
-        TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe), Precedence::Pipe),
+        TokenType::PipeArrow => ParseRule::new(None, Some(Parser::pipe_arrow), Precedence::Pipe),
         TokenType::Dot => ParseRule::new(None, Some(Parser::dot), Precedence::Call),
         TokenType::Minus => {
             ParseRule::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)

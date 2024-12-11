@@ -1,0 +1,23 @@
+class NumberTooLarge! {}
+
+fn raise_if_greater_than_10(array) -> int | NumberTooLarge! {
+    for let i = 0; i < len(array); i += 1 {
+        if array[i] > 10 {
+            raise NumberTooLarge! {};
+        }
+    }
+    array
+}
+
+let arr = [1, 2, 3, 4, 5];
+let result = arr |> map(|x| x * 1) |> raise_if_greater_than_10 |err| {
+    print(err);
+    10
+};
+print(result); // expect: [1, 2, 3, 4, 5]
+
+let result = arr |> map(|x| x * 3) |> raise_if_greater_than_10 |err| {
+    print(err); // expect: NumberTooLarge! {}
+    "greater_than_10"
+};
+print(result); // expect: greater_than_10
