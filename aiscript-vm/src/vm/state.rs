@@ -489,13 +489,14 @@ impl<'gc> State<'gc> {
             OpCode::Constructor {
                 positional_count,
                 keyword_count,
+                validate,
             } => {
                 // *2 because each keyword arg has name and value
                 // Get the actual function from the correct stack position
                 // Need to peek past all args (both positional and keyword) to get to the function
                 let arg_slot_count = positional_count + keyword_count * 2;
                 let callee = *self.peek(arg_slot_count as usize);
-                self.call_constructor(callee, positional_count, keyword_count)?;
+                self.call_constructor(callee, positional_count, keyword_count, validate)?;
             }
             OpCode::Call {
                 positional_count,
@@ -1069,6 +1070,7 @@ impl<'gc> State<'gc> {
         callee: Value<'gc>,
         args_count: u8,
         keyword_args_count: u8,
+        validate: bool,
     ) -> Result<(), VmError> {
         let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         if let Value::Class(class) = callee {
@@ -1077,15 +1079,20 @@ impl<'gc> State<'gc> {
                 Value::from(Gc::new(self.mc, RefLock::new(instance)));
             if let Some(constructor) = class.borrow().methods.get(&self.intern(b"new")) {
                 let closure = constructor.as_closure()?;
-                match self.validate_args(closure, args_count, keyword_args_count)? {
-                    CheckArgsResult::ValidationError(error) => {
-                        // Pop arguments and push error
-                        self.stack_top -= args_count as usize + keyword_args_count as usize * 2 + 1; // we need +1 to pop the instance too
-                        self.push_stack(error);
+                if validate {
+                    match self.validate_args(closure, args_count, keyword_args_count)? {
+                        CheckArgsResult::ValidationError(error) => {
+                            // Pop arguments and push error
+                            self.stack_top -=
+                                args_count as usize + keyword_args_count as usize * 2 + 1; // we need +1 to pop the instance too
+                            self.push_stack(error);
+                        }
+                        CheckArgsResult::Args(final_args) => {
+                            self.call_inner(closure, args_count, keyword_args_count, final_args)?;
+                        }
                     }
-                    CheckArgsResult::Args(final_args) => {
-                        self.call_inner(closure, args_count, keyword_args_count, final_args)?;
-                    }
+                } else {
+                    self.call(closure, args_count, keyword_args_count)?;
                 }
             } else if (args_count + keyword_args_count) != 0 {
                 return Err(self.runtime_error(
@@ -1392,22 +1399,28 @@ impl<'gc> State<'gc> {
             let pos = param.position as usize;
             if final_args[pos].equals(&Value::Nil) {
                 if pos < function.arity as usize && param.default_value.is_nil() {
-                    return Err(
-                        self.runtime_error(format!("Missing required argument '{}'.", name).into())
-                    );
-                }
-                final_args[pos] = param.default_value;
-            }
-
-            for validator in &param.validators {
-                if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos])) {
                     validation_errors.push(crate::builtins::create_error_info(
                         ctx,
                         *name,
-                        "validation_error",
-                        &err,
-                        final_args[pos],
+                        "missing",
+                        "Field required",
+                        Value::Nil,
                     ));
+                    continue;
+                }
+                final_args[pos] = param.default_value;
+            } else {
+                for validator in &param.validators {
+                    if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos]))
+                    {
+                        validation_errors.push(crate::builtins::create_error_info(
+                            ctx,
+                            *name,
+                            "validation_error",
+                            &err,
+                            final_args[pos],
+                        ));
+                    }
                 }
             }
         }

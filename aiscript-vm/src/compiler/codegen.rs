@@ -946,6 +946,7 @@ impl<'gc> CodeGen<'gc> {
             self.emit(OpCode::Constructor {
                 positional_count: arg_count,
                 keyword_count: kw_count,
+                validate: error_handler.is_some(),
             });
         } else {
             // Emit call instruction - result will be on stack

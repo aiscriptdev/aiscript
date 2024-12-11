@@ -50,6 +50,7 @@ pub enum OpCode {
     Constructor {
         positional_count: u8,
         keyword_count: u8,
+        validate: bool,
     },
     Call {
         positional_count: u8,
@@ -262,9 +263,10 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Constructor {
                     positional_count,
                     keyword_count,
+                    validate,
                 } => {
                     println!(
-                        "{:-16} {:4} {:4}",
+                        "{:-16} {:4} {:4} {validate}",
                         "OP_CONSTRUCTOR", positional_count, keyword_count
                     );
                 }

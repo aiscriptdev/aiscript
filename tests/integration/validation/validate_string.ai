@@ -4,6 +4,19 @@ class Person {
     age: int = 18,
 }
 
+// No validation for class literal syntax
+let o = Person {
+    name: "aa",
+    age: 20,
+};
+print(o.name); // expect: aa
+print(o.age); // expect: 20
+
+// No validation if no error handler
+let p = Person(name="aa");
+print(p.name); // expect: aa
+print(p.age); // expect: 18
+
 let x = Person(name="aa") |err| {
     let errors = 11111;
     print(errors); // expect: 11111
@@ -15,3 +28,19 @@ let x = Person(name="aa") |err| {
 };
 print(x.name); // expect: Anonymouse
 print(x.age); // expect: 18
+
+let y = Person() |err| {
+    let error_item = err.errors[0];
+    print(error_item.input); // expect: nil
+    print(error_item.msg);   // expect: Field required
+    print(error_item.loc);   // expect: [name]
+    Person { name: "Anonymouse" }
+};
+print(y.name); // expect: Anonymouse
+print(y.age); // expect: 18
+
+let z = Person(name="Alice", age=20) |err| {
+    print(err);
+};
+print(z.name); // expect: Alice
+print(z.age); // expect: 20
