@@ -208,6 +208,9 @@ pub enum MatchPattern<'gc> {
     Literal {
         value: Literal<'gc>,
     },
+    Variable {
+        name: Token<'gc>,
+    },
     Range {
         start: Option<Box<Expr<'gc>>>,
         end: Option<Box<Expr<'gc>>>,

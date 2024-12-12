@@ -919,7 +919,16 @@ impl<'gc> CodeGen<'gc> {
                     self.emit_constant((value).into());
                     self.emit(OpCode::Equal);
                 }
+                MatchPattern::Variable { name } => {
+                    // Bind the value to the variable name in a new scope
+                    self.begin_scope();
+                    self.add_local(name, Mutability::default());
+                    self.mark_initialized();
 
+                    // Always match (like wildcard) but keep value bound
+                    self.emit(OpCode::Bool(true));
+                    self.end_scope();
+                }
                 MatchPattern::Range {
                     start,
                     end,

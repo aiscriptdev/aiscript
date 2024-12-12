@@ -1,0 +1,16 @@
+fn match_number(n) {
+    return match n {
+        0 => "zero",
+        n if n < 0 and n % 2 == 0 => "negative even",
+        n if n < 0 => "negative odd",
+        n if n % 2 == 0 => "positive even",
+        n if n % 2 == 0 => "positive even",
+        _ => "positive odd",
+    };
+}
+
+print(match_number(0));      // expect: zero
+print(match_number(-2));     // expect: negative even
+print(match_number(-3));     // expect: negative odd
+print(match_number(4));      // expect: positive even
+print(match_number(5));      // expect: positive odd

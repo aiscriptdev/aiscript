@@ -1,0 +1,13 @@
+fn match_string(s) {
+    return match s {
+        "hello" => "greeting",
+        "bye" => "farewell",
+        s if s in ["good", "great"] => "happy",
+        _ => "other",
+    };
+}
+
+print(match_string("hello"));     // expect: greeting
+print(match_string("bye"));       // expect: farewell
+print(match_string("good"));      // expect: happy
+print(match_string("unknown"));   // expect: other

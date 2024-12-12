@@ -1822,6 +1822,12 @@ impl<'gc> Parser<'gc> {
                         self.error("Duplicate match pattern.");
                     }
                 }
+                MatchPattern::Variable { name } => {
+                    // FIXME: incorrect duplicate pattern checking due guard hash
+                    if !seen_patterns.insert(format!("{} {:?}", name.lexeme, arm.guard)) {
+                        self.error("Duplicate match pattern.");
+                    }
+                }
                 MatchPattern::Range { .. } => {
                     // Range patterns are validated during parsing
                 }
@@ -1877,7 +1883,7 @@ impl<'gc> Parser<'gc> {
 
         let current_kind = self.current.kind;
         let start = match current_kind {
-            TokenType::Number | TokenType::String | TokenType::True | TokenType::False => {
+            TokenType::Number | TokenType::True | TokenType::False => {
                 self.advance();
                 if self.check(TokenType::DotDot) || self.check(TokenType::DotDotEq) {
                     let start_expr = Box::new(Expr::Literal {
@@ -1891,6 +1897,15 @@ impl<'gc> Parser<'gc> {
                     }
                 }
             }
+            TokenType::String => {
+                self.advance();
+                MatchPattern::Literal {
+                    value: Literal::String(
+                        self.ctx
+                            .intern(self.previous.lexeme.trim_matches('"').as_bytes()),
+                    ),
+                }
+            }
             TokenType::Identifier | TokenType::Error => {
                 if self.peek_next().map(|t| t.kind) == Some(TokenType::ColonColon) {
                     self.advance(); // consume enum name
@@ -1901,8 +1916,11 @@ impl<'gc> Parser<'gc> {
 
                     MatchPattern::EnumVariant { enum_name, variant }
                 } else {
-                    self.error_at_current("Invalid match pattern.");
-                    return None;
+                    // Variable binding pattern
+                    self.advance(); // consume identifier
+                    MatchPattern::Variable {
+                        name: self.previous,
+                    }
                 }
             }
             TokenType::DotDot | TokenType::DotDotEq => self.parse_range_pattern(None)?,
