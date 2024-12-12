@@ -886,93 +886,112 @@ impl<'gc> CodeGen<'gc> {
                 self.emit(OpCode::Dup);
             }
 
-            match arm.pattern {
-                MatchPattern::EnumVariant { enum_name, variant } => {
-                    // Validate enum and variant exist
-                    if let Some(enum_) = self.get_enum(enum_name.lexeme) {
-                        let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
-                        if enum_.borrow().get_variant_value(variant_name).is_none() {
+            // For multiple patterns in an arm, we'll use a series of jumps
+            let mut pattern_jumps = Vec::new();
+            let arm_pattern_count = arm.patterns.len();
+            // Generate or-chain of pattern tests
+            for (j, pattern) in arm.patterns.into_iter().enumerate() {
+                if j > 0 {
+                    self.emit(OpCode::Dup); // Duplicate value for next pattern test
+                }
+                match pattern {
+                    MatchPattern::EnumVariant { enum_name, variant } => {
+                        // Validate enum and variant exist
+                        if let Some(enum_) = self.get_enum(enum_name.lexeme) {
+                            let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
+                            if enum_.borrow().get_variant_value(variant_name).is_none() {
+                                self.error_at(
+                                    variant,
+                                    &format!(
+                                        "No variant called '{}' in enum '{}'.",
+                                        variant.lexeme, enum_name.lexeme
+                                    ),
+                                );
+                                return Err(VmError::CompileError);
+                            }
+                        } else {
                             self.error_at(
-                                variant,
-                                &format!(
-                                    "No variant called '{}' in enum '{}'.",
-                                    variant.lexeme, enum_name.lexeme
-                                ),
+                                enum_name,
+                                &format!("Invalid enum '{}'.", enum_name.lexeme),
                             );
                             return Err(VmError::CompileError);
                         }
-                    } else {
-                        self.error_at(enum_name, &format!("Invalid enum '{}'.", enum_name.lexeme));
-                        return Err(VmError::CompileError);
+
+                        self.named_variable(enum_name, false)?;
+                        let name_constant = self.identifier_constant(variant.lexeme);
+                        self.emit(OpCode::EnumVariant {
+                            name_constant: name_constant as u8,
+                            evaluate: false,
+                        });
+                        self.emit(OpCode::Equal);
                     }
 
-                    self.named_variable(enum_name, false)?;
-                    let name_constant = self.identifier_constant(variant.lexeme);
-                    self.emit(OpCode::EnumVariant {
-                        name_constant: name_constant as u8,
-                        evaluate: false,
-                    });
-                    self.emit(OpCode::Equal);
-                }
+                    MatchPattern::Literal { value } => {
+                        self.emit_constant((value).into());
+                        self.emit(OpCode::Equal);
+                    }
+                    MatchPattern::Variable { name } => {
+                        // Bind the value to the variable name in a new scope
+                        self.begin_scope();
+                        self.add_local(name, Mutability::default());
+                        self.mark_initialized();
 
-                MatchPattern::Literal { value } => {
-                    self.emit_constant((value).into());
-                    self.emit(OpCode::Equal);
-                }
-                MatchPattern::Variable { name } => {
-                    // Bind the value to the variable name in a new scope
-                    self.begin_scope();
-                    self.add_local(name, Mutability::default());
-                    self.mark_initialized();
-
-                    // Always match (like wildcard) but keep value bound
-                    self.emit(OpCode::Bool(true));
-                    self.end_scope();
-                }
-                MatchPattern::Range {
-                    start,
-                    end,
-                    inclusive,
-                } => {
-                    if let Some(start) = start {
-                        self.emit(OpCode::Dup);
-                        self.generate_expr(*start)?;
-                        self.emit(OpCode::GreaterEqual);
-
-                        if end.is_some() {
-                            let start_fail = self.emit_jump(OpCode::JumpIfFalse(0));
-                            self.emit(OpCode::Pop(1));
-
+                        // Always match (like wildcard) but keep value bound
+                        self.emit(OpCode::Bool(true));
+                        self.end_scope();
+                    }
+                    MatchPattern::Range {
+                        start,
+                        end,
+                        inclusive,
+                    } => {
+                        if let Some(start) = start {
                             self.emit(OpCode::Dup);
-                            if let Some(end) = end {
-                                self.generate_expr(*end)?;
+                            self.generate_expr(*start)?;
+                            self.emit(OpCode::GreaterEqual);
+
+                            if end.is_some() {
+                                let start_fail = self.emit_jump(OpCode::JumpIfFalse(0));
+                                self.emit(OpCode::Pop(1));
+
+                                self.emit(OpCode::Dup);
+                                if let Some(end) = end {
+                                    self.generate_expr(*end)?;
+                                }
+                                if inclusive {
+                                    self.emit(OpCode::LessEqual);
+                                } else {
+                                    self.emit(OpCode::Less);
+                                }
+
+                                self.patch_jump(start_fail);
                             }
+                        } else if let Some(end) = end {
+                            self.emit(OpCode::Dup);
+                            self.generate_expr(*end)?;
                             if inclusive {
                                 self.emit(OpCode::LessEqual);
                             } else {
                                 self.emit(OpCode::Less);
                             }
-
-                            self.patch_jump(start_fail);
-                        }
-                    } else if let Some(end) = end {
-                        self.emit(OpCode::Dup);
-                        self.generate_expr(*end)?;
-                        if inclusive {
-                            self.emit(OpCode::LessEqual);
                         } else {
-                            self.emit(OpCode::Less);
+                            self.emit(OpCode::Bool(true));
                         }
-                    } else {
+                    }
+
+                    MatchPattern::Wildcard => {
                         self.emit(OpCode::Bool(true));
                     }
                 }
-
-                MatchPattern::Wildcard => {
-                    self.emit(OpCode::Bool(true));
+                if j < arm_pattern_count - 1 {
+                    // If this pattern fails, try next pattern
+                    let pattern_fail = self.emit_jump(OpCode::JumpIfFalse(0));
+                    // If it succeeds, jump to arm body (will be patched later)
+                    pattern_jumps.push(self.emit_jump(OpCode::Jump(0)));
+                    self.patch_jump(pattern_fail);
+                    self.emit(OpCode::Pop(1)); // Pop the failed test result
                 }
             }
-
             if let Some(guard) = arm.guard {
                 let pattern_fail = self.emit_jump(OpCode::JumpIfFalse(0));
                 self.emit(OpCode::Pop(1));
@@ -985,6 +1004,11 @@ impl<'gc> CodeGen<'gc> {
 
             let else_jump = self.emit_jump(OpCode::JumpIfFalse(0));
             self.emit(OpCode::Pop(1));
+
+            // Patch all successful pattern matches to jump here
+            for jump in pattern_jumps {
+                self.patch_jump(jump);
+            }
 
             match *arm.body {
                 Expr::Block { statements, .. } => {

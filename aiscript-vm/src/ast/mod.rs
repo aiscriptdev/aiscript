@@ -192,7 +192,7 @@ pub enum ObjectProperty<'gc> {
 
 #[derive(Debug)]
 pub struct MatchArm<'gc> {
-    pub pattern: MatchPattern<'gc>,
+    pub patterns: Vec<MatchPattern<'gc>>,
     pub body: Box<Expr<'gc>>,
     // Optional if guard
     pub guard: Option<Box<Expr<'gc>>>,

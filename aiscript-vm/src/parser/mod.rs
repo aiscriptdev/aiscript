@@ -1804,35 +1804,36 @@ impl<'gc> Parser<'gc> {
         while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
             let arm = self.match_arm()?;
 
-            match &arm.pattern {
-                MatchPattern::Wildcard => {
-                    if has_wildcard {
-                        self.error("Multiple wildcard patterns in match expression.");
+            for pattern in &arm.patterns {
+                match pattern {
+                    MatchPattern::Wildcard => {
+                        if has_wildcard {
+                            self.error("Multiple wildcard patterns in match expression.");
+                        }
+                        has_wildcard = true;
                     }
-                    has_wildcard = true;
-                }
-                MatchPattern::EnumVariant { enum_name, variant } => {
-                    let pattern_key = format!("{}::{}", enum_name.lexeme, variant.lexeme);
-                    if !seen_patterns.insert(pattern_key) {
-                        self.error_at(*variant, "Duplicate match pattern.");
+                    MatchPattern::EnumVariant { enum_name, variant } => {
+                        let pattern_key = format!("{}::{}", enum_name.lexeme, variant.lexeme);
+                        if !seen_patterns.insert(pattern_key) {
+                            self.error_at(*variant, "Duplicate match pattern.");
+                        }
                     }
-                }
-                MatchPattern::Literal { value } => {
-                    if !seen_patterns.insert(format!("{:?}", value)) {
-                        self.error("Duplicate match pattern.");
+                    MatchPattern::Literal { value } => {
+                        if !seen_patterns.insert(format!("{:?}", value)) {
+                            self.error("Duplicate match pattern.");
+                        }
                     }
-                }
-                MatchPattern::Variable { name } => {
-                    // FIXME: incorrect duplicate pattern checking due guard hash
-                    if !seen_patterns.insert(format!("{} {:?}", name.lexeme, arm.guard)) {
-                        self.error("Duplicate match pattern.");
+                    MatchPattern::Variable { name } => {
+                        // FIXME: incorrect duplicate pattern checking due guard hash
+                        if !seen_patterns.insert(format!("{} {:?}", name.lexeme, arm.guard)) {
+                            self.error("Duplicate match pattern.");
+                        }
                     }
-                }
-                MatchPattern::Range { .. } => {
-                    // Range patterns are validated during parsing
+                    MatchPattern::Range { .. } => {
+                        // Range patterns are validated during parsing
+                    }
                 }
             }
-
             arms.push(arm);
         }
         self.in_match_arm = false;
@@ -1843,7 +1844,12 @@ impl<'gc> Parser<'gc> {
     }
 
     fn match_arm(&mut self) -> Option<MatchArm<'gc>> {
-        let pattern = self.match_pattern()?;
+        let mut patterns = Vec::new();
+        patterns.push(self.match_pattern()?);
+
+        while self.match_token(TokenType::Pipe) {
+            patterns.push(self.match_pattern()?);
+        }
 
         // Parse optional guard
         let guard = if self.match_token(TokenType::If) {
@@ -1869,7 +1875,7 @@ impl<'gc> Parser<'gc> {
         }
 
         Some(MatchArm {
-            pattern,
+            patterns,
             guard,
             body,
             line: self.previous.line,

@@ -1,0 +1,10 @@
+match true {
+    true => print("true"),
+    false => print("false"),
+};
+match false {
+    true => print("true"),
+    false => print("false"),
+};
+// expect: true
+// expect: false

@@ -1,0 +1,26 @@
+fn match_string(s) {
+    return match s {
+        "hello" | "hi" => "greeting",
+        "bye" => "farewell",
+        _ => "other",
+    };
+}
+print(match_string("hi"));      // expect: greeting
+print(match_string("hello"));   // expect: greeting
+print(match_string("bye"));     // expect: farewell
+print(match_string("h"));       // expect: other
+print(match_string("abc"));     // expect: other
+
+fn match_number(n) {
+    return match n {
+        1 | 5 | 7 => "lucky",
+        42 => "magic",
+        _ => "funny",
+    };
+}
+print(match_number(0));      // expect: funny
+print(match_number(1));      // expect: lucky
+print(match_number(5));      // expect: lucky
+print(match_number(7));      // expect: lucky
+print(match_number(42));     // expect: magic
+print(match_number(100));    // expect: funny
