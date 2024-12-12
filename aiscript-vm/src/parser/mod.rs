@@ -959,6 +959,8 @@ impl<'gc> Parser<'gc> {
 
     fn lambda(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let line = self.previous.line;
+        let previous_fn_type = self.fn_type;
+        self.fn_type = FunctionType::Lambda;
         let mut params = Vec::new();
 
         // Parse parameters between pipes (||)
@@ -1001,6 +1003,7 @@ impl<'gc> Parser<'gc> {
             })
         };
 
+        self.fn_type = previous_fn_type;
         Some(Expr::Lambda { params, body, line })
     }
 
@@ -1764,6 +1767,10 @@ impl<'gc> Parser<'gc> {
     }
 
     fn raise_statement(&mut self) -> Option<Stmt<'gc>> {
+        if self.fn_type.is_lambda() {
+            self.error("Cannot raise error in lambda.");
+            return None;
+        }
         if !self.in_error_function() {
             self.error("Cannot use 'raise' outside of a function that declares error types.");
             return None;

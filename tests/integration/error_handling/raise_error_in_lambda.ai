@@ -1,0 +1,8 @@
+class DivideZero! {}
+let divid = |x, y| {
+    if y == 0 {
+        raise DivideZero! {}; // Error at 'raise': Cannot raise error in lambda.
+    }
+
+    x / y
+};

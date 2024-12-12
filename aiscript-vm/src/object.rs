@@ -122,6 +122,10 @@ impl FunctionType {
         matches!(self, Self::Method { .. })
     }
 
+    pub fn is_lambda(&self) -> bool {
+        matches!(self, Self::Lambda { .. })
+    }
+
     pub fn is_static_method(&self) -> bool {
         matches!(self, Self::Method { is_static, .. } if *is_static)
     }
