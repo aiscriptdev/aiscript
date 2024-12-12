@@ -1,0 +1,26 @@
+enum Color {
+    Red = "red",
+    Green = "green",
+    Blue = "blue",
+}
+
+fn match_color(color) {
+    return match color {
+        Color::Red => "found red",
+        Color::Green => "found green",
+        Color::Blue => { 
+            print("processing blue");
+            "found blue" 
+        },
+    };
+}
+
+let red = Color::Red;
+let green = Color::Green;
+let blue = Color::Blue;
+
+print(match_color(red));    // expect: found red
+print(match_color(green));  // expect: found green
+print(match_color(blue));   
+// expect: processing blue
+// expect: found blue

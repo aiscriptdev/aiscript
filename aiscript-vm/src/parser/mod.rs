@@ -1809,13 +1809,6 @@ impl<'gc> Parser<'gc> {
                     if has_wildcard {
                         self.error("Multiple wildcard patterns in match expression.");
                     }
-                    if !arms.is_empty()
-                        && arms
-                            .iter()
-                            .all(|a| matches!(a.pattern, MatchPattern::EnumVariant { .. }))
-                    {
-                        self.error("Wildcard pattern after exhaustive enum match.");
-                    }
                     has_wildcard = true;
                 }
                 MatchPattern::EnumVariant { enum_name, variant } => {
@@ -1898,7 +1891,7 @@ impl<'gc> Parser<'gc> {
                     }
                 }
             }
-            TokenType::Identifier => {
+            TokenType::Identifier | TokenType::Error => {
                 if self.peek_next().map(|t| t.kind) == Some(TokenType::ColonColon) {
                     self.advance(); // consume enum name
                     let enum_name = self.previous;

@@ -1,0 +1,23 @@
+enum FileError! {
+    NotFound = "file not found",
+    PermissionDenied = "permission denied",
+}
+
+fn match_error(err) {
+    return match err {
+        FileError!::NotFound => "404",
+        FileError!::PermissionDenied => {
+            print("access denied");
+            "403"
+        },
+        _ => "unknown error",
+    };
+}
+
+let err1 = FileError!::NotFound;
+let err2 = FileError!::PermissionDenied;
+
+print(match_error(err1));   // expect: 404
+print(match_error(err2));   
+// expect: access denied
+// expect: 403
