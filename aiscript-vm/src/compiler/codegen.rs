@@ -8,7 +8,8 @@ use crate::{
     ai::Agent,
     ast::{
         AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, Expr, FnDef, FunctionDecl, Literal,
-        Mutability, ObjectProperty, ParameterDecl, Program, Stmt, VariableDecl,
+        MatchArm, MatchPattern, Mutability, ObjectProperty, ParameterDecl, Program, Stmt,
+        VariableDecl,
     },
     lexer::{Token, TokenType},
     object::{Enum, EnumVariant, Function, FunctionType, Parameter, Upvalue},
@@ -709,6 +710,7 @@ impl<'gc> CodeGen<'gc> {
                     self.emit(OpCode::GetIndex);
                 }
             }
+            Expr::Match { expr, arms, .. } => self.generate_match(expr, arms)?,
             Expr::InlineIf {
                 condition,
                 then_branch,
@@ -863,6 +865,142 @@ impl<'gc> CodeGen<'gc> {
             self.emit(OpCode::Constant(name_constant as u8));
             self.generate_expr(value)?;
         }
+        Ok(())
+    }
+
+    fn generate_match(
+        &mut self,
+        expr: Box<Expr<'gc>>,
+        arms: Vec<MatchArm<'gc>>,
+    ) -> Result<(), VmError> {
+        // Generate the value being matched
+        self.generate_expr(expr)?;
+
+        let mut exit_jumps = Vec::new();
+
+        let arm_count = arms.len();
+        for (i, arm) in arms.into_iter().enumerate() {
+            let is_last = i == arm_count - 1;
+
+            if !is_last {
+                self.emit(OpCode::Dup);
+            }
+
+            match arm.pattern {
+                MatchPattern::EnumVariant { enum_name, variant } => {
+                    // Validate enum and variant exist
+                    if let Some(enum_) = self.get_enum(enum_name.lexeme) {
+                        let variant_name = self.ctx.intern(variant.lexeme.as_bytes());
+                        if enum_.borrow().get_variant_value(variant_name).is_none() {
+                            self.error_at(
+                                variant,
+                                &format!(
+                                    "No variant called '{}' in enum '{}'.",
+                                    variant.lexeme, enum_name.lexeme
+                                ),
+                            );
+                            return Err(VmError::CompileError);
+                        }
+                    } else {
+                        self.error_at(enum_name, &format!("Invalid enum '{}'.", enum_name.lexeme));
+                        return Err(VmError::CompileError);
+                    }
+
+                    self.named_variable(enum_name, false)?;
+                    let name_constant = self.identifier_constant(variant.lexeme);
+                    self.emit(OpCode::EnumVariant {
+                        name_constant: name_constant as u8,
+                        evaluate: false,
+                    });
+                    self.emit(OpCode::Equal);
+                }
+
+                MatchPattern::Literal { value } => {
+                    self.emit_constant((value).into());
+                    self.emit(OpCode::Equal);
+                }
+
+                MatchPattern::Range {
+                    start,
+                    end,
+                    inclusive,
+                } => {
+                    if let Some(start) = start {
+                        self.emit(OpCode::Dup);
+                        self.generate_expr(*start)?;
+                        self.emit(OpCode::GreaterEqual);
+
+                        if end.is_some() {
+                            let start_fail = self.emit_jump(OpCode::JumpIfFalse(0));
+                            self.emit(OpCode::Pop(1));
+
+                            self.emit(OpCode::Dup);
+                            if let Some(end) = end {
+                                self.generate_expr(*end)?;
+                            }
+                            if inclusive {
+                                self.emit(OpCode::LessEqual);
+                            } else {
+                                self.emit(OpCode::Less);
+                            }
+
+                            self.patch_jump(start_fail);
+                        }
+                    } else if let Some(end) = end {
+                        self.emit(OpCode::Dup);
+                        self.generate_expr(*end)?;
+                        if inclusive {
+                            self.emit(OpCode::LessEqual);
+                        } else {
+                            self.emit(OpCode::Less);
+                        }
+                    } else {
+                        self.emit(OpCode::Bool(true));
+                    }
+                }
+
+                MatchPattern::Wildcard => {
+                    self.emit(OpCode::Bool(true));
+                }
+            }
+
+            if let Some(guard) = arm.guard {
+                let pattern_fail = self.emit_jump(OpCode::JumpIfFalse(0));
+                self.emit(OpCode::Pop(1));
+
+                self.emit(OpCode::Dup);
+                self.generate_expr(*guard)?;
+
+                self.patch_jump(pattern_fail);
+            }
+
+            let else_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+            self.emit(OpCode::Pop(1));
+
+            match *arm.body {
+                Expr::Block { statements, .. } => {
+                    for stmt in statements {
+                        self.generate_stmt(stmt)?;
+                    }
+                }
+                expr => self.generate_expr(expr)?,
+            }
+
+            if !is_last {
+                exit_jumps.push(self.emit_jump(OpCode::Jump(0)));
+            }
+
+            self.patch_jump(else_jump);
+
+            if !is_last {
+                self.emit(OpCode::Pop(1));
+            }
+        }
+
+        for jump in exit_jumps {
+            self.patch_jump(jump);
+        }
+
         Ok(())
     }
 }

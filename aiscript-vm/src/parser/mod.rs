@@ -15,7 +15,7 @@ use super::{
 use crate::{
     ast::{
         AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FunctionDecl,
-        ObjectProperty, VariableDecl, Visibility,
+        MatchArm, MatchPattern, ObjectProperty, VariableDecl, Visibility,
     },
     object::FunctionType,
     ty::{
@@ -46,6 +46,7 @@ pub struct Parser<'gc> {
     // since we omit the paren around,
     // it is hard to handle the '{' conflict without this flag.
     stop_at_brace: bool,
+    in_match_arm: bool,
     type_resolver: TypeResolver<'gc>,
     error_resolver: Option<FunctionErrorResolver<'gc>>,
 }
@@ -83,6 +84,7 @@ impl<'gc> Parser<'gc> {
             scopes: Vec::new(),
             loop_depth: 0,
             stop_at_brace: false,
+            in_match_arm: false,
             type_resolver: TypeResolver::new(),
             error_resolver: None,
         }
@@ -1785,6 +1787,196 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn match_expression(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let line = self.previous.line;
+        self.stop_at_brace = true;
+        let expr = Box::new(self.expression()?);
+        self.stop_at_brace = false;
+
+        self.consume(TokenType::OpenBrace, "Expect '{' after match expression.");
+
+        let mut arms: Vec<MatchArm> = Vec::new();
+        let mut seen_patterns = HashSet::new();
+        let mut has_wildcard = false;
+
+        // Set mode for parsing match arms
+        self.in_match_arm = true;
+        while !self.check(TokenType::CloseBrace) && !self.is_at_end() {
+            let arm = self.match_arm()?;
+
+            match &arm.pattern {
+                MatchPattern::Wildcard => {
+                    if has_wildcard {
+                        self.error("Multiple wildcard patterns in match expression.");
+                    }
+                    if !arms.is_empty()
+                        && arms
+                            .iter()
+                            .all(|a| matches!(a.pattern, MatchPattern::EnumVariant { .. }))
+                    {
+                        self.error("Wildcard pattern after exhaustive enum match.");
+                    }
+                    has_wildcard = true;
+                }
+                MatchPattern::EnumVariant { enum_name, variant } => {
+                    let pattern_key = format!("{}::{}", enum_name.lexeme, variant.lexeme);
+                    if !seen_patterns.insert(pattern_key) {
+                        self.error_at(*variant, "Duplicate match pattern.");
+                    }
+                }
+                MatchPattern::Literal { value } => {
+                    if !seen_patterns.insert(format!("{:?}", value)) {
+                        self.error("Duplicate match pattern.");
+                    }
+                }
+                MatchPattern::Range { .. } => {
+                    // Range patterns are validated during parsing
+                }
+            }
+
+            arms.push(arm);
+        }
+        self.in_match_arm = false;
+
+        self.consume(TokenType::CloseBrace, "Expect '}' after match arms.");
+
+        Some(Expr::Match { expr, arms, line })
+    }
+
+    fn match_arm(&mut self) -> Option<MatchArm<'gc>> {
+        let pattern = self.match_pattern()?;
+
+        // Parse optional guard
+        let guard = if self.match_token(TokenType::If) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+
+        self.consume(TokenType::FatArrow, "Expect '=>' after match pattern.");
+
+        let body = if self.match_token(TokenType::OpenBrace) {
+            let statements = self.block_expr();
+            Box::new(Expr::Block {
+                statements,
+                line: self.previous.line,
+            })
+        } else {
+            Box::new(self.expression()?)
+        };
+
+        if !self.check(TokenType::CloseBrace) {
+            self.consume(TokenType::Comma, "Expect ',' after match arm.");
+        }
+
+        Some(MatchArm {
+            pattern,
+            guard,
+            body,
+            line: self.previous.line,
+        })
+    }
+
+    fn match_pattern(&mut self) -> Option<MatchPattern<'gc>> {
+        if self.match_token(TokenType::Underscore) {
+            return Some(MatchPattern::Wildcard);
+        }
+
+        let current_kind = self.current.kind;
+        let start = match current_kind {
+            TokenType::Number | TokenType::String | TokenType::True | TokenType::False => {
+                self.advance();
+                if self.check(TokenType::DotDot) || self.check(TokenType::DotDotEq) {
+                    let start_expr = Box::new(Expr::Literal {
+                        value: self.parse_literal(self.previous)?,
+                        line: self.previous.line,
+                    });
+                    self.parse_range_pattern(Some(start_expr))?
+                } else {
+                    MatchPattern::Literal {
+                        value: self.parse_literal(self.previous)?,
+                    }
+                }
+            }
+            TokenType::Identifier => {
+                if self.peek_next().map(|t| t.kind) == Some(TokenType::ColonColon) {
+                    self.advance(); // consume enum name
+                    let enum_name = self.previous;
+                    self.advance(); // consume ::
+                    self.consume(TokenType::Identifier, "Expect variant name after '::'.");
+                    let variant = self.previous;
+
+                    MatchPattern::EnumVariant { enum_name, variant }
+                } else {
+                    self.error_at_current("Invalid match pattern.");
+                    return None;
+                }
+            }
+            TokenType::DotDot | TokenType::DotDotEq => self.parse_range_pattern(None)?,
+            _ => {
+                self.error_at_current("Expected match pattern.");
+                return None;
+            }
+        };
+        Some(start)
+    }
+
+    fn parse_range_pattern(&mut self, start: Option<Box<Expr<'gc>>>) -> Option<MatchPattern<'gc>> {
+        let inclusive = self.match_token(TokenType::DotDotEq);
+        if !inclusive && !self.match_token(TokenType::DotDot) {
+            self.error_at_current("Expected '..' or '..=' in range pattern.");
+            return None;
+        }
+
+        let end = if self.check(TokenType::FatArrow) || self.check(TokenType::Comma) {
+            None
+        } else {
+            Some(Box::new(self.expression()?))
+        };
+
+        // Validate range values if both are literals
+        if let (Some(box_start), Some(box_end)) = (&start, &end) {
+            if let (
+                Expr::Literal {
+                    value: start_val, ..
+                },
+                Expr::Literal { value: end_val, .. },
+            ) = (&**box_start, &**box_end)
+            {
+                match (start_val, end_val) {
+                    (Literal::Number(s), Literal::Number(e)) if s > e => {
+                        self.error("Invalid range pattern: start value must be less than or equal to end value.");
+                    }
+                    (Literal::Number(_), Literal::Number(_)) => {}
+                    _ => {
+                        self.error("Range patterns only support numeric values.");
+                    }
+                }
+            }
+        }
+
+        Some(MatchPattern::Range {
+            start,
+            end,
+            inclusive,
+        })
+    }
+
+    fn parse_literal(&mut self, token: Token<'gc>) -> Option<Literal<'gc>> {
+        match token.kind {
+            TokenType::Number => {
+                let value = token.lexeme.parse::<f64>().unwrap();
+                Some(Literal::Number(value))
+            }
+            TokenType::String => Some(Literal::String(
+                self.ctx.intern(token.lexeme.trim_matches('"').as_bytes()),
+            )),
+            TokenType::True => Some(Literal::Boolean(true)),
+            TokenType::False => Some(Literal::Boolean(false)),
+            _ => None,
+        }
+    }
+
     fn error_type(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let name = self.previous;
         Some(Expr::Variable {
@@ -1903,9 +2095,13 @@ impl<'gc> Parser<'gc> {
         self.previous_expr = expr;
 
         while precedence <= get_rule(self.current.kind).precedence {
-            // If we're in a flow condition and see a '{', stop here
-            // to let the statement parser handle the block
             if self.stop_at_brace && self.current.kind == TokenType::OpenBrace {
+                // If we're in a flow condition and see a '{', stop here
+                // to let the statement parser handle the block
+                break;
+            } else if self.in_match_arm && self.current.kind == TokenType::If {
+                // If we're in a match arm and see a 'if', stop here to
+                // avoid conflict with match arm's if guard
                 break;
             }
 
@@ -2040,6 +2236,12 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             ParseRule::new(Some(Parser::literal), None, Precedence::None)
         }
         TokenType::If => ParseRule::new(None, Some(Parser::inline_if), Precedence::If),
+        TokenType::Match => ParseRule::new(
+            Some(Parser::match_expression),
+            None,
+            // Same precedence as inline if expressions
+            Precedence::If,
+        ),
         TokenType::In => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         TokenType::Prompt => ParseRule::new(Some(Parser::prompt), None, Precedence::None),
         _ => ParseRule::new(None, None, Precedence::None),

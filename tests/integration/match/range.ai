@@ -1,0 +1,30 @@
+fn match_range(n) {
+    return match n {
+        ..0 => "negative",
+        0   => "zero",
+        1..=10 => "small",
+        11..=20 if n % 2 == 0 => "even medium",
+        11..=20 => "odd medium",
+        21..31 => "big medium",
+        31.. => {
+            print("rest arm");
+            "large"
+        },
+    };
+}
+
+print(match_range(-1));     // expect: negative
+print(match_range(0));      // expect: zero
+print(match_range(1));      // expect: small
+print(match_range(10));     // expect: small
+print(match_range(12));     // expect: even medium
+print(match_range(15));     // expect: odd medium
+print(match_range(20));     // expect: even medium
+print(match_range(21));     // expect: big medium
+print(match_range(30));     // expect: big medium
+print(match_range(31));
+// expect: rest arm
+// expect: large
+print(match_range(42));
+// expect: rest arm
+// expect: large

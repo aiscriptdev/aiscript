@@ -36,11 +36,14 @@ pub enum TokenType {
     Bang,       // !
     Question,   // ?
     At,         // @
+    Underscore, // _
     StarStar,   // **
     ColonColon, // ::
     Arrow,      // ->
     FatArrow,   // =>
     PipeArrow,  // |>
+    DotDot,     // .. for ranges
+    DotDotEq,   // ..= for inclusive ranges
 
     // Comparison and logical operators
     NotEqual,     // !=
@@ -78,6 +81,7 @@ pub enum TokenType {
     Fn,
     If,
     In,
+    Match,
     Nil,
     Not,
     Or,
@@ -167,6 +171,7 @@ impl<'a> Token<'a> {
                 | TokenType::For
                 | TokenType::If
                 | TokenType::Let
+                | TokenType::Match
                 | TokenType::Pub
                 | TokenType::Raise
                 | TokenType::Return
@@ -430,6 +435,7 @@ impl<'a> Lexer<'a> {
             "fn" => TokenType::Fn,
             "if" => TokenType::If,
             "in" => TokenType::In,
+            "match" => TokenType::Match,
             "nil" => TokenType::Nil,
             "not" => TokenType::Not,
             "or" => TokenType::Or,
@@ -469,9 +475,23 @@ impl<'a> Lexer<'a> {
             '}' => self.make_token(TokenType::CloseBrace),
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
-            '.' => self.make_token(TokenType::Dot),
             '@' => self.make_token(TokenType::At),
             '?' => self.make_token(TokenType::Question),
+            '_' => self.make_token(TokenType::Underscore),
+            '.' => {
+                let kind = if self.peek() == Some('.') {
+                    self.advance();
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::DotDotEq
+                    } else {
+                        TokenType::DotDot
+                    }
+                } else {
+                    TokenType::Dot
+                };
+                self.make_token(kind)
+            }
             '|' => {
                 let kind = if self.peek() == Some('>') {
                     self.advance();

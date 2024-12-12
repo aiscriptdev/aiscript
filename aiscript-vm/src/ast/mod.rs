@@ -191,6 +191,32 @@ pub enum ObjectProperty<'gc> {
 }
 
 #[derive(Debug)]
+pub struct MatchArm<'gc> {
+    pub pattern: MatchPattern<'gc>,
+    pub body: Box<Expr<'gc>>,
+    // Optional if guard
+    pub guard: Option<Box<Expr<'gc>>>,
+    pub line: u32,
+}
+
+#[derive(Debug)]
+pub enum MatchPattern<'gc> {
+    EnumVariant {
+        enum_name: Token<'gc>,
+        variant: Token<'gc>,
+    },
+    Literal {
+        value: Literal<'gc>,
+    },
+    Range {
+        start: Option<Box<Expr<'gc>>>,
+        end: Option<Box<Expr<'gc>>>,
+        inclusive: bool,
+    },
+    Wildcard,
+}
+
+#[derive(Debug)]
 pub enum Expr<'gc> {
     Object {
         properties: Vec<ObjectProperty<'gc>>,
@@ -279,6 +305,11 @@ pub enum Expr<'gc> {
         error_handler: Option<ErrorHandler<'gc>>,
         line: u32,
     },
+    Match {
+        expr: Box<Expr<'gc>>,
+        arms: Vec<MatchArm<'gc>>,
+        line: u32,
+    },
     InlineIf {
         condition: Box<Expr<'gc>>,
         then_branch: Box<Expr<'gc>>,
@@ -328,6 +359,7 @@ impl<'gc> Expr<'gc> {
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }
             | Self::Index { line, .. }
+            | Self::Match { line, .. }
             | Self::InlineIf { line, .. }
             | Self::Assign { line, .. }
             | Self::And { line, .. }
