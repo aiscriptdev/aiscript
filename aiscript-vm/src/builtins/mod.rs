@@ -1,12 +1,20 @@
-use crate::{vm::State, NativeFn, Value, VmError};
-use gc_arena::Gc;
-use std::io::{self, Write};
+use crate::{
+    string::InternedString,
+    vm::{Context, State},
+    BuiltinMethod, NativeFn, Value, VmError,
+};
+use gc_arena::{Collect, Gc, Mutation};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 mod convert;
 mod error;
 mod format;
 mod function;
 mod print;
+mod string;
 
 use convert::*;
 pub use error::*;
@@ -14,7 +22,48 @@ use format::format;
 use function::*;
 use print::print;
 
-pub(crate) fn define_native_functions(state: &mut State) {
+#[derive(Collect)]
+#[collect(no_drop)]
+pub(crate) struct BuiltinMethods<'gc> {
+    string: HashMap<InternedString<'gc>, BuiltinMethod<'gc>>,
+}
+
+impl<'gc> Default for BuiltinMethods<'gc> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'gc> BuiltinMethods<'gc> {
+    pub fn new() -> Self {
+        BuiltinMethods {
+            string: HashMap::default(),
+        }
+    }
+
+    pub fn init(&mut self, ctx: Context<'gc>) {
+        self.string = string::define_string_methods(ctx);
+    }
+
+    pub fn invoke_string_method(
+        &self,
+        mc: &'gc Mutation<'gc>,
+        name: InternedString<'gc>,
+        receiver: Value<'gc>,
+        args: Vec<Value<'gc>>,
+    ) -> Result<Value<'gc>, VmError> {
+        if let Some(f) = self.string.get(&name) {
+            f(mc, receiver, args)
+        } else {
+            Err(VmError::RuntimeError(format!(
+                "Unknown string method: {}",
+                name
+            )))
+        }
+    }
+}
+
+pub(crate) fn define_builtin_functions(state: &mut State) {
     [
         ("abs", NativeFn(abs)),
         ("all", NativeFn(all)),

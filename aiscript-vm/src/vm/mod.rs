@@ -59,6 +59,7 @@ impl Vm {
                 strings: state.strings,
             };
 
+            state.builtin_methods.init(ctx);
             state.globals.insert(
                 ctx.intern(b"ValidationError!"),
                 Value::Class(builtins::create_validation_error(ctx)),
@@ -74,9 +75,6 @@ impl Vm {
             state
                 .module_manager
                 .register_native_module(ctx.intern(b"std.time"), stdlib::create_time_module(ctx));
-            state
-                .module_manager
-                .register_native_module(ctx.intern(b"std.str"), stdlib::create_str_module(ctx));
         });
     }
 
@@ -87,7 +85,7 @@ impl Vm {
                 strings: state.strings,
             };
             state.chunks = crate::compiler::compile(context, source)?;
-            builtins::define_native_functions(state);
+            builtins::define_builtin_functions(state);
             // The script function's chunk id is always the highest chunk id.
             let script_chunk_id = state.chunks.keys().max().copied().unwrap();
             let function = state.get_chunk(script_chunk_id)?;

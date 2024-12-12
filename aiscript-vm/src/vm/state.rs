@@ -15,6 +15,7 @@ use gc_arena::{
 use crate::{
     ai,
     ast::{ChunkId, Visibility},
+    builtins::BuiltinMethods,
     module::{ModuleKind, ModuleManager, ModuleSource},
     object::{
         BoundMethod, Class, Closure, EnumVariant, Function, Instance, Object, Upvalue, UpvalueObj,
@@ -102,6 +103,7 @@ pub struct State<'gc> {
     pub(super) globals: Table<'gc>,
     open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
     pub module_manager: ModuleManager<'gc>,
+    pub(super) builtin_methods: BuiltinMethods<'gc>,
     current_module: Option<InternedString<'gc>>,
 }
 
@@ -122,6 +124,7 @@ unsafe impl<'gc> Collect for State<'gc> {
         self.globals.trace(cc);
         self.open_upvalues.trace(cc);
         self.module_manager.trace(cc);
+        self.builtin_methods.trace(cc);
         self.current_module.trace(cc);
     }
 }
@@ -139,6 +142,7 @@ impl<'gc> State<'gc> {
             globals: HashMap::default(),
             open_upvalues: None,
             module_manager: ModuleManager::new(),
+            builtin_methods: BuiltinMethods::new(),
             current_module: None,
         }
     }
@@ -1181,6 +1185,25 @@ impl<'gc> State<'gc> {
         let args_slot_count = (args_count + keyword_args_count * 2) as usize;
         let receiver = *self.peek(args_slot_count);
         match receiver {
+            Value::String(_) | Value::IoString(_) => {
+                let mut args = Vec::new();
+
+                // Collect arguments
+                for _ in 0..args_count {
+                    args.push(self.pop_stack());
+                }
+                args.reverse(); // Restore argument order
+
+                // Pop the receiver and keyword args
+                self.stack_top -= keyword_args_count as usize * 2 + 1;
+
+                // Dispatch to string method
+                let result = self
+                    .builtin_methods
+                    .invoke_string_method(self.mc, name, receiver, args)?;
+                self.push_stack(result);
+                Ok(())
+            }
             Value::Class(class) => {
                 if let Some(value) = class.borrow().static_methods.get(&name) {
                     self.call_value(*value, args_count, keyword_args_count)

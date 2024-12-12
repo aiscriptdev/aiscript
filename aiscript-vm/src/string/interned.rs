@@ -14,7 +14,7 @@ use gc_arena::{
 };
 use hashbrown::{hash_map, raw::RawTable, HashMap};
 
-use crate::string_utils::{debug_utf8_lossy, display_utf8_lossy};
+use super::utils::{debug_utf8_lossy, display_utf8_lossy};
 
 /// The Lua string type.
 ///
