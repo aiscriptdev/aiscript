@@ -11,6 +11,7 @@ mod character_tests;
 mod error_reporter;
 mod peakable;
 mod tests;
+
 /// Represents different types of tokens in the language
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
@@ -193,6 +194,7 @@ impl<'a> Token<'a> {
                 | TokenType::Identifier
                 | TokenType::OpenParen
                 | TokenType::OpenBracket
+                | TokenType::Match
                 | TokenType::Minus
                 | TokenType::Not
                 | TokenType::Self_
@@ -619,56 +621,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    // Process an escape sequence and return the escaped character
-    #[allow(unused)]
-    fn process_escape_sequence(&mut self) -> Result<char, &'static str> {
-        match self.advance() {
-            Some('n') => Ok('\n'),
-            Some('r') => Ok('\r'),
-            Some('t') => Ok('\t'),
-            Some('\\') => Ok('\\'),
-            Some('\'') => Ok('\''),
-            Some('\"') => Ok('\"'),
-            Some('0') => Ok('\0'),
-            Some(_) => Err("Invalid escape sequence"),
-            None => Err("Unterminated escape sequence"),
-        }
-    }
-
     // Scan a string literal, handling escape sequences
     fn scan_string(&mut self) -> Token<'a> {
         let start_content = self.current; // Skip opening quote
 
         while let Some((end_pos, ch)) = self.iter.peek().copied() {
             match ch {
+                '\\' => {
+                    self.advance(); // consume backslash
+                    self.advance(); // consume the following char
+                }
                 '"' => {
                     let content = &self.source[start_content..end_pos];
                     self.advance(); // consume closing quote
                     return Token::new(TokenType::String, content, self.line);
-                }
-                '\\' => {
-                    self.advance(); // consume backslash
-                    match self.peek() {
-                        // FIXME: escape characters
-                        Some('n') | Some('r') | Some('t') | Some('\\') | Some('\'') | Some('"')
-                        | Some('0') => {
-                            self.advance(); // consume escape char
-                        }
-                        Some(_) => {
-                            return Token::new(
-                                TokenType::Invalid,
-                                "Invalid escape sequence",
-                                self.line,
-                            );
-                        }
-                        None => {
-                            return Token::new(
-                                TokenType::Invalid,
-                                "Unterminated escape sequence",
-                                self.line,
-                            );
-                        }
-                    }
                 }
                 '\n' => {
                     self.line += 1;
@@ -763,6 +729,36 @@ impl<'a> Scanner<'a> {
         // Advance to next token.
         self.advance();
         Ok(script)
+    }
+
+    pub fn escape_string(&mut self, input: &str) -> Option<String> {
+        let mut escaped_string = String::new();
+        let mut chars = input.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                let c = match chars.next() {
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some('\\') => '\\',
+                    Some('\'') => '\'',
+                    Some('\"') => '\"',
+                    Some('0') => '\0',
+                    Some(ch) => {
+                        self.error(&format!("Invalid escape sequence: \\{}", ch));
+                        return None;
+                    }
+                    None => {
+                        self.error("Unterminated escape sequence");
+                        return None;
+                    }
+                };
+                escaped_string.push(c);
+            } else {
+                escaped_string.push(ch);
+            }
+        }
+        Some(escaped_string)
     }
 
     pub fn advance(&mut self) {

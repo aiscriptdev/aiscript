@@ -1306,9 +1306,10 @@ impl<'gc> Parser<'gc> {
     }
 
     fn string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        let string = self.previous.lexeme;
+        let lexeme = self.previous.lexeme;
+        let escaped_string = self.escape_string(lexeme)?;
         Some(Expr::Literal {
-            value: Literal::String(self.ctx.intern(string.as_bytes())),
+            value: Literal::String(self.ctx.intern(escaped_string.as_bytes())),
             line: self.previous.line,
         })
     }
