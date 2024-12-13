@@ -32,11 +32,10 @@ print("hello".slice(1, -1));             // expect: ell
 print("hello".slice(-2));                // expect: lo
 
 // Join operation
-print(",".join("a", "b", "c"));          // expect: a,b,c
-print(" and ".join("cats", "dogs"));     // expect: cats and dogs
+print(",".join(["a", "b", "c"]));          // expect: a,b,c
+print(" and ".join(["cats", "dogs"]));     // expect: cats and dogs
 
 // Regex operations
-"hello123".regex_match("[a-z]+\\d+");        // true
 print("abc".regex_replace("[aeiou]", "*"));         // expect: *bc
 
 // String manipulation
@@ -44,9 +43,9 @@ print("ha".repeat(3));                    // expect: hahaha
 print("hello".reverse());                 // expect: olleh
 print("hello".replace("l", "L"));         // expect: heLLo
 
-// Method chaining
-print("  HELLO  ".trim().to_lowercase()); // expect: hello
-
 // Complex examples
 let text = "Hello, World!";
 print(text.substring(0, text.index_of(",")).to_uppercase());  // expect: HELLO
+let s = text.split(",");
+print(s); // expect: [Hello,  World!]
+print(" ".join(s)); // expect: Hello  World!

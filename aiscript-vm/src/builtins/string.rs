@@ -276,7 +276,6 @@ fn split<'gc>(
     Ok(Value::Array(Gc::new(mc, RefLock::new(parts))))
 }
 
-// FIXME: first args should be array
 fn join<'gc>(
     mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
@@ -285,24 +284,34 @@ fn join<'gc>(
     let receiver = receiver.as_string_value()?;
     let separator = receiver.as_str();
 
-    if args.is_empty() {
+    if args.len() != 1 {
         return Err(VmError::RuntimeError(
-            "join: expected at least one argument".into(),
+            "join: expected exactly one array argument".into(),
         ));
     }
 
+    // Get the array from args[0]
+    let array = match &args[0] {
+        Value::Array(arr) => arr,
+        _ => {
+            return Err(VmError::RuntimeError(
+                "join: argument must be an array".into(),
+            ))
+        }
+    };
+
     let mut result = String::new();
-    for (i, arg) in args.iter().enumerate() {
+    for (i, value) in array.borrow().iter().enumerate() {
         if i > 0 {
             result.push_str(separator);
         }
-        match arg {
+        match value {
             Value::String(s) => result.push_str(s.to_str().unwrap()),
             Value::IoString(s) => result.push_str(s),
             _ => {
                 return Err(VmError::RuntimeError(format!(
-                    "join: argument {} must be a string",
-                    i + 1
+                    "join: array element {} must be a string",
+                    i
                 )))
             }
         }
