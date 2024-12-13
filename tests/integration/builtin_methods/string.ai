@@ -1,0 +1,52 @@
+// Basic methods
+print("".is_empty());      // expect: true
+print("abc".is_empty());   // expect: false
+
+// Case conversion
+print("Hello".to_uppercase());  // expect: HELLO
+print("HeLLo".to_lowercase());  // expect: hello
+
+// Trim functions
+print("  hello  ".trim());         // expect: hello
+print("  hello  ".trim_start());   // expect: "hello  "
+print("  hello  ".trim_end());     // expect: "  hello"
+
+// Contains and position
+print("hello world".contains("world"));     // expect: true
+print("hello world".contains("goodbye"));   // expect: false
+print("hello world".contains("H"));         // expect: false
+print("hello".starts_with("he"));           // expect: true
+print("hello".starts_with("He"));           // expect: false
+print("hello".ends_with("lo"));             // expect: true
+
+// Index search
+print("hello world".index_of("o"));        // expect: 4
+print("hello world".index_of("o", 5));     // expect: 7
+print("hello".index_of("z"));              // expect: -1
+print("hello hello".last_index_of("o"));   // expect: 10
+
+// Substring and slicing
+print("hello".substring(0, 2));           // expect: he
+print("hello".substring(1));              // expect: ello
+print("hello".slice(1, -1));             // expect: ell
+print("hello".slice(-2));                // expect: lo
+
+// Join operation
+print(",".join("a", "b", "c"));          // expect: a,b,c
+print(" and ".join("cats", "dogs"));     // expect: cats and dogs
+
+// Regex operations
+"hello123".regex_match("[a-z]+\\d+");        // true
+print("abc".regex_replace("[aeiou]", "*"));         // expect: *bc
+
+// String manipulation
+print("ha".repeat(3));                    // expect: hahaha
+print("hello".reverse());                 // expect: olleh
+print("hello".replace("l", "L"));         // expect: heLLo
+
+// Method chaining
+print("  HELLO  ".trim().to_lowercase()); // expect: hello
+
+// Complex examples
+let text = "Hello, World!";
+print(text.substring(0, text.index_of(",")).to_uppercase());  // expect: HELLO

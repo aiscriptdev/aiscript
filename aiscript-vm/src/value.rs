@@ -5,7 +5,7 @@ use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
 use crate::{
     ai::Agent,
     object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, Object},
-    string::InternedString,
+    string::{InternedString, StringValue},
     vm::{Context, VmError},
     NativeFn, ReturnValue,
 };
@@ -161,6 +161,24 @@ impl<'gc> Value<'gc> {
             v => Err(VmError::RuntimeError(format!(
                 "cannot convert to string, the value is {v}"
             ))),
+        }
+    }
+
+    // Helper method to convert any string value to a common format
+    pub fn as_string_value(&self) -> Result<StringValue<'gc>, VmError> {
+        match self {
+            Value::String(s) => Ok(StringValue::Interned(*s)),
+            Value::IoString(s) => Ok(StringValue::Dynamic(*s)),
+            _ => Err(VmError::RuntimeError("Not a string value".into())),
+        }
+    }
+
+    // Helper to create a new string value
+    pub fn new_string(ctx: Context<'gc>, s: &str, should_intern: bool) -> Value<'gc> {
+        if should_intern {
+            Value::String(ctx.intern(s.as_bytes()))
+        } else {
+            Value::IoString(Gc::new(&ctx, s.to_string()))
         }
     }
 

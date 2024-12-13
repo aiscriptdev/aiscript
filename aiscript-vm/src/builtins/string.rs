@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Gc, Mutation};
+use gc_arena::{Gc, Mutation, RefLock};
 use regex::Regex;
 
 use crate::BuiltinMethod;
@@ -28,7 +28,7 @@ pub(crate) fn define_string_methods(ctx: Context) -> HashMap<InternedString, Bui
         ("substring", BuiltinMethod(substring)),
         ("slice", BuiltinMethod(slice)),
         // Split and join
-        // ("split", BuiltinMethod(split)),
+        ("split", BuiltinMethod(split)),
         ("join", BuiltinMethod(join)),
         // Regex operations
         ("regex_match", BuiltinMethod(regex_match)),
@@ -53,54 +53,57 @@ fn is_empty<'gc>(
 
 // Case conversion
 fn to_uppercase<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let upper = receiver.as_string()?.to_str().unwrap().to_uppercase();
-    // Ok(Value::String(_mc.intern(upper.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, upper)))
+    let upper = receiver.as_string_value()?.as_str().to_uppercase();
+    // Ok(Value::String(mc.intern(upper.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, upper)))
 }
 
 fn to_lowercase<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let lower = receiver.as_string()?.to_str().unwrap().to_lowercase();
-    // Ok(Value::String(_mc.intern(lower.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, lower)))
+    let lower = receiver.as_string_value()?.as_str().to_lowercase();
+    // Ok(Value::String(mc.intern(lower.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, lower)))
 }
 
 // Trim functions
 fn trim<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let trimmed = receiver.as_string()?.to_str().unwrap().trim();
-    // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, trimmed.to_owned())))
+    let s = receiver.as_string_value()?;
+    let trimmed = s.as_str().trim();
+    // Ok(Value::String(mc.intern(trimmed.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
 }
 
 fn trim_start<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let trimmed = receiver.as_string()?.to_str().unwrap().trim_start();
-    // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, trimmed.to_owned())))
+    let s = receiver.as_string_value()?;
+    let trimmed = s.as_str().trim_start();
+    // Ok(Value::String(mc.intern(trimmed.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
 }
 
 fn trim_end<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let trimmed = receiver.as_string()?.to_str().unwrap().trim_end();
-    // Ok(Value::String(_mc.intern(trimmed.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, trimmed.to_owned())))
+    let s = receiver.as_string_value()?;
+    let trimmed = s.as_str().trim_end();
+    // Ok(Value::String(mc.intern(trimmed.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, trimmed.to_owned())))
 }
 
 // Contains and position functions
@@ -164,7 +167,8 @@ fn index_of<'gc>(
         0
     };
 
-    let s = receiver.as_string()?.to_str().unwrap();
+    let s = receiver.as_string_value()?;
+    let s = s.as_str();
     let substr = substr.to_str().unwrap();
 
     if start > s.len() {
@@ -184,7 +188,8 @@ fn last_index_of<'gc>(
 ) -> Result<Value<'gc>, VmError> {
     let substr = string_arg!(&args, 0, "last_index_of")?;
 
-    let s = receiver.as_string()?.to_str().unwrap();
+    let s = receiver.as_string_value()?;
+    let s = s.as_str();
     let substr = substr.to_str().unwrap();
 
     match s.rfind(substr) {
@@ -195,7 +200,7 @@ fn last_index_of<'gc>(
 
 // Substring and slicing
 fn substring<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -215,12 +220,12 @@ fn substring<'gc>(
     let end = end.min(s.len());
     let start = start.min(end); // Ensure start <= end
 
-    // Ok(Value::String(_mc.intern(s[start..end].as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, s[start..end].to_owned())))
+    // Ok(Value::String(mc.intern(s[start..end].as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, s[start..end].to_owned())))
 }
 
 fn slice<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -248,31 +253,37 @@ fn slice<'gc>(
     } as usize;
     let start = start.min(end); // Ensure start <= end
 
-    // Ok(Value::String(_mc.intern(s[start..end].as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, s[start..end].to_owned())))
+    // Ok(Value::String(mc.intern(s[start..end].as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, s[start..end].to_owned())))
 }
 
 // Split and join
-// fn split<'gc>(_mc: &'gc Mutation<'gc>, receiver: Value<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-//     let delimiter = string_arg!(&args, 0, "split")?;
-
-//     let parts: Vec<&str> = receiver.as_string()?
-//         .to_str()
-//         .unwrap()
-//         .split(delimiter.to_str().unwrap())
-//         // .map(|part| Value::IoString(_mc.intern(part.as_bytes())))
-//         .collect();
-
-//     // Convert to array once array type is implemented
-//     Ok(Value::String(_mc.intern(format!("{:?}", parts).as_bytes())))
-// }
-
-fn join<'gc>(
-    _mc: &'gc Mutation<'gc>,
+fn split<'gc>(
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    let separator = receiver.as_string()?;
+    let delimiter = string_arg!(&args, 0, "split")?.to_str().unwrap();
+
+    let s = receiver.as_string_value()?;
+    let parts = s
+        .as_str()
+        .split(delimiter)
+        .map(|part| Value::IoString(Gc::new(mc, part.to_string())))
+        .collect();
+
+    // Convert to array
+    Ok(Value::Array(Gc::new(mc, RefLock::new(parts))))
+}
+
+// FIXME: first args should be array
+fn join<'gc>(
+    mc: &'gc Mutation<'gc>,
+    receiver: Value<'gc>,
+    args: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError> {
+    let receiver = receiver.as_string_value()?;
+    let separator = receiver.as_str();
 
     if args.is_empty() {
         return Err(VmError::RuntimeError(
@@ -283,10 +294,11 @@ fn join<'gc>(
     let mut result = String::new();
     for (i, arg) in args.iter().enumerate() {
         if i > 0 {
-            result.push_str(separator.to_str().unwrap());
+            result.push_str(separator);
         }
         match arg {
             Value::String(s) => result.push_str(s.to_str().unwrap()),
+            Value::IoString(s) => result.push_str(s),
             _ => {
                 return Err(VmError::RuntimeError(format!(
                     "join: argument {} must be a string",
@@ -296,7 +308,7 @@ fn join<'gc>(
         }
     }
 
-    Ok(Value::IoString(Gc::new(_mc, result)))
+    Ok(Value::IoString(Gc::new(mc, result)))
 }
 
 // Regex operations
@@ -311,12 +323,12 @@ fn regex_match<'gc>(
         .map_err(|e| VmError::RuntimeError(format!("Invalid regex pattern: {}", e)))?;
 
     Ok(Value::Boolean(
-        regex.is_match(receiver.as_string()?.to_str().unwrap()),
+        regex.is_match(receiver.as_string_value()?.as_str()),
     ))
 }
 
 fn regex_replace<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -328,30 +340,30 @@ fn regex_replace<'gc>(
 
     let result = regex
         .replace_all(
-            receiver.as_string()?.to_str().unwrap(),
+            receiver.as_string_value()?.as_str(),
             replacement.to_str().unwrap(),
         )
         .into_owned();
 
-    // Ok(Value::String(_mc.intern(result.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, result)))
+    // Ok(Value::String(mc.intern(result.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, result)))
 }
 
 // Misc string operations
 fn repeat<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     let count = float_arg!(&args, 0, "repeat")? as usize;
 
-    let repeated = receiver.as_string()?.to_str().unwrap().repeat(count);
-    // Ok(Value::String(_mc.intern(repeated.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, repeated)))
+    let repeated = receiver.as_string_value()?.as_str().repeat(count);
+    // Ok(Value::String(mc.intern(repeated.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, repeated)))
 }
 
 fn reverse<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -362,12 +374,12 @@ fn reverse<'gc>(
         .chars()
         .rev()
         .collect();
-    // Ok(Value::String(_mc.intern(reversed.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, reversed)))
+    // Ok(Value::String(mc.intern(reversed.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, reversed)))
 }
 
 fn replace<'gc>(
-    _mc: &'gc Mutation<'gc>,
+    mc: &'gc Mutation<'gc>,
     receiver: Value<'gc>,
     args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
@@ -379,6 +391,6 @@ fn replace<'gc>(
         .to_str()
         .unwrap()
         .replace(from.to_str().unwrap(), to.to_str().unwrap());
-    // Ok(Value::String(_mc.intern(result.as_bytes())))
-    Ok(Value::IoString(Gc::new(_mc, result)))
+    // Ok(Value::String(mc.intern(result.as_bytes())))
+    Ok(Value::IoString(Gc::new(mc, result)))
 }
