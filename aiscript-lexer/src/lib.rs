@@ -609,26 +609,7 @@ impl<'a> Lexer<'a> {
                     self.scan_docstring()
                 } else {
                     // Regular string
-                    while let Some(ch) = self.peek() {
-                        match ch {
-                            '"' => break,
-                            '\n' => {
-                                self.line += 1;
-                                self.advance();
-                            }
-                            _ => {
-                                self.advance();
-                            }
-                        }
-                    }
-
-                    match self.peek() {
-                        Some('"') => {
-                            self.advance();
-                            self.make_token(TokenType::String)
-                        }
-                        _ => Token::new(TokenType::Invalid, "Unterminated string.", self.line),
-                    }
+                    self.scan_string()
                 }
             }
 
@@ -636,6 +617,70 @@ impl<'a> Lexer<'a> {
             c if c.is_alphabetic() || c == '_' => self.scan_identifier(),
             _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
         }
+    }
+
+    // Process an escape sequence and return the escaped character
+    #[allow(unused)]
+    fn process_escape_sequence(&mut self) -> Result<char, &'static str> {
+        match self.advance() {
+            Some('n') => Ok('\n'),
+            Some('r') => Ok('\r'),
+            Some('t') => Ok('\t'),
+            Some('\\') => Ok('\\'),
+            Some('\'') => Ok('\''),
+            Some('\"') => Ok('\"'),
+            Some('0') => Ok('\0'),
+            Some(_) => Err("Invalid escape sequence"),
+            None => Err("Unterminated escape sequence"),
+        }
+    }
+
+    // Scan a string literal, handling escape sequences
+    fn scan_string(&mut self) -> Token<'a> {
+        let start_content = self.current; // Skip opening quote
+
+        while let Some((end_pos, ch)) = self.iter.peek().copied() {
+            match ch {
+                '"' => {
+                    let content = &self.source[start_content..end_pos];
+                    self.advance(); // consume closing quote
+                    return Token::new(TokenType::String, content, self.line);
+                }
+                '\\' => {
+                    self.advance(); // consume backslash
+                    match self.peek() {
+                        // FIXME: escape characters
+                        Some('n') | Some('r') | Some('t') | Some('\\') | Some('\'') | Some('"')
+                        | Some('0') => {
+                            self.advance(); // consume escape char
+                        }
+                        Some(_) => {
+                            return Token::new(
+                                TokenType::Invalid,
+                                "Invalid escape sequence",
+                                self.line,
+                            );
+                        }
+                        None => {
+                            return Token::new(
+                                TokenType::Invalid,
+                                "Unterminated escape sequence",
+                                self.line,
+                            );
+                        }
+                    }
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        Token::new(TokenType::Invalid, "Unterminated string.", self.line)
     }
 }
 

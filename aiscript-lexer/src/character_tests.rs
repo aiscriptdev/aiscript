@@ -9,7 +9,7 @@ mod tests {
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::String);
-        assert_eq!(token.lexeme, r#""Hello 你好 World 世界""#);
+        assert_eq!(token.lexeme, r#"Hello 你好 World 世界"#);
     }
 
     #[test]

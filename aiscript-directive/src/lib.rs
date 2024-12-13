@@ -167,7 +167,7 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
         let token = self.scanner.current;
         self.scanner.advance();
         match token.kind {
-            TokenType::String => Some(Value::String(token.lexeme.trim_matches('"').to_owned())),
+            TokenType::String => Some(Value::String(token.lexeme.to_owned())),
             TokenType::Number => match token.lexeme.parse::<f64>() {
                 Ok(num) => Some(Value::Number(serde_json::Number::from(num as i64))),
                 Err(err) => {

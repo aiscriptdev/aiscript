@@ -1306,7 +1306,7 @@ impl<'gc> Parser<'gc> {
     }
 
     fn string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        let string = self.previous.lexeme.trim_matches('"');
+        let string = self.previous.lexeme;
         Some(Expr::Literal {
             value: Literal::String(self.ctx.intern(string.as_bytes())),
             line: self.previous.line,
@@ -1359,7 +1359,7 @@ impl<'gc> Parser<'gc> {
                     self.advance();
                     let key = Token::new(
                         TokenType::Identifier,
-                        self.previous.lexeme.trim_matches('"'),
+                        self.previous.lexeme,
                         self.previous.line,
                     );
                     self.consume(TokenType::Colon, "Expect ':' after property name.");
@@ -1906,10 +1906,7 @@ impl<'gc> Parser<'gc> {
             TokenType::String => {
                 self.advance();
                 MatchPattern::Literal {
-                    value: Literal::String(
-                        self.ctx
-                            .intern(self.previous.lexeme.trim_matches('"').as_bytes()),
-                    ),
+                    value: Literal::String(self.ctx.intern(self.previous.lexeme.as_bytes())),
                 }
             }
             TokenType::Identifier | TokenType::Error => {
@@ -1985,9 +1982,7 @@ impl<'gc> Parser<'gc> {
                 let value = token.lexeme.parse::<f64>().unwrap();
                 Some(Literal::Number(value))
             }
-            TokenType::String => Some(Literal::String(
-                self.ctx.intern(token.lexeme.trim_matches('"').as_bytes()),
-            )),
+            TokenType::String => Some(Literal::String(self.ctx.intern(token.lexeme.as_bytes()))),
             TokenType::True => Some(Literal::Boolean(true)),
             TokenType::False => Some(Literal::Boolean(false)),
             _ => None,

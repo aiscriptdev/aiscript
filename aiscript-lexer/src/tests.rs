@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_string_tokens() {
-        let source = r#"print("Hello" "World");"#;
+        let source = r#"print("Hello World");"#;
         let scanner = Lexer::new(source);
         let tokens: Vec<Token> = scanner.collect();
 
@@ -142,13 +142,11 @@ mod tests {
         assert_eq!(tokens[0].kind, TokenType::Identifier);
         assert_eq!(tokens[1].kind, TokenType::OpenParen);
         assert_eq!(tokens[2].kind, TokenType::String);
-        assert_eq!(tokens[3].kind, TokenType::String);
-        assert_eq!(tokens[4].kind, TokenType::CloseParen);
-        assert_eq!(tokens[5].kind, TokenType::Semicolon);
+        assert_eq!(tokens[3].kind, TokenType::CloseParen);
+        assert_eq!(tokens[4].kind, TokenType::Semicolon);
 
         // Verify the string contents
-        assert_eq!(tokens[2].lexeme, "\"Hello\"");
-        assert_eq!(tokens[3].lexeme, "\"World\"");
+        assert_eq!(tokens[2].lexeme, "Hello World");
     }
 
     #[test]

@@ -209,7 +209,7 @@ impl<'a> Parser<'a> {
                     Value::Number(serde_json::Number::from(num))
                 }
             }
-            TokenType::String => Value::String(self.current.lexeme.trim_matches('"').to_string()),
+            TokenType::String => Value::String(self.current.lexeme.to_string()),
             TokenType::True => Value::Bool(true),
             TokenType::False => Value::Bool(false),
             _ => return Err("Expected value".to_string()),

@@ -1,6 +1,6 @@
 // Invalid array literal syntax
 let a1 = [
-   "value" "bad" // Error at '"bad"': Expect ',' after array element.
+   "value" "bad" // Error at 'bad': Expect ',' after array element.
 ];
 
 let a2 = [
