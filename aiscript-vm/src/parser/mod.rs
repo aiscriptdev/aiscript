@@ -1314,6 +1314,13 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn raw_string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        Some(Expr::Literal {
+            value: Literal::String(self.ctx.intern(self.previous.lexeme.as_bytes())),
+            line: self.previous.line,
+        })
+    }
+
     fn literal(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         match self.previous.kind {
             TokenType::False => Some(Expr::Literal {
@@ -2240,6 +2247,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::Error => ParseRule::new(Some(Parser::error_type), None, Precedence::None),
         TokenType::Identifier => ParseRule::new(Some(Parser::variable), None, Precedence::None),
         TokenType::String => ParseRule::new(Some(Parser::string), None, Precedence::None),
+        TokenType::RawString => ParseRule::new(Some(Parser::raw_string), None, Precedence::None),
         TokenType::Number => ParseRule::new(Some(Parser::number), None, Precedence::None),
         TokenType::And => ParseRule::new(None, Some(Parser::and), Precedence::And),
         TokenType::Or => ParseRule::new(None, Some(Parser::or), Precedence::Or),

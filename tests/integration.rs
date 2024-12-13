@@ -53,8 +53,9 @@ fn parse_comments(path: &PathBuf) -> Option<Expected> {
             return None;
         }
         if let Some(m) = output_re.captures(line) {
-            let s = m.get(1).unwrap().as_str().trim_matches('"').to_owned();
-            expected.out.push(s);
+            let raw_str = m.get(1).unwrap().as_str().to_owned();
+            let processed_str = parse_expected_string(&raw_str);
+            expected.out.push(processed_str);
         }
         if let Some(m) = error_line_re.captures(line) {
             let line = m.get(1).unwrap().as_str();
@@ -145,4 +146,44 @@ fn run_file_test(filename: &str) {
     }
 
     assert_eq!(expected.out, out, "Output should match");
+}
+
+fn parse_expected_string(s: &str) -> String {
+    if s.starts_with("r\"") && s.ends_with('"') {
+        // If it's a raw string (r"..."), treat contents literally
+        s[2..s.len() - 1].to_string()
+    } else if s.starts_with('"') && s.ends_with('"') {
+        // If it's a regular quoted string, unescape its contents
+        let inner = &s[1..s.len() - 1];
+        unescape_string(inner)
+    } else {
+        // If not quoted, treat it as a literal string
+        s.to_string()
+    }
+}
+
+fn unescape_string(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next() {
+                Some('n') => result.push('\n'),
+                Some('t') => result.push('\t'),
+                Some('r') => result.push('\r'),
+                Some('\\') => result.push('\\'),
+                Some('"') => result.push('"'),
+                Some('\'') => result.push('\''),
+                Some(c) => {
+                    result.push('\\');
+                    result.push(c);
+                }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
 }

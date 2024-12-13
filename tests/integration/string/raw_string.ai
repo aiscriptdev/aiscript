@@ -1,0 +1,17 @@
+// Basic string literals
+print(r"hello");             // expect: hello
+print(r"hello\nworld");      // expect: hello\nworld
+print(r"hello\\world");      // expect: hello\\world
+
+// Escape sequences
+print(r"\\");               // expect: r"\\"
+print(r"\n");               // expect: r"\n"
+print(r"\t");               // expect: r"\t"
+print(r"\"");               // expect: r"\""
+print(r"\'");               // expect: r"\'"
+
+// Mixed content
+print(r"Line 1\nLine 2");   // expect: Line 1\nLine 2
+print(r"Tab\there");        // expect: r"Tab\there"
+print(r"Backslash\\here");  // expect: r"Backslash\\here"
+print(r"Quote\"here");      // expect: r"Quote\"here"

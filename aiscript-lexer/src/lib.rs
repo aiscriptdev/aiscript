@@ -66,6 +66,7 @@ pub enum TokenType {
     Identifier, // Variable/function names
     Error,      // Error type name (ends with qustion mark, e.g. NetworkError! )
     String,     // "string literal"
+    RawString,  // r"raw string \n\t"
     Number,     // 123, 123.45
     Doc,        // """docstring"""
 
@@ -614,7 +615,18 @@ impl<'a> Lexer<'a> {
                     self.scan_string()
                 }
             }
-
+            'r' => {
+                // Parse raw string: r"raw string \n\t"
+                if self.peek() == Some('"') {
+                    self.advance(); // consume the quote
+                    let mut token = self.scan_string();
+                    // Change the toke type to RawString
+                    token.kind = TokenType::RawString;
+                    token
+                } else {
+                    self.scan_identifier()
+                }
+            }
             c if c.is_ascii_digit() => self.scan_number(),
             c if c.is_alphabetic() || c == '_' => self.scan_identifier(),
             _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
