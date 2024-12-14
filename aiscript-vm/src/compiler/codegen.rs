@@ -939,8 +939,7 @@ impl<'gc> CodeGen<'gc> {
                             self.emit(OpCode::GreaterEqual);
 
                             if end.is_some() {
-                                let start_fail = self.emit_jump(OpCode::JumpIfFalse(0));
-                                self.emit(OpCode::Pop(1));
+                                let start_fail = self.emit_jump(OpCode::JumpPopIfFalse(0));
 
                                 self.emit(OpCode::Dup);
                                 if let Some(end) = end {
@@ -966,7 +965,6 @@ impl<'gc> CodeGen<'gc> {
                             self.emit(OpCode::Bool(true));
                         }
                     }
-
                     MatchPattern::Wildcard => {
                         self.emit(OpCode::Bool(true));
                     }
