@@ -27,6 +27,9 @@ pub enum OpCode {
     Bool(bool),
     Not,
     Equal,
+    // A Equal but set the result to the right operand
+    // Mainly used in match arms
+    EqualInplace,
     NotEqual,
     Greater,
     GreaterEqual,
@@ -238,6 +241,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Bool(b) => simple_instruction(if b { "TRUE" } else { "FALSE" }),
                 OpCode::Not => simple_instruction("NOT"),
                 OpCode::Equal => simple_instruction("EQUAL"),
+                OpCode::EqualInplace => simple_instruction("EQUAL_INPLACE"),
                 OpCode::NotEqual => simple_instruction("NOT_EQUAL"),
                 OpCode::Greater => simple_instruction("GREATER"),
                 OpCode::GreaterEqual => simple_instruction("GREATER_EQUAL"),

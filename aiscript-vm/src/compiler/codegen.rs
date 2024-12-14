@@ -882,18 +882,11 @@ impl<'gc> CodeGen<'gc> {
         for (i, arm) in arms.into_iter().enumerate() {
             let is_last = i == arm_count - 1;
 
-            if !is_last {
-                self.emit(OpCode::Dup);
-            }
-
             // For multiple patterns in an arm, we'll use a series of jumps
             let mut pattern_jumps = Vec::new();
             let arm_pattern_count = arm.patterns.len();
             // Generate or-chain of pattern tests
             for (j, pattern) in arm.patterns.into_iter().enumerate() {
-                if j > 0 {
-                    self.emit(OpCode::Dup); // Duplicate value for next pattern test
-                }
                 match pattern {
                     MatchPattern::EnumVariant { enum_name, variant } => {
                         // Validate enum and variant exist
@@ -923,22 +916,17 @@ impl<'gc> CodeGen<'gc> {
                             name_constant: name_constant as u8,
                             evaluate: false,
                         });
-                        self.emit(OpCode::Equal);
+                        self.emit(OpCode::EqualInplace);
                     }
-
                     MatchPattern::Literal { value } => {
                         self.emit_constant((value).into());
-                        self.emit(OpCode::Equal);
+                        self.emit(OpCode::EqualInplace);
                     }
                     MatchPattern::Variable { name } => {
-                        // Bind the value to the variable name in a new scope
-                        self.begin_scope();
+                        // Store the current value in local
                         self.add_local(name, Mutability::default());
                         self.mark_initialized();
-
-                        // Always match (like wildcard) but keep value bound
-                        self.emit(OpCode::Bool(true));
-                        self.end_scope();
+                        self.emit(OpCode::Bool(true)); // Always match
                     }
                     MatchPattern::Range {
                         start,
@@ -989,9 +977,11 @@ impl<'gc> CodeGen<'gc> {
                     // If it succeeds, jump to arm body (will be patched later)
                     pattern_jumps.push(self.emit_jump(OpCode::Jump(0)));
                     self.patch_jump(pattern_fail);
-                    self.emit(OpCode::Pop(1)); // Pop the failed test result
+                    // Pop the failed test result
+                    self.emit(OpCode::Pop(1));
                 }
             }
+
             if let Some(guard) = arm.guard {
                 let pattern_fail = self.emit_jump(OpCode::JumpIfFalse(0));
                 self.emit(OpCode::Pop(1));

@@ -399,6 +399,11 @@ impl<'gc> State<'gc> {
                 let a = self.pop_stack();
                 self.push_stack(a.equals(&b).into());
             }
+            OpCode::EqualInplace => {
+                let b = self.peek(0);
+                let a = self.peek(1);
+                self.stack[self.stack_top - 1] = a.equals(b).into();
+            }
             OpCode::NotEqual => {
                 let b = self.pop_stack();
                 let a = self.pop_stack();
