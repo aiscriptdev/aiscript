@@ -219,6 +219,12 @@ pub enum MatchPattern<'gc> {
     Wildcard,
 }
 
+impl<'gc> MatchPattern<'gc> {
+    pub fn is_variable_pattern(&self) -> bool {
+        matches!(self, Self::Variable { .. })
+    }
+}
+
 #[derive(Debug)]
 pub enum Expr<'gc> {
     Object {

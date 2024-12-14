@@ -1,4 +1,4 @@
-fn match_string(s) {
+fn match_string1(s) {
     return match s {
         "hello" | "hi" => "greeting",
         "bye" => "farewell",
@@ -10,10 +10,31 @@ fn match_string(s) {
     };
 }
 
-print(match_string("hi"));      // expect: greeting
-print(match_string("bye"));     // expect: farewell
-print(match_string("#id"));     // expect: sharp
-print(match_string("@email"));  // expect: at
-print(match_string("luck"));    // expect: lucky
-print(match_string("ai"));      // expect: ai
-print(match_string("match"));   // expect: unknown
+print(match_string1("hi"));      // expect: greeting
+print(match_string1("bye"));     // expect: farewell
+print(match_string1("#id"));     // expect: sharp
+print(match_string1("@email"));  // expect: at
+print(match_string1("luck"));    // expect: lucky
+print(match_string1("ai"));      // expect: ai
+print(match_string1("xyz"));     // expect: unknown
+
+fn match_string2(s) {
+    let r = match s {
+        "hello" | "hi" => "greeting",
+        "bye" => "farewell",
+        s if s.starts_with("#") => "sharp",
+        x if x.starts_with("@") => "at",
+        x if x in ["luck", "magic"] => "lucky",
+        s if s == "ai" => "ai",
+        _ => "unknown",
+    };
+    r
+}
+
+print(match_string2("hi"));      // expect: greeting
+print(match_string2("bye"));     // expect: farewell
+print(match_string2("#id"));     // expect: sharp
+print(match_string2("@email"));  // expect: at
+print(match_string2("luck"));    // expect: lucky
+print(match_string2("ai"));      // expect: ai
+print(match_string2("xyz"));     // expect: unknown

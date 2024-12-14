@@ -1,0 +1,12 @@
+match "@email" {
+    "bye" => print("farewell"),
+    x if x.starts_with("@") => print("at"), // expect: at
+    _ => print("unknown"),
+};
+
+let x = match "xyz" {
+    "bye" => "farewell",
+    x if x.starts_with("@") => "at",
+    _ => "unknown",
+};
+print(x); // expect: unknown

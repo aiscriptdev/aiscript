@@ -1,12 +1,12 @@
 fn match_number(n) {
-    return match n {
+    let x = match n {
         0 => "zero",
         x if x < 0 and x % 2 == 0 => "negative even",
         x if x < 0 => "negative odd",
         n if n % 2 == 0 => "positive even",
-        n if n % 2 == 0 => "positive even",
         _ => "positive odd",
     };
+    x
 }
 
 print(match_number(0));      // expect: zero

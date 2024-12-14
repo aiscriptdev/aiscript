@@ -33,6 +33,12 @@ struct Local<'gc> {
     mutability: Mutability,
 }
 
+impl<'gc> Local<'gc> {
+    fn is_initialized(&self) -> bool {
+        self.depth != UNINITIALIZED_LOCAL_DEPTH
+    }
+}
+
 #[derive(Debug, Default)]
 struct LoopScope {
     // Position of increment code for continue
@@ -875,10 +881,13 @@ impl<'gc> CodeGen<'gc> {
     ) -> Result<(), VmError> {
         // Generate the value being matched
         self.generate_expr(expr)?;
+        let expr_slot = self.local_count - 1;
 
         let mut exit_jumps = Vec::new();
 
+        self.begin_scope();
         let arm_count = arms.len();
+        let mut declared_arm_variable = false;
         for (i, arm) in arms.into_iter().enumerate() {
             let is_last = i == arm_count - 1;
 
@@ -923,10 +932,20 @@ impl<'gc> CodeGen<'gc> {
                         self.emit(OpCode::EqualInplace);
                     }
                     MatchPattern::Variable { name } => {
-                        // Store the current value in local
-                        self.add_local(name, Mutability::default());
-                        self.mark_initialized();
-                        self.emit(OpCode::Bool(true)); // Always match
+                        if declared_arm_variable {
+                            // Reuse the declared arm variable
+                            self.update_top_local_name(name);
+                        } else {
+                            // Store the current value in local
+                            self.add_local(name, Mutability::default());
+                            self.mark_initialized();
+                            // Dup the variable, this opcode cannot be omited
+                            self.emit(OpCode::Dup);
+                            declared_arm_variable = true;
+                        }
+                        // Always match for variable, let 
+                        // the guard (if exists) to check the condition later
+                        self.emit(OpCode::Bool(true));
                     }
                     MatchPattern::Range {
                         start,
@@ -984,7 +1003,6 @@ impl<'gc> CodeGen<'gc> {
                 let pattern_fail = self.emit_jump(OpCode::JumpIfFalse(0));
                 self.emit(OpCode::Pop(1));
 
-                self.emit(OpCode::Dup);
                 self.generate_expr(*guard)?;
 
                 self.patch_jump(pattern_fail);
@@ -1006,6 +1024,31 @@ impl<'gc> CodeGen<'gc> {
                 }
                 expr => self.generate_expr(expr)?,
             }
+            if self.locals[expr_slot].is_initialized() {
+                /*
+                case like this:
+                let r = match s {
+                    arm => {},
+                };
+
+                The match expression value will assign to local variable `r`.
+                */
+                self.emit(OpCode::SetLocal(expr_slot as u8 + 1));
+            } else {
+                /*
+                case like this:
+                return match s {
+                    arm => {},
+                };
+
+                The match expression value returned directly.
+                */
+                self.emit(OpCode::SetLocal(expr_slot as u8));
+            }
+            if declared_arm_variable {
+                // Pop the Duped arm variable
+                self.emit(OpCode::Pop(1));
+            }
 
             if !is_last {
                 exit_jumps.push(self.emit_jump(OpCode::Jump(0)));
@@ -1022,6 +1065,7 @@ impl<'gc> CodeGen<'gc> {
             self.patch_jump(jump);
         }
 
+        self.end_scope();
         Ok(())
     }
 }
@@ -1648,7 +1692,7 @@ impl<'gc> CodeGen<'gc> {
 
         for i in (0..self.local_count).rev() {
             let local = &self.locals[i];
-            if local.depth != UNINITIALIZED_LOCAL_DEPTH && local.depth < self.scope_depth {
+            if local.is_initialized() && local.depth < self.scope_depth {
                 // Stop when we reach an outer scope
                 break;
             }
@@ -1659,6 +1703,10 @@ impl<'gc> CodeGen<'gc> {
         }
 
         self.add_local(name, mutability)
+    }
+
+    fn update_top_local_name(&mut self, name: Token<'gc>) {
+        self.locals[self.local_count - 1].name = name;
     }
 
     fn add_local(&mut self, name: Token<'gc>, mutability: Mutability) -> usize {
