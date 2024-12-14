@@ -1803,6 +1803,13 @@ impl<'gc> Parser<'gc> {
 
         self.consume(TokenType::OpenBrace, "Expect '{' after match expression.");
 
+        if self.check(TokenType::CloseBrace) {
+            self.error_at_current(
+                "Empty match not allowed. A match expression must have at least one arm.",
+            );
+            return None;
+        }
+
         let mut arms: Vec<MatchArm> = Vec::new();
         let mut seen_patterns = HashSet::new();
         let mut has_wildcard = false;
