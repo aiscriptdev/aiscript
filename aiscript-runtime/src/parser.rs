@@ -122,7 +122,7 @@ impl<'a> Parser<'a> {
         }
         // Parse the handler function body
         let script = self.read_raw_script()?;
-        let statements = format!("fn handler(query, body, request, header){{{}}}", script);
+        let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
             path_specs,
