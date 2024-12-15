@@ -20,6 +20,7 @@ tokio = { version = "1.41.0" }
 indexmap = "2.6.0"
 chrono = "0.4.38"
 regex = "1.11.1"
+rand = "0.8.5"
 
 [features]
 # Enable debug features

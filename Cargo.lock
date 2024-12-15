@@ -103,6 +103,7 @@ dependencies = [
  "indexmap",
  "num_enum",
  "openai-api-rs",
+ "rand",
  "regex",
  "serde_json",
  "tokio",
