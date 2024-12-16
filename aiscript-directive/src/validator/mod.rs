@@ -200,6 +200,11 @@ pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
                     .get("end_with")
                     .and_then(|v| v.as_str().map(|v| v.to_string())),
             }),
+            "number" => Box::new(NumberValidator {
+                min: params.get("min").and_then(|v| v.as_f64()),
+                max: params.get("max").and_then(|v| v.as_f64()),
+                equal: params.get("equal").and_then(|v| v.as_f64()),
+            }),
             _ => {
                 panic!("Unsupported directive: @{}", name)
             }
