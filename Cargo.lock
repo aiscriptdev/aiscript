@@ -1207,8 +1207,8 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "openai-api-rs"
-version = "5.2.3"
-source = "git+https://github.com/aiscriptdev/openai-api-rs.git?rev=568f41b74f0e0443814b74810fa31a37bed9c7d2#568f41b74f0e0443814b74810fa31a37bed9c7d2"
+version = "5.2.4"
+source = "git+https://github.com/aiscriptdev/openai-api-rs.git?branch=main#449a68229c494cbaf387410e5978f11fc6e1bf03"
 dependencies = [
  "bytes",
  "futures-util",

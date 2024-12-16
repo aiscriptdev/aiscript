@@ -13,7 +13,7 @@ gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "3dbc6c4263700312e
 ] }
 # gc-arena = { path = "../../gc-arena", features = ["allocator-api2", "hashbrown"] }
 hashbrown = { version = "0.14", features = ["raw"] }
-openai-api-rs = { git = "https://github.com/aiscriptdev/openai-api-rs.git", rev = "568f41b74f0e0443814b74810fa31a37bed9c7d2" }
+openai-api-rs = { git = "https://github.com/aiscriptdev/openai-api-rs.git", branch = "main" }
 num_enum = "0.7.3"
 serde_json = "1.0.132"
 tokio = { version = "1.41.0" }

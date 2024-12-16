@@ -208,27 +208,28 @@ impl<'gc> Agent<'gc> {
         for tool_call in tool_calls.as_ref().unwrap() {
             let name = tool_call.function.name.as_ref().unwrap();
             if let Some(tool_def) = self.tools.get(name) {
-                // Pass params as the keyword args
                 let arguments = serde_json::from_str::<serde_json::Value>(
                     tool_call.function.arguments.as_ref().unwrap(),
                 )
                 .unwrap();
+                // Pass params as positional arguments
                 let params = tool_def
                     .params
                     .keys()
                     .filter_map(|key| {
-                        arguments.get(key).map(|v| {
-                            vec![
-                                Value::String(state.intern(key.as_bytes())),
-                                Value::String(state.intern(v.as_str().unwrap().as_bytes())),
-                            ]
-                        })
+                        arguments
+                            .get(key)
+                            .map(|v| Value::String(state.intern(v.as_str().unwrap().as_bytes())))
                     })
-                    .flatten()
                     .collect::<Vec<_>>();
                 let result = state
                     .eval_function_with_id(tool_def.chunk_id, &params)
                     .unwrap();
+                // println!(
+                //     "call tool {name} params: {:?}, result: {}",
+                //     params.iter().map(|i| format!("{i}")).collect::<Vec<_>>(),
+                //     result
+                // );
                 let content = if let ReturnValue::Agent(agent_name) = ReturnValue::from(result) {
                     let agent_name = state.intern(agent_name.as_bytes());
                     response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());
