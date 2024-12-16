@@ -1,8 +1,9 @@
-## AIScript
 
 <p align="center">
-    <img align="right" width="300" src="./assets/tuocan.png">
+    <img width="500" src="./assets/logo.svg">
 </p>
+
+# AIScript
 
 The next generation language for human and AI.
 
