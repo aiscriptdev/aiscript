@@ -102,8 +102,8 @@ pub enum OpCode {
         var_name_constant: u8,
     },
     // AI
-    Prompt,
-    Agent(u8), // constant index
+    Prompt(u8), // optional model index
+    Agent(u8),  // constant index
 }
 
 impl OpCode {
@@ -344,7 +344,7 @@ impl<'gc> Chunk<'gc> {
                     module_name_constant,
                     var_name_constant,
                 ),
-                OpCode::Prompt => simple_instruction("PROMPT"),
+                OpCode::Prompt(c) => self.constant_instruction("PROMPT", c),
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);
                 }

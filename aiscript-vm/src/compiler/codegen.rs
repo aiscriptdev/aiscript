@@ -854,9 +854,29 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(right)?;
                 self.patch_jump(end_jump);
             }
-            Expr::Prompt { expression, .. } => {
+            Expr::Prompt {
+                expression, model, ..
+            } => {
                 self.generate_expr(expression)?;
-                self.emit(OpCode::Prompt);
+                let model_idx = if let Some(model) = model {
+                    match *model {
+                        Expr::Literal {
+                            value: Literal::String(name),
+                            ..
+                        } => {
+                            let constant = self.make_constant(Value::from(name));
+                            constant as u8
+                        }
+                        _ => {
+                            self.error("Model specification must be a string literal");
+                            return Err(VmError::CompileError);
+                        }
+                    }
+                } else {
+                    u8::MAX // Use MAX value to indicate no model specified
+                };
+
+                self.emit(OpCode::Prompt(model_idx));
             }
         }
         Ok(())
@@ -943,7 +963,7 @@ impl<'gc> CodeGen<'gc> {
                             self.emit(OpCode::Dup);
                             declared_arm_variable = true;
                         }
-                        // Always match for variable, let 
+                        // Always match for variable, let
                         // the guard (if exists) to check the condition later
                         self.emit(OpCode::Bool(true));
                     }

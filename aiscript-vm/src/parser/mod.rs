@@ -2100,8 +2100,24 @@ impl<'gc> Parser<'gc> {
             self.error("Can't prompt outside of ai function or root script.");
         }
         let expr = Box::new(self.expression()?);
+        // Parse optional model specification after =>
+        let model = if self.match_token(TokenType::FatArrow) {
+            // Model must be a string literal
+            if !matches!(self.current.kind, TokenType::String) {
+                self.error_at_current("Model specification must be a string literal.");
+                return None;
+            }
+            self.advance();
+            Some(Box::new(Expr::Literal {
+                value: Literal::String(self.ctx.intern(self.previous.lexeme.as_bytes())),
+                line: self.previous.line,
+            }))
+        } else {
+            None
+        };
         Some(Expr::Prompt {
             expression: expr,
+            model,
             line: self.previous.line,
         })
     }

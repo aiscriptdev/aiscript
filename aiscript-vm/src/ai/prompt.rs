@@ -1,12 +1,14 @@
 use tokio::runtime::Handle;
 
+use crate::string::InternedString;
+
 #[cfg(feature = "ai_test")]
-async fn _prompt(message: String) -> String {
+async fn _prompt(message: String, _model: Option<InternedString<'_>>) -> String {
     return format!("AI: {message}");
 }
 
 #[cfg(not(feature = "ai_test"))]
-async fn _prompt(message: String) -> String {
+async fn _prompt(message: String, _model: Option<InternedString<'_>>) -> String {
     use openai_api_rs::v1::{
         chat_completion::{self, ChatCompletionRequest},
         common::GPT3_5_TURBO,
@@ -26,13 +28,13 @@ async fn _prompt(message: String) -> String {
     result.choices[0].message.content.clone().unwrap()
 }
 
-pub fn prompt(message: String) -> String {
+pub fn prompt(message: String, model: Option<InternedString>) -> String {
     if Handle::try_current().is_ok() {
         // We're in an async context, use await
-        Handle::current().block_on(async { _prompt(message).await })
+        Handle::current().block_on(async { _prompt(message, model).await })
     } else {
         // We're in a sync context, create a new runtime
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime.block_on(async { _prompt(message).await })
+        runtime.block_on(async { _prompt(message, model).await })
     }
 }
