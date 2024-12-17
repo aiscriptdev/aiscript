@@ -147,6 +147,13 @@ impl<'gc> State<'gc> {
         }
     }
 
+    pub fn get_context(&mut self) -> Context<'gc> {
+        Context {
+            mutation: self.mc,
+            strings: self.strings,
+        }
+    }
+
     pub fn import_module(&mut self, path: InternedString<'gc>) -> Result<(), VmError> {
         // Get the simple name (last component) from the path
         let simple_name = path.to_str().unwrap().split('.').last().unwrap();
@@ -185,13 +192,8 @@ impl<'gc> State<'gc> {
 
                 self.module_manager.register_script_module(path, module);
 
-                let context = Context {
-                    mutation: self.mc,
-                    strings: self.strings,
-                };
-
                 let source: &'static str = Box::leak(source.into_boxed_str());
-                let chunks = crate::compiler::compile(context, source)?;
+                let chunks = crate::compiler::compile(self.get_context(), source)?;
 
                 let imported_script_chunk_id = chunks.keys().last().copied().unwrap();
                 self.chunks.extend(chunks);
@@ -1423,10 +1425,7 @@ impl<'gc> State<'gc> {
     ) -> Result<CheckArgsResult<'gc>, VmError> {
         let function = &closure.function;
         let mut final_args = self.prepare_args(function, args_count, keyword_args_count)?;
-        let ctx = Context {
-            mutation: self.mc,
-            strings: self.strings,
-        };
+        let ctx = self.get_context();
         let mut validation_errors = Vec::new();
         // Fill in default values and check required parameters
         for (name, param) in &function.params {

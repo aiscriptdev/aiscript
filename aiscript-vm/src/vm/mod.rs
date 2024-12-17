@@ -53,11 +53,8 @@ impl Vm {
     }
 
     fn init_stdlib(&mut self) {
-        self.arena.mutate_root(|mc, state| {
-            let ctx = Context {
-                mutation: mc,
-                strings: state.strings,
-            };
+        self.arena.mutate_root(|_mc, state| {
+            let ctx = state.get_context();
 
             state.builtin_methods.init(ctx);
             state.globals.insert(
@@ -79,15 +76,15 @@ impl Vm {
                 ctx.intern(b"std.random"),
                 stdlib::create_random_module(ctx),
             );
+            state
+                .module_manager
+                .register_native_module(ctx.intern(b"std.serde"), stdlib::create_serde_module(ctx));
         });
     }
 
     pub fn compile(&mut self, source: &'static str) -> Result<(), VmError> {
-        self.arena.mutate_root(|mc, state| {
-            let context = Context {
-                mutation: mc,
-                strings: state.strings,
-            };
+        self.arena.mutate_root(|_mc, state| {
+            let context = state.get_context();
             state.chunks = crate::compiler::compile(context, source)?;
             builtins::define_builtin_functions(state);
             // The script function's chunk id is always the highest chunk id.
@@ -102,11 +99,8 @@ impl Vm {
         chunk_id: ChunkId,
         params: &[serde_json::Value],
     ) -> Result<ReturnValue, VmError> {
-        self.arena.mutate_root(|mc, state| {
-            let ctx = Context {
-                mutation: mc,
-                strings: state.strings,
-            };
+        self.arena.mutate_root(|_mc, state| {
+            let ctx = state.get_context();
             let return_value = state.eval_function_with_id(
                 chunk_id,
                 &params
