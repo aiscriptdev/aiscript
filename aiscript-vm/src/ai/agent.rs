@@ -20,7 +20,7 @@ use crate::{
     string::InternedString,
     ty::PrimitiveType,
     vm::{Context, State},
-    Chunk, ReturnValue, Value,
+    Chunk, Value,
 };
 
 #[derive(Collect)]
@@ -230,8 +230,8 @@ impl<'gc> Agent<'gc> {
                 //     params.iter().map(|i| format!("{i}")).collect::<Vec<_>>(),
                 //     result
                 // );
-                let content = if let ReturnValue::Agent(agent_name) = ReturnValue::from(result) {
-                    let agent_name = state.intern(agent_name.as_bytes());
+                let content = if let Value::Agent(agent) = result {
+                    let agent_name = agent.name;
                     response.agent = state.get_global(agent_name).map(|v| v.as_agent().unwrap());
                     format!("{{\"assistant\": {}}}", agent_name)
                 } else {

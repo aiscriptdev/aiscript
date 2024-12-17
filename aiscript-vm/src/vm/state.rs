@@ -1444,8 +1444,7 @@ impl<'gc> State<'gc> {
                 final_args[pos] = param.default_value;
             } else {
                 for validator in &param.validators {
-                    if let Err(err) = validator.validate(&serde_json::Value::from(&final_args[pos]))
-                    {
+                    if let Err(err) = validator.validate(&final_args[pos].to_serde_value()) {
                         validation_errors.push(crate::builtins::create_error_info(
                             ctx,
                             *name,

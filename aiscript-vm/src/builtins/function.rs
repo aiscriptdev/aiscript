@@ -1,4 +1,4 @@
-use crate::{vm::State, ReturnValue, Value, VmError};
+use crate::{vm::State, Value, VmError};
 use gc_arena::{Gc, RefLock};
 
 pub(super) fn map<'gc>(
@@ -36,23 +36,17 @@ pub(super) fn map<'gc>(
         }
     };
 
+    let arr = arr.borrow();
     // Create result array
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(arr.len());
 
     // Apply function to each element
-    for value in arr.borrow().iter() {
+    for value in arr.iter() {
         // Prepare arguments for the function call
         let call_args = vec![*value];
 
         // Call the function and convert result
-        match ReturnValue::from(state.eval_function(function, &call_args)?) {
-            ReturnValue::Number(n) => result.push(Value::Number(n)),
-            ReturnValue::Boolean(b) => result.push(Value::Boolean(b)),
-            ReturnValue::String(s) => result.push(Value::String(state.intern(s.as_bytes()))),
-            ReturnValue::Object(_) => todo!("Handle object return type"),
-            ReturnValue::Nil => result.push(Value::Nil),
-            ReturnValue::Agent(_) => todo!("Handle agent return type"),
-        }
+        result.push(state.eval_function(function, &call_args)?);
     }
 
     Ok(Value::Array(Gc::new(state, RefLock::new(result))))
@@ -93,23 +87,18 @@ pub(super) fn filter<'gc>(
         }
     };
 
+    let arr = arr.borrow();
     // Create result array
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(arr.len());
 
     // Filter elements based on predicate function
-    for value in arr.borrow().iter() {
+    for value in arr.iter() {
         // Prepare arguments for the function call
         let call_args = vec![*value];
 
         // Call function and check if it returns true
-        match ReturnValue::from(state.eval_function(function, &call_args)?) {
-            ReturnValue::Boolean(true) => result.push(*value),
-            ReturnValue::Boolean(false) => {}
-            _ => {
-                return Err(VmError::RuntimeError(
-                    "filter() function must return a boolean.".into(),
-                ))
-            }
+        if state.eval_function(function, &call_args)?.is_true() {
+            result.push(*value);
         }
     }
 

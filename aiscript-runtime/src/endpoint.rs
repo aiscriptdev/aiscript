@@ -257,9 +257,7 @@ impl Future for RequestProcessor {
                 ProcessingState::Executing(handle) => {
                     return match Pin::new(handle).poll(cx) {
                         Poll::Ready(Ok(result)) => match result {
-                            Ok(value) => {
-                                Poll::Ready(Ok(format!("Result: {}", value).into_response()))
-                            }
+                            Ok(value) => Poll::Ready(Ok(Json(value).into_response())),
                             Err(VmError::CompileError) => {
                                 Poll::Ready(Ok("Compile Error".into_response()))
                             }

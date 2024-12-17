@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
 
@@ -7,7 +7,7 @@ use crate::{
     object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, Object},
     string::{InternedString, StringValue},
     vm::{Context, VmError},
-    NativeFn, ReturnValue,
+    NativeFn,
 };
 
 #[derive(Copy, Clone, Default, Collect)]
@@ -280,6 +280,33 @@ impl<'gc> Value<'gc> {
             _ => Value::Nil,
         }
     }
+
+    pub fn to_serde_value(&self) -> serde_json::Value {
+        match self {
+            Value::Number(n) => (*n).into(),
+            Value::Boolean(b) => (*b).into(),
+            Value::String(str) => str.to_string().into(),
+            Value::IoString(str) => str.to_string().into(),
+            Value::Array(vec) => {
+                serde_json::Value::Array(vec.borrow().iter().map(|v| v.to_serde_value()).collect())
+            }
+            Value::Object(obj) => serde_json::Value::Object(
+                obj.borrow()
+                    .fields
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_serde_value()))
+                    .collect(),
+            ),
+            Value::Instance(instance) => instance
+                .borrow()
+                .fields
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_serde_value()))
+                .collect(),
+            Value::EnumVariant(variant) => variant.value.to_serde_value(),
+            _ => serde_json::Value::Null,
+        }
+    }
 }
 
 // Implementations for Enum and EnumVariant
@@ -350,55 +377,5 @@ impl<'gc> From<Gc<'gc, BoundMethod<'gc>>> for Value<'gc> {
 impl<'gc> From<Gc<'gc, Agent<'gc>>> for Value<'gc> {
     fn from(value: Gc<'gc, Agent<'gc>>) -> Self {
         Value::Agent(value)
-    }
-}
-
-impl<'gc> From<Value<'gc>> for ReturnValue {
-    fn from(value: Value<'gc>) -> Self {
-        match value {
-            Value::Number(value) => ReturnValue::Number(value),
-            Value::Boolean(value) => ReturnValue::Boolean(value),
-            Value::String(value) => ReturnValue::String(value.to_string()),
-            Value::Instance(instance) => {
-                let mut map = HashMap::new();
-                for (key, value) in &instance.borrow().fields {
-                    let v = match value {
-                        Value::Number(n) => (*n).into(),
-                        Value::Boolean(b) => (*b).into(),
-                        Value::String(str) => str.to_string().into(),
-                        Value::Nil => serde_json::Value::Null,
-                        _ => continue,
-                    };
-                    map.insert(key.to_string(), v);
-                }
-                ReturnValue::Object(map)
-            }
-            Value::Agent(agent) => ReturnValue::Agent(agent.name.to_string()),
-            _ => ReturnValue::Nil,
-        }
-    }
-}
-
-impl<'gc> From<&Value<'gc>> for serde_json::Value {
-    fn from(value: &Value<'gc>) -> Self {
-        match value {
-            Value::Number(n) => {
-                serde_json::Value::Number(serde_json::Number::from_f64(*n).unwrap())
-            }
-            Value::Boolean(b) => serde_json::Value::Bool(*b),
-            Value::String(s) => serde_json::Value::String(s.to_string()),
-            Value::IoString(s) => serde_json::Value::String(s.to_string()),
-            Value::Array(vec) => {
-                serde_json::Value::Array(vec.borrow().iter().map(serde_json::Value::from).collect())
-            }
-            Value::Object(obj) => serde_json::Value::Object(
-                obj.borrow()
-                    .fields
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), serde_json::Value::from(v)))
-                    .collect(),
-            ),
-            _ => serde_json::Value::Null,
-        }
     }
 }
