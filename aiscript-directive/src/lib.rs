@@ -168,13 +168,28 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
         self.scanner.advance();
         match token.kind {
             TokenType::String => Some(Value::String(token.lexeme.to_owned())),
-            TokenType::Number => match token.lexeme.parse::<f64>() {
-                Ok(num) => Some(Value::Number(serde_json::Number::from(num as i64))),
-                Err(err) => {
-                    self.scanner.error(&format!("Invalid number: {err}"));
-                    None
+            TokenType::Number => {
+                let num_str = token.lexeme;
+                // First try parsing as i64 (integer)
+                if let Ok(int_val) = num_str.parse::<i64>() {
+                    Some(Value::Number(serde_json::Number::from(int_val)))
+                } else {
+                    // If not an integer, try as f64 (float)
+                    match num_str.parse::<f64>() {
+                        Ok(float_val) => match serde_json::Number::from_f64(float_val) {
+                            Some(num) => Some(Value::Number(num)),
+                            None => {
+                                self.scanner.error("Invalid float value");
+                                None
+                            }
+                        },
+                        Err(err) => {
+                            self.scanner.error(&format!("Invalid number: {err}"));
+                            None
+                        }
+                    }
                 }
-            },
+            }
             TokenType::True => Some(Value::Bool(true)),
             TokenType::False => Some(Value::Bool(false)),
             TokenType::OpenBracket => {

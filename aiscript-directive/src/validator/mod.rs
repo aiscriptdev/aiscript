@@ -2,7 +2,7 @@ use serde_json::Value;
 
 use crate::Directive;
 
-pub trait Validator: Send + Sync + 'static {
+pub trait Validator: Send + Sync {
     fn name(&self) -> &'static str;
     fn validate(&self, value: &Value) -> Result<(), String>;
 }
@@ -34,6 +34,8 @@ pub struct NumberValidator {
     min: Option<f64>,
     max: Option<f64>,
     equal: Option<f64>,
+    strict_int: Option<bool>,
+    strict_float: Option<bool>,
 }
 
 pub struct InValidator(Vec<Value>);
@@ -136,7 +138,21 @@ impl Validator for NumberValidator {
     }
 
     fn validate(&self, value: &Value) -> Result<(), String> {
-        let value = value.as_f64().unwrap();
+        let num = value.as_number().unwrap();
+        let value = num.as_f64().unwrap();
+        if let (Some(true), Some(true)) = (self.strict_int, self.strict_float) {
+            return Err("Cannot set both strict_int and strict_float to true".into());
+        }
+        if let Some(true) = self.strict_int {
+            if !num.is_i64() {
+                return Err("Value must be an integer".into());
+            }
+        }
+        if let Some(true) = self.strict_float {
+            if num.is_i64() {
+                return Err("Value must be a float".into());
+            }
+        }
         if let Some(min) = self.min {
             if value < min {
                 return Err(format!("Number is less than the minimum value of {}", min));
@@ -204,6 +220,8 @@ pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
                 min: params.get("min").and_then(|v| v.as_f64()),
                 max: params.get("max").and_then(|v| v.as_f64()),
                 equal: params.get("equal").and_then(|v| v.as_f64()),
+                strict_int: params.get("strict_int").and_then(|v| v.as_bool()),
+                strict_float: params.get("strict_float").and_then(|v| v.as_bool()),
             }),
             _ => {
                 panic!("Unsupported directive: @{}", name)
