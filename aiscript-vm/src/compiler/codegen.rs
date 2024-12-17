@@ -8,7 +8,7 @@ use crate::{
     ai::Agent,
     ast::{
         AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, Expr, FnDef, FunctionDecl, Literal,
-        MatchArm, MatchPattern, Mutability, ObjectProperty, ParameterDecl, Program, Stmt,
+        MatchArm, MatchPattern, Mutability, ObjectProperty, ParameterDecl, Program, SqlParam, Stmt,
         VariableDecl,
     },
     lexer::{Token, TokenType},
@@ -854,6 +854,9 @@ impl<'gc> CodeGen<'gc> {
                 self.generate_expr(right)?;
                 self.patch_jump(end_jump);
             }
+            Expr::Sql { query, params, .. } => {
+                self.generate_sql(query, params)?;
+            }
             Expr::Prompt {
                 expression, model, ..
             } => {
@@ -1086,6 +1089,28 @@ impl<'gc> CodeGen<'gc> {
         }
 
         self.end_scope();
+        Ok(())
+    }
+
+    fn generate_sql(
+        &mut self,
+        query: Token<'gc>,
+        params: Vec<SqlParam<'gc>>,
+    ) -> Result<(), VmError> {
+        // First load the SQL query string as a constant
+        let query_constant = self.identifier_constant(query.lexeme);
+
+        let param_count = params.len() as u8;
+        // Generate code for each parameter value in order
+        for param in params {
+            self.generate_expr(*param.value)?;
+        }
+
+        // Emit SQL instruction with the query constant and parameter count
+        self.emit(OpCode::Sql {
+            query_constant: query_constant as u8,
+            param_count,
+        });
         Ok(())
     }
 }

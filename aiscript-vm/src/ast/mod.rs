@@ -226,6 +226,12 @@ impl<'gc> MatchPattern<'gc> {
 }
 
 #[derive(Debug)]
+pub struct SqlParam<'gc> {
+    pub name: Token<'gc>,
+    pub value: Box<Expr<'gc>>,
+}
+
+#[derive(Debug)]
 pub enum Expr<'gc> {
     Object {
         properties: Vec<ObjectProperty<'gc>>,
@@ -349,6 +355,11 @@ pub enum Expr<'gc> {
         keyword_args: HashMap<String, Expr<'gc>>,
         line: u32,
     },
+    Sql {
+        query: Token<'gc>,
+        params: Vec<SqlParam<'gc>>,
+        line: u32,
+    },
     Prompt {
         expression: Box<Expr<'gc>>,
         model: Option<Box<Expr<'gc>>>,
@@ -383,6 +394,7 @@ impl<'gc> Expr<'gc> {
             | Self::Self_ { line, .. }
             | Self::Super { line, .. }
             | Self::SuperInvoke { line, .. }
+            | Self::Sql { line, .. }
             | Self::Prompt { line, .. } => *line,
         }
     }

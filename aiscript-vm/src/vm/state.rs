@@ -869,6 +869,41 @@ impl<'gc> State<'gc> {
 
                 self.push_stack(Value::Boolean(result));
             }
+            OpCode::Sql {
+                query_constant,
+                param_count,
+            } => {
+                let query = match frame.read_constant(query_constant) {
+                    Value::String(s) => s.to_string(),
+                    _ => return Err(self.runtime_error("Expected SQL query string".into())),
+                };
+
+                // Get parameters from stack
+                let mut params = Vec::new();
+                for _ in 0..param_count {
+                    params.push(self.pop_stack());
+                }
+                params.reverse(); // Restore correct parameter order
+
+                println!(
+                    "{query}, {:?}",
+                    params
+                        .into_iter()
+                        .map(|i| format!("{i}"))
+                        .collect::<Vec<_>>()
+                );
+                // Execute SQL
+                // if let Some(executor) = &self.sql_executor {
+                //     match executor.execute(self.mc, &query, params).await {
+                //         Ok(result) => {
+                //             self.push_stack(result);
+                //         }
+                //         Err(e) => return Err(e),
+                //     }
+                // } else {
+                //     return Err(self.runtime_error("SQL not initialized".into()));
+                // }
+            }
             OpCode::Prompt(model_idx) => {
                 let message = self.pop_stack().as_string()?.to_string();
                 let model = if model_idx == u8::MAX {

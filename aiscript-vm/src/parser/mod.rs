@@ -15,7 +15,7 @@ use super::{
 use crate::{
     ast::{
         AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FunctionDecl,
-        MatchArm, MatchPattern, ObjectProperty, VariableDecl, Visibility,
+        MatchArm, MatchPattern, ObjectProperty, SqlParam, VariableDecl, Visibility,
     },
     object::FunctionType,
     ty::{
@@ -1795,6 +1795,67 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn sql_expression(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let line = self.previous.line;
+
+        // Handle both block and string literal syntax
+        let sql_script = if self.match_token(TokenType::String) {
+            self.previous
+        } else {
+            // Parse SQL block between braces
+            self.consume(
+                TokenType::OpenBrace,
+                "Expect '{' or string literal after sql keyword.",
+            );
+            match self.scanner.read_sql_script() {
+                Ok(script) => Token::new(TokenType::String, script.leak(), line),
+                Err(err) => {
+                    self.error(&err);
+                    return None;
+                }
+            }
+        };
+
+        // Extract parameters from SQL
+        let mut params = Vec::new();
+        let mut seen_params = HashSet::new();
+
+        // Look for :param_name patterns in the SQL
+        for cap in sql_script.lexeme.matches(":$@+?[a-zA-Z][a-zA-Z0-9_]*") {
+            let param_name = &cap[1..]; // Remove the colon
+
+            if seen_params.contains(param_name) {
+                continue;
+            }
+            seen_params.insert(param_name);
+
+            // Create parameter token
+            let param_token = Token::new(TokenType::Identifier, param_name, line);
+
+            // Create a variable expression for this parameter
+            let param_expr = Expr::Variable {
+                name: param_token,
+                line,
+            };
+
+            params.push(SqlParam {
+                name: param_token,
+                value: Box::new(param_expr),
+            });
+        }
+
+        // Only consume closing brace for block syntax
+        if !matches!(self.previous.kind, TokenType::String) {
+            self.consume(TokenType::CloseBrace, "Expect '}' after SQL block.");
+        }
+
+        Some(Expr::Sql {
+            query: sql_script,
+            params,
+            line,
+        })
+    }
+
     fn match_expression(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let line = self.previous.line;
         self.stop_at_brace = true;
@@ -2287,6 +2348,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
             Precedence::If,
         ),
         TokenType::In => ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
+        TokenType::Sql => ParseRule::new(Some(Parser::sql_expression), None, Precedence::None),
         TokenType::Prompt => ParseRule::new(Some(Parser::prompt), None, Precedence::None),
         _ => ParseRule::new(None, None, Precedence::None),
     }

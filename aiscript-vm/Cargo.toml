@@ -22,6 +22,7 @@ indexmap = "2.6.0"
 chrono = "0.4.38"
 regex = "1.11.1"
 rand = "0.8.5"
+sqlx = "0.8.2"
 
 [features]
 # Enable debug features

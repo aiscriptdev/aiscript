@@ -101,9 +101,15 @@ pub enum OpCode {
         module_name_constant: u8,
         var_name_constant: u8,
     },
+    Sql {
+        // Index of SQL query string in constants
+        query_constant: u8,
+        // Number of parameters
+        param_count: u8,
+    },
     // AI
     Prompt(u8), // optional model index
-    Agent(u8),  // constant index
+    Agent(u8),
 }
 
 impl OpCode {
@@ -344,6 +350,10 @@ impl<'gc> Chunk<'gc> {
                     module_name_constant,
                     var_name_constant,
                 ),
+                OpCode::Sql {
+                    query_constant,
+                    param_count,
+                } => println!("{:-16} {:4} {}", "OP_SQL", query_constant, param_count),
                 OpCode::Prompt(c) => self.constant_instruction("PROMPT", c),
                 OpCode::Agent(c) => {
                     println!("{:-16} {:4} '{}'", "OP_AGENT", c, self.constans[c as usize]);

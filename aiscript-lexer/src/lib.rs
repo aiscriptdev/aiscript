@@ -92,6 +92,7 @@ pub enum TokenType {
     Return,
     Super,
     Self_,
+    Sql,
     True,
     Let,
     Use,
@@ -448,6 +449,7 @@ impl<'a> Lexer<'a> {
             "raise" => TokenType::Raise,
             "super" => TokenType::Super,
             "self" => TokenType::Self_,
+            "sql" => TokenType::Sql,
             "true" => TokenType::True,
             "let" => TokenType::Let,
             "use" => TokenType::Use,
@@ -663,6 +665,42 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    fn read_sql_script(&mut self) -> Result<String, String> {
+        let mut script = String::new();
+        let mut brace_count = 1;
+
+        while let Some((_, ch)) = self.iter.peek() {
+            match ch {
+                '{' => {
+                    brace_count += 1;
+                    script.push('{');
+                }
+                '}' => {
+                    brace_count -= 1;
+                    if brace_count == 0 {
+                        break;
+                    } else {
+                        script.push('}');
+                    }
+                }
+                '\n' => {
+                    script.push('\n');
+                    self.line += 1;
+                }
+                ch => {
+                    script.push(*ch);
+                }
+            }
+            self.advance();
+        }
+
+        if brace_count > 0 {
+            return Err("Unclosed SQL block".to_string());
+        }
+
+        Ok(script.trim().to_owned())
+    }
+
     fn read_raw_script(&mut self) -> Result<String, String> {
         let mut script = String::new();
         let mut brace_count = 1;
@@ -730,17 +768,28 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn read_raw_script(&mut self) -> Result<String, String> {
+    fn enter_lexer<F>(&mut self, f: F) -> Result<String, String>
+    where
+        F: Fn(&mut Lexer) -> Result<String, String>,
+    {
         let mut lexer = Lexer::from(mem::replace(
             &mut self.lexer,
             peakable::Peekable::new(Lexer::new("")),
         ));
-        let script = format!("{} {}", self.current.lexeme, lexer.read_raw_script()?);
+        let script = format!("{} {}", self.current.lexeme, f(&mut lexer)?);
 
         self.lexer = peakable::Peekable::new(lexer);
         // Advance to next token.
         self.advance();
         Ok(script)
+    }
+
+    pub fn read_sql_script(&mut self) -> Result<String, String> {
+        self.enter_lexer(|lexer| lexer.read_sql_script())
+    }
+
+    pub fn read_raw_script(&mut self) -> Result<String, String> {
+        self.enter_lexer(|lexer| lexer.read_raw_script())
     }
 
     pub fn escape_string(&mut self, input: &str) -> Option<String> {
