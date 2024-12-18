@@ -7,6 +7,7 @@ use axum::{
     Form, Json,
 };
 use serde_json::Value;
+use sqlx::PgPool;
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -47,6 +48,7 @@ pub struct Endpoint {
     pub body_fields: Vec<Field>,
     pub script: String,
     pub path_specs: Vec<PathSpec>,
+    pub pg_connection: Option<Arc<PgPool>>,
 }
 
 enum ProcessingState {
@@ -234,24 +236,26 @@ impl Future for RequestProcessor {
                     let script = Box::leak(script.into_boxed_str());
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
-                    let handle = task::spawn_blocking(move || {
-                        let mut vm = Vm::new();
-                        vm.compile(script)?;
-                        vm.eval_function(
-                            0,
-                            &[
-                                Value::Object(query_data.into_iter().collect()),
-                                Value::Object(body_data.into_iter().collect()),
-                                Value::Object(
-                                    request_obj
-                                        .into_iter()
-                                        .map(|(k, v)| (k.to_owned(), v))
-                                        .collect(),
-                                ),
-                                Value::Object(header_obj.into_iter().collect()),
-                            ],
-                        )
-                    });
+                    let pg_connection = self.endpoint.pg_connection.as_ref().cloned();
+                    let handle: JoinHandle<Result<ReturnValue, VmError>> =
+                        task::spawn_blocking(move || {
+                            let mut vm = Vm::new(pg_connection);
+                            vm.compile(script)?;
+                            vm.eval_function(
+                                0,
+                                &[
+                                    Value::Object(query_data.into_iter().collect()),
+                                    Value::Object(body_data.into_iter().collect()),
+                                    Value::Object(
+                                        request_obj
+                                            .into_iter()
+                                            .map(|(k, v)| (k.to_owned(), v))
+                                            .collect(),
+                                    ),
+                                    Value::Object(header_obj.into_iter().collect()),
+                                ],
+                            )
+                        });
                     self.state = ProcessingState::Executing(handle);
                 }
                 ProcessingState::Executing(handle) => {

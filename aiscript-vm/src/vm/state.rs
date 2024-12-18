@@ -4,6 +4,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     hash::BuildHasherDefault,
     mem, ops,
+    sync::Arc,
 };
 
 use ahash::AHasher;
@@ -11,6 +12,7 @@ use gc_arena::{
     lock::{GcRefLock, RefLock},
     Collect, Collection, Gc, Mutation,
 };
+use sqlx::PgPool;
 
 use crate::{
     ai,
@@ -105,6 +107,7 @@ pub struct State<'gc> {
     pub module_manager: ModuleManager<'gc>,
     pub(super) builtin_methods: BuiltinMethods<'gc>,
     current_module: Option<InternedString<'gc>>,
+    pub pg_connection: Option<Arc<PgPool>>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {
@@ -144,6 +147,7 @@ impl<'gc> State<'gc> {
             module_manager: ModuleManager::new(),
             builtin_methods: BuiltinMethods::new(),
             current_module: None,
+            pg_connection: None,
         }
     }
 
