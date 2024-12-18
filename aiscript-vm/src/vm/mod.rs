@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, fs, ops, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, fmt::Display, fs, ops, path::PathBuf};
 
 use gc_arena::{arena::CollectionPhase, lock::RefLock, Arena, Gc, Mutation, Rootable};
 use sqlx::PgPool;
@@ -45,7 +45,7 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new(pg_connection: Option<Arc<PgPool>>) -> Self {
+    pub fn new(pg_connection: Option<PgPool>) -> Self {
         let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| {
                 let mut state = State::new(mc);

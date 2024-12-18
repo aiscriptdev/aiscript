@@ -4,7 +4,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     hash::BuildHasherDefault,
     mem, ops,
-    sync::Arc,
 };
 
 use ahash::AHasher;
@@ -107,7 +106,7 @@ pub struct State<'gc> {
     pub module_manager: ModuleManager<'gc>,
     pub(super) builtin_methods: BuiltinMethods<'gc>,
     current_module: Option<InternedString<'gc>>,
-    pub pg_connection: Option<Arc<PgPool>>,
+    pub pg_connection: Option<PgPool>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {

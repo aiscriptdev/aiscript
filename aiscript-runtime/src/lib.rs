@@ -123,14 +123,13 @@ where
     Ok(watcher)
 }
 
-pub async fn get_pg_connection() -> Option<Arc<PgPool>> {
+pub async fn get_pg_connection() -> Option<PgPool> {
     match std::env::var("DATABASE_URL") {
         Ok(url) => PgPoolOptions::new()
             .max_connections(5)
             .connect(&url)
             .await
-            .ok()
-            .map(Arc::new),
+            .ok(),
         Err(_) => None,
     }
 }

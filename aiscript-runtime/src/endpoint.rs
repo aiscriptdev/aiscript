@@ -48,7 +48,7 @@ pub struct Endpoint {
     pub body_fields: Vec<Field>,
     pub script: String,
     pub path_specs: Vec<PathSpec>,
-    pub pg_connection: Option<Arc<PgPool>>,
+    pub pg_connection: Option<PgPool>,
 }
 
 enum ProcessingState {
@@ -236,7 +236,7 @@ impl Future for RequestProcessor {
                     let script = Box::leak(script.into_boxed_str());
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
-                    let pg_connection = self.endpoint.pg_connection.as_ref().cloned();
+                    let pg_connection = self.endpoint.pg_connection.clone();
                     let handle: JoinHandle<Result<ReturnValue, VmError>> =
                         task::spawn_blocking(move || {
                             let mut vm = Vm::new(pg_connection);

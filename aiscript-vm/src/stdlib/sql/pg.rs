@@ -78,7 +78,7 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
             // Bind parameters
             let query = params.iter().fold(query, |query, param| query.bind(param));
 
-            query.fetch_all(&**conn).await
+            query.fetch_all(&*conn).await
         })
         .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)))?;
 
