@@ -60,25 +60,41 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
         ));
     }
 
-    let query = args[0].as_string()?;
+    let sql = args[0].as_string()?;
     let conn = state.pg_connection.as_ref().unwrap();
-
-    // Convert remaining args to parameters
-    let params: Vec<sqlx::types::JsonValue> = args
-        .iter()
-        .skip(1)
-        .map(|v| v.to_serde_value())
-        .collect::<Vec<_>>();
 
     // Execute query in runtime
     let rows = Handle::current()
         .block_on(async {
-            let query = sqlx::query(query.to_str().unwrap());
+            let mut query = sqlx::query(sql.to_str().unwrap());
+            // Bind parameters directly with their native types
+            for value in args.iter().skip(1) {
+                match value {
+                    Value::Number(n) => {
+                        query = query.bind(n);
+                    }
+                    Value::String(s) => {
+                        query = query.bind(s.to_str().unwrap());
+                    }
+                    Value::Boolean(b) => {
+                        query = query.bind(b);
+                    }
+                    Value::Nil => {
+                        query = query.bind(None::<&str>);
+                    }
+                    _ => {
+                        return Err(VmError::RuntimeError(format!(
+                            "Unsupported parameter: {}",
+                            value
+                        )))
+                    }
+                }
+            }
 
-            // Bind parameters
-            let query = params.iter().fold(query, |query, param| query.bind(param));
-
-            query.fetch_all(&*conn).await
+            query
+                .fetch_all(conn)
+                .await
+                .map_err(|err| VmError::RuntimeError(err.to_string()))
         })
         .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)))?;
 
