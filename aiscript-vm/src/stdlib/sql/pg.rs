@@ -222,94 +222,103 @@ fn row_to_object<'gc>(state: &mut State<'gc>, row: &sqlx::postgres::PgRow) -> Va
     Value::Object(Gc::new(&ctx, RefLock::new(obj)))
 }
 
-async fn execute_query<'a, E>(
+fn execute_query<'a, E>(
     executor: E,
     query: &str,
     bindings: Vec<Value<'_>>,
-) -> Result<Vec<sqlx::postgres::PgRow>, sqlx::Error>
+) -> Result<Vec<sqlx::postgres::PgRow>, VmError>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    let mut query_builder = sqlx::query(query);
+    Handle::current()
+        .block_on(async {
+            let mut query_builder = sqlx::query(query);
 
-    // Bind parameters
-    for value in bindings {
-        match value {
-            Value::Number(n) => {
-                query_builder = query_builder.bind(n);
-            }
-            Value::String(s) => {
-                let s_str = s.to_str().unwrap();
-                // Try to parse special types from string
-                if let Ok(uuid) = sqlx::types::Uuid::parse_str(s_str) {
-                    query_builder = query_builder.bind(uuid);
-                } else if let Ok(date) =
-                    sqlx::types::chrono::NaiveDate::parse_from_str(s_str, "%Y-%m-%d")
-                {
-                    query_builder = query_builder.bind(date);
-                } else if let Ok(datetime) =
-                    sqlx::types::chrono::NaiveDateTime::parse_from_str(s_str, "%Y-%m-%dT%H:%M:%S")
-                {
-                    query_builder = query_builder.bind(datetime);
-                } else {
-                    query_builder = query_builder.bind(s_str);
-                }
-            }
-            Value::Boolean(b) => {
-                query_builder = query_builder.bind(b);
-            }
-            Value::Nil => {
-                query_builder = query_builder.bind(Option::<String>::None);
-            }
-            Value::Array(arr) => {
-                let arr = arr.borrow();
-                if let Some(first) = arr.first() {
-                    match first {
-                        Value::Number(_) => {
-                            let nums: Vec<f64> = arr
-                                .iter()
-                                .filter_map(|v| match v {
-                                    Value::Number(n) => Some(*n),
-                                    _ => None,
-                                })
-                                .collect();
-                            query_builder = query_builder.bind(nums);
-                        }
-                        Value::String(_) => {
-                            let strings: Vec<String> = arr
-                                .iter()
-                                .filter_map(|v| match v {
-                                    Value::String(s) => Some(s.to_str().unwrap().to_string()),
-                                    _ => None,
-                                })
-                                .collect();
-                            query_builder = query_builder.bind(strings);
-                        }
-                        Value::Boolean(_) => {
-                            let bools: Vec<bool> = arr
-                                .iter()
-                                .filter_map(|v| match v {
-                                    Value::Boolean(b) => Some(*b),
-                                    _ => None,
-                                })
-                                .collect();
-                            query_builder = query_builder.bind(bools);
-                        }
-                        _ => {
-                            return Err(sqlx::Error::Protocol(
-                                "Unsupported array element type".into(),
-                            ))
+            // Bind parameters
+            for value in bindings {
+                match value {
+                    Value::Number(n) => {
+                        query_builder = query_builder.bind(n);
+                    }
+                    Value::String(s) => {
+                        let s_str = s.to_str().unwrap();
+                        // Try to parse special types from string
+                        if let Ok(uuid) = sqlx::types::Uuid::parse_str(s_str) {
+                            query_builder = query_builder.bind(uuid);
+                        } else if let Ok(date) =
+                            sqlx::types::chrono::NaiveDate::parse_from_str(s_str, "%Y-%m-%d")
+                        {
+                            query_builder = query_builder.bind(date);
+                        } else if let Ok(datetime) =
+                            sqlx::types::chrono::NaiveDateTime::parse_from_str(
+                                s_str,
+                                "%Y-%m-%dT%H:%M:%S",
+                            )
+                        {
+                            query_builder = query_builder.bind(datetime);
+                        } else {
+                            query_builder = query_builder.bind(s_str);
                         }
                     }
-                } else {
-                    query_builder = query_builder.bind::<Vec<String>>(vec![]);
+                    Value::Boolean(b) => {
+                        query_builder = query_builder.bind(b);
+                    }
+                    Value::Nil => {
+                        query_builder = query_builder.bind(Option::<String>::None);
+                    }
+                    Value::Array(arr) => {
+                        let arr = arr.borrow();
+                        if let Some(first) = arr.first() {
+                            match first {
+                                Value::Number(_) => {
+                                    let nums: Vec<f64> = arr
+                                        .iter()
+                                        .filter_map(|v| match v {
+                                            Value::Number(n) => Some(*n),
+                                            _ => None,
+                                        })
+                                        .collect();
+                                    query_builder = query_builder.bind(nums);
+                                }
+                                Value::String(_) => {
+                                    let strings: Vec<String> = arr
+                                        .iter()
+                                        .filter_map(|v| match v {
+                                            Value::String(s) => {
+                                                Some(s.to_str().unwrap().to_string())
+                                            }
+                                            _ => None,
+                                        })
+                                        .collect();
+                                    query_builder = query_builder.bind(strings);
+                                }
+                                Value::Boolean(_) => {
+                                    let bools: Vec<bool> = arr
+                                        .iter()
+                                        .filter_map(|v| match v {
+                                            Value::Boolean(b) => Some(*b),
+                                            _ => None,
+                                        })
+                                        .collect();
+                                    query_builder = query_builder.bind(bools);
+                                }
+                                _ => {
+                                    return Err(sqlx::Error::Protocol(
+                                        "Unsupported array element type".into(),
+                                    ))
+                                }
+                            }
+                        } else {
+                            query_builder = query_builder.bind::<Vec<String>>(vec![]);
+                        }
+                    }
+                    _ => return Err(sqlx::Error::Protocol("Unsupported parameter type".into())),
                 }
             }
-            _ => return Err(sqlx::Error::Protocol("Unsupported parameter type".into())),
-        }
-    }
 
-    query_builder.fetch_all(executor).await
+            query_builder.fetch_all(executor).await
+        })
+        .map_err(|e| VmError::RuntimeError(format!("Database query error: {}", e)))
 }
 
 // Native function implementations
@@ -324,17 +333,11 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     let conn = state.pg_connection.as_ref().unwrap();
 
     // Execute query in runtime
-    let rows = Handle::current()
-        .block_on(async {
-            execute_query(
-                conn,
-                sql.to_str().unwrap(),
-                args.into_iter().skip(1).collect(),
-            )
-            .await
-            .map_err(|err| VmError::RuntimeError(err.to_string()))
-        })
-        .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)))?;
+    let rows = execute_query(
+        conn,
+        sql.to_str().unwrap(),
+        args.into_iter().skip(1).collect(),
+    )?;
 
     // Convert rows to array of objects
     let mut results = Vec::new();
@@ -393,12 +396,11 @@ mod transaction {
         // Execute query with the active transaction
         let result = ACTIVE_TRANSACTION.with(|cell| {
             if let Some(tx) = (*cell.borrow_mut()).as_mut() {
-                let rows = Handle::current()
-                    .block_on(async {
-                        execute_query(&mut **tx, query.to_str().unwrap(), args[1..].to_vec()).await
-                    })
-                    .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)));
-
+                let rows = execute_query(
+                    &mut **tx,
+                    query.to_str().unwrap(),
+                    args.into_iter().skip(1).collect(),
+                );
                 Some(rows)
             } else {
                 None
@@ -414,7 +416,7 @@ mod transaction {
                 }
                 Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
             }
-            Some(Err(e)) => Err(VmError::RuntimeError(format!("Database error: {}", e))),
+            Some(Err(e)) => Err(VmError::RuntimeError(format!("Database error: {e}"))),
             None => Err(VmError::RuntimeError("No active transaction".into())),
         }
     }
@@ -432,8 +434,7 @@ mod transaction {
         match result {
             Some(Ok(())) => Ok(Value::Nil),
             Some(Err(e)) => Err(VmError::RuntimeError(format!(
-                "Failed to commit transaction: {}",
-                e
+                "Failed to commit transaction: {e}"
             ))),
             None => Err(VmError::RuntimeError("No active transaction".into())),
         }
@@ -452,8 +453,7 @@ mod transaction {
         match result {
             Some(Ok(())) => Ok(Value::Nil),
             Some(Err(e)) => Err(VmError::RuntimeError(format!(
-                "Failed to rollback transaction: {}",
-                e
+                "Failed to rollback transaction: {e}"
             ))),
             None => Err(VmError::RuntimeError("No active transaction".into())),
         }
