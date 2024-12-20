@@ -1,6 +1,7 @@
-use std::{collections::HashMap, fmt::Display, ops};
+use std::{collections::HashMap, fmt::Display, fs, ops, path::PathBuf};
 
 use gc_arena::{arena::CollectionPhase, lock::RefLock, Arena, Gc, Mutation, Rootable};
+use sqlx::PgPool;
 pub use state::State;
 
 use crate::{
@@ -33,23 +34,39 @@ impl Display for VmError {
     }
 }
 
+impl Default for Vm {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
 pub struct Vm {
     arena: Arena<Rootable![State<'_>]>,
 }
 
-impl Default for Vm {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Vm {
-    pub fn new() -> Self {
+    pub fn new(pg_connection: Option<PgPool>) -> Self {
         let mut vm = Vm {
-            arena: Arena::<Rootable![State<'_>]>::new(|mc| State::new(mc)),
+            arena: Arena::<Rootable![State<'_>]>::new(|mc| {
+                let mut state = State::new(mc);
+                state.pg_connection = pg_connection;
+                state
+            }),
         };
         vm.init_stdlib();
         vm
+    }
+
+    pub fn run_file(&mut self, path: PathBuf) {
+        let source = fs::read_to_string(path).unwrap();
+        let source: &'static str = Box::leak(source.into_boxed_str());
+        if let Err(VmError::CompileError) = self.compile(source) {
+            std::process::exit(65);
+        }
+        if let Err(VmError::RuntimeError(err)) = self.interpret() {
+            eprintln!("{err}");
+            std::process::exit(70);
+        }
     }
 
     fn init_stdlib(&mut self) {
@@ -79,6 +96,9 @@ impl Vm {
             state
                 .module_manager
                 .register_native_module(ctx.intern(b"std.serde"), stdlib::create_serde_module(ctx));
+            state
+                .module_manager
+                .register_native_module(ctx.intern(b"std.sql.pg"), stdlib::create_pg_module(ctx));
         });
     }
 
@@ -225,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_inject_variables() {
-        let mut vm = Vm::new();
+        let mut vm = Vm::default();
         vm.inject_variables({
             let mut map = HashMap::new();
             map.insert("test".into(), "abc".into());
@@ -246,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_inject_instance() {
-        let mut vm = Vm::new();
+        let mut vm = Vm::default();
         vm.inject_instance("request", {
             let mut map = HashMap::new();
             map.insert("method", "get".into());

@@ -22,6 +22,7 @@ indexmap = "2.6.0"
 chrono = "0.4.38"
 regex = "1.11.1"
 rand = "0.8.5"
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
 
 [features]
 # Enable debug features

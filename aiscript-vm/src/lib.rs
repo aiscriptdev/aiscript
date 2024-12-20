@@ -188,7 +188,7 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
 }
 
 pub fn eval(source: &'static str) -> Result<ReturnValue, VmError> {
-    let mut vm = Vm::new();
+    let mut vm = Vm::default();
     vm.compile(source)?;
     vm.interpret()
 }

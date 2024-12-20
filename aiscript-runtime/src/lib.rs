@@ -1,6 +1,8 @@
 use ast::HttpMethod;
 use axum::{response::Html, routing::*};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -121,6 +123,17 @@ where
     Ok(watcher)
 }
 
+pub async fn get_pg_connection() -> Option<PgPool> {
+    match std::env::var("DATABASE_URL") {
+        Ok(url) => PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&url)
+            .await
+            .ok(),
+        Err(_) => None,
+    }
+}
+
 async fn run_server(
     path: Option<PathBuf>,
     port: u16,
@@ -145,6 +158,8 @@ async fn run_server(
             "/redoc",
             get(|| async { Html(include_str!("openapi/redoc.html")) }),
         );
+
+    let pg_connection = get_pg_connection().await;
     for route in routes {
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
@@ -159,6 +174,7 @@ async fn run_server(
                     .collect(),
                 script: endpoint_spec.statements,
                 path_specs: endpoint_spec.path_specs,
+                pg_connection: pg_connection.as_ref().cloned(),
             };
 
             for path_spec in &endpoint.path_specs[..endpoint.path_specs.len() - 1] {

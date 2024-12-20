@@ -44,7 +44,7 @@ impl Repl {
         }
 
         Self {
-            vm: Vm::new(),
+            vm: Vm::default(),
             buffer: String::new(),
             brace_depth: 0,
             editor,
