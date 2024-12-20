@@ -1,15 +1,19 @@
+use std::cell::RefCell;
+
 use gc_arena::{Gc, RefLock};
-use sqlx::{Column, Row, TypeInfo, ValueRef};
+use sqlx::{Column, Postgres, Row, TypeInfo, ValueRef};
 
 use tokio::runtime::Handle;
 
 use crate::{
     module::ModuleKind,
-    object::Object,
+    object::{Class, Instance, Object},
     vm::{Context, State},
     NativeFn, Value, VmError,
 };
-
+thread_local! {
+    static ACTIVE_TRANSACTION: RefCell<Option<sqlx::Transaction<'static, Postgres>>> = RefCell::new(const { None });
+}
 // Create the PostgreSQL module with native functions
 pub fn create_pg_module(ctx: Context) -> ModuleKind {
     let name = ctx.intern(b"std.sql.pg");
@@ -17,10 +21,10 @@ pub fn create_pg_module(ctx: Context) -> ModuleKind {
     let exports = [
         // Basic query function
         ("query", Value::NativeFunction(NativeFn(pg_query))),
-        // Transaction function
+        // Transaction functions
         (
-            "transaction",
-            Value::NativeFunction(NativeFn(pg_transaction)),
+            "begin_transaction",
+            Value::NativeFunction(NativeFn(pg_begin_transaction)),
         ),
     ]
     .into_iter()
@@ -191,6 +195,96 @@ fn row_to_object<'gc>(state: &mut State<'gc>, row: &sqlx::postgres::PgRow) -> Va
     Value::Object(Gc::new(&ctx, RefLock::new(obj)))
 }
 
+async fn execute_query<'a, E>(
+    executor: E,
+    query: &str,
+    bindings: Vec<Value<'_>>,
+) -> Result<Vec<sqlx::postgres::PgRow>, sqlx::Error>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    let mut query_builder = sqlx::query(query);
+
+    // Bind parameters
+    for value in bindings {
+        match value {
+            Value::Number(n) => {
+                query_builder = query_builder.bind(n);
+            }
+            Value::String(s) => {
+                let s_str = s.to_str().unwrap();
+                // Try to parse special types from string
+                if let Ok(uuid) = sqlx::types::Uuid::parse_str(s_str) {
+                    query_builder = query_builder.bind(uuid);
+                } else if let Ok(date) =
+                    sqlx::types::chrono::NaiveDate::parse_from_str(s_str, "%Y-%m-%d")
+                {
+                    query_builder = query_builder.bind(date);
+                } else if let Ok(datetime) =
+                    sqlx::types::chrono::NaiveDateTime::parse_from_str(s_str, "%Y-%m-%dT%H:%M:%S")
+                {
+                    query_builder = query_builder.bind(datetime);
+                } else {
+                    query_builder = query_builder.bind(s_str);
+                }
+            }
+            Value::Boolean(b) => {
+                query_builder = query_builder.bind(b);
+            }
+            Value::Nil => {
+                query_builder = query_builder.bind(Option::<String>::None);
+            }
+            Value::Array(arr) => {
+                let arr = arr.borrow();
+                if let Some(first) = arr.first() {
+                    match first {
+                        Value::Number(_) => {
+                            let nums: Vec<f64> = arr
+                                .iter()
+                                .filter_map(|v| match v {
+                                    Value::Number(n) => Some(*n),
+                                    _ => None,
+                                })
+                                .collect();
+                            query_builder = query_builder.bind(nums);
+                        }
+                        Value::String(_) => {
+                            let strings: Vec<String> = arr
+                                .iter()
+                                .filter_map(|v| match v {
+                                    Value::String(s) => Some(s.to_str().unwrap().to_string()),
+                                    _ => None,
+                                })
+                                .collect();
+                            query_builder = query_builder.bind(strings);
+                        }
+                        Value::Boolean(_) => {
+                            let bools: Vec<bool> = arr
+                                .iter()
+                                .filter_map(|v| match v {
+                                    Value::Boolean(b) => Some(*b),
+                                    _ => None,
+                                })
+                                .collect();
+                            query_builder = query_builder.bind(bools);
+                        }
+                        _ => {
+                            return Err(sqlx::Error::Protocol(
+                                "Unsupported array element type".into(),
+                            ))
+                        }
+                    }
+                } else {
+                    query_builder = query_builder.bind::<Vec<String>>(vec![]);
+                }
+            }
+            _ => return Err(sqlx::Error::Protocol("Unsupported parameter type".into())),
+        }
+    }
+
+    query_builder.fetch_all(executor).await
+}
+
 // Native function implementations
 fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
@@ -205,35 +299,13 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     // Execute query in runtime
     let rows = Handle::current()
         .block_on(async {
-            let mut query = sqlx::query(sql.to_str().unwrap());
-            // Bind parameters directly with their native types
-            for value in args.iter().skip(1) {
-                match value {
-                    Value::Number(n) => {
-                        query = query.bind(n);
-                    }
-                    Value::String(s) => {
-                        query = query.bind(s.to_str().unwrap());
-                    }
-                    Value::Boolean(b) => {
-                        query = query.bind(b);
-                    }
-                    Value::Nil => {
-                        query = query.bind(None::<&str>);
-                    }
-                    _ => {
-                        return Err(VmError::RuntimeError(format!(
-                            "Unsupported parameter: {}",
-                            value
-                        )))
-                    }
-                }
-            }
-
-            query
-                .fetch_all(conn)
-                .await
-                .map_err(|err| VmError::RuntimeError(err.to_string()))
+            execute_query(
+                conn,
+                sql.to_str().unwrap(),
+                args.into_iter().skip(1).collect(),
+            )
+            .await
+            .map_err(|err| VmError::RuntimeError(err.to_string()))
         })
         .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)))?;
 
@@ -249,43 +321,121 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     )))
 }
 
-fn pg_transaction<'gc>(
+fn pg_begin_transaction<'gc>(
     state: &mut State<'gc>,
-    args: Vec<Value<'gc>>,
+    _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
-    if args.len() != 1 {
+    // Check if there's already an active transaction
+    let has_active = ACTIVE_TRANSACTION.with(|tx| tx.borrow().is_some());
+    if has_active {
+        return Err(VmError::RuntimeError("Transaction already active".into()));
+    }
+
+    let ctx = state.get_context();
+    let conn = state.pg_connection.as_ref().unwrap();
+    let tx = Handle::current()
+        .block_on(async move { conn.begin().await })
+        .map_err(|e| VmError::RuntimeError(format!("Failed to begin transaction: {}", e)))?;
+
+    // Store transaction in thread local
+    ACTIVE_TRANSACTION.with(|cell| {
+        *cell.borrow_mut() = Some(tx);
+    });
+
+    let class_name = state.intern(b"Transaction");
+    let class = Gc::new(&ctx, RefLock::new(Class::new(class_name)));
+
+    let mut class_ref = class.borrow_mut(&ctx);
+    class_ref.methods.insert(
+        ctx.intern(b"query"),
+        Value::NativeFunction(NativeFn(tx_query)),
+    );
+    class_ref.methods.insert(
+        ctx.intern(b"commit_transaction"),
+        Value::NativeFunction(NativeFn(tx_commit)),
+    );
+    class_ref.methods.insert(
+        ctx.intern(b"rollback_transaction"),
+        Value::NativeFunction(NativeFn(tx_rollback)),
+    );
+
+    // Create and return new instance
+    let instance = Instance::new(class);
+    Ok(Value::Instance(Gc::new(&ctx, RefLock::new(instance))))
+}
+
+fn tx_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+    if args.is_empty() {
         return Err(VmError::RuntimeError(
-            "transaction() requires a function argument.".into(),
+            "query() requires a SQL query string.".into(),
         ));
     }
 
-    // Get closure from args
-    let closure = args[0].as_closure()?;
-    let conn = state.pg_connection.as_ref().unwrap().clone();
+    let query = args[0].as_string()?;
+    let ctx = state.get_context();
 
-    // Execute transaction in runtime
-    Handle::current().block_on(async {
-        let tx = conn
-            .begin()
-            .await
-            .map_err(|e| VmError::RuntimeError(format!("Failed to begin transaction: {}", e)))?;
+    // Execute query with the active transaction
+    let result = ACTIVE_TRANSACTION.with(|cell| {
+        if let Some(tx) = (*cell.borrow_mut()).as_mut() {
+            let rows = Handle::current()
+                .block_on(async {
+                    execute_query(&mut **tx, query.to_str().unwrap(), args[1..].to_vec()).await
+                })
+                .map_err(|e| VmError::RuntimeError(format!("Database error: {}", e)));
 
-        // Call the closure
-        let result = state.eval_function(closure.function, &[]);
-
-        match result {
-            Ok(_) => tx
-                .commit()
-                .await
-                .map_err(|e| VmError::RuntimeError(format!("Failed to commit transaction: {}", e))),
-            Err(e) => {
-                tx.rollback().await.map_err(|e| {
-                    VmError::RuntimeError(format!("Failed to rollback transaction: {}", e))
-                })?;
-                Err(e)
-            }
+            Some(rows)
+        } else {
+            None
         }
-    })?;
+    });
 
-    Ok(Value::Nil)
+    match result {
+        Some(Ok(rows)) => {
+            // Convert rows to array of objects
+            let mut results = Vec::new();
+            for row in rows {
+                results.push(row_to_object(state, &row));
+            }
+            Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+        }
+        Some(Err(e)) => Err(VmError::RuntimeError(format!("Database error: {}", e))),
+        None => Err(VmError::RuntimeError("No active transaction".into())),
+    }
+}
+
+fn tx_commit<'gc>(_state: &mut State<'gc>, _args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+    let result = ACTIVE_TRANSACTION.with(|cell| {
+        cell.borrow_mut()
+            .take()
+            .map(|tx| Handle::current().block_on(async { tx.commit().await }))
+    });
+
+    match result {
+        Some(Ok(())) => Ok(Value::Nil),
+        Some(Err(e)) => Err(VmError::RuntimeError(format!(
+            "Failed to commit transaction: {}",
+            e
+        ))),
+        None => Err(VmError::RuntimeError("No active transaction".into())),
+    }
+}
+
+fn tx_rollback<'gc>(
+    _state: &mut State<'gc>,
+    _args: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError> {
+    let result = ACTIVE_TRANSACTION.with(|cell| {
+        cell.borrow_mut()
+            .take()
+            .map(|tx| Handle::current().block_on(async { tx.rollback().await }))
+    });
+
+    match result {
+        Some(Ok(())) => Ok(Value::Nil),
+        Some(Err(e)) => Err(VmError::RuntimeError(format!(
+            "Failed to rollback transaction: {}",
+            e
+        ))),
+        None => Err(VmError::RuntimeError("No active transaction".into())),
+    }
 }

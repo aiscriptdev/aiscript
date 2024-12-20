@@ -237,6 +237,10 @@ impl<'gc> Value<'gc> {
         matches!(self, Value::Closure(_))
     }
 
+    pub fn is_native_function(&self) -> bool {
+        matches!(self, Value::NativeFunction(_))
+    }
+
     pub fn is_nil(&self) -> bool {
         matches!(self, Value::Nil)
     }

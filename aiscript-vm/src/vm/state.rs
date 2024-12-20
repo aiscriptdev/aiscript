@@ -1185,10 +1185,13 @@ impl<'gc> State<'gc> {
         arg_count: u8,
         keyword_args_count: u8,
     ) -> Result<(), VmError> {
-        if let Some(method) = class.borrow().methods.get(&name) {
-            self.call(method.as_closure()?, arg_count, keyword_args_count)
-        } else {
-            Err(self.runtime_error(format!("Undefined property '{}'.", name).into()))
+        match class.borrow().methods.get(&name) {
+            Some(Value::Closure(closure)) => self.call(*closure, arg_count, keyword_args_count),
+            Some(value) if value.is_native_function() => {
+                // class methods can be a native function
+                self.call_value(*value, arg_count, keyword_args_count)
+            }
+            _ => Err(self.runtime_error(format!("Undefined property '{}'.", name).into())),
         }
     }
 
