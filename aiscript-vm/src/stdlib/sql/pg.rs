@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use gc_arena::{Gc, RefLock};
+use gc_arena::{Gc, GcRefLock, RefLock};
 use sqlx::{Column, Postgres, Row, TypeInfo, ValueRef};
 
 use tokio::runtime::Handle;
@@ -16,39 +16,13 @@ thread_local! {
     static ACTIVE_TRANSACTION: RefCell<Option<sqlx::Transaction<'static, Postgres>>> = const { RefCell::new(None) };
 }
 
-fn create_transaction_class(ctx: Context) -> Gc<RefLock<Class>> {
-    let methods = [
-        (
-            ctx.intern(b"query"),
-            Value::NativeFunction(NativeFn(transaction::query)),
-        ),
-        (
-            ctx.intern(b"commit"),
-            Value::NativeFunction(NativeFn(transaction::commit)),
-        ),
-        (
-            ctx.intern(b"rollback"),
-            Value::NativeFunction(NativeFn(transaction::rollback)),
-        ),
-    ]
-    .into_iter()
-    .collect();
-    Gc::new(
-        &ctx,
-        RefLock::new(Class {
-            name: ctx.intern(b"Transaction"),
-            methods,
-            static_methods: HashMap::default(),
-        }),
-    )
-}
-
 // Create the PostgreSQL module with native functions
 pub fn create_pg_module(ctx: Context) -> ModuleKind {
     let name = ctx.intern(b"std.sql.pg");
 
     let exports = [
         ("query", Value::NativeFunction(NativeFn(pg_query))),
+        ("query_as", Value::NativeFunction(NativeFn(pg_query_as))),
         (
             "begin_transaction",
             Value::NativeFunction(NativeFn(transaction::begin_transaction)),
@@ -72,7 +46,7 @@ fn column_to_value<'gc>(
         return Ok(Value::Nil);
     }
 
-    let value = match dbg!(type_info.name()) {
+    let value = match type_info.name() {
         // Integer types
         "INT2" | "SMALLINT" => row.try_get::<i16, _>(i).map(|v| Value::Number(v as f64)),
         "INT4" | "INTEGER" => row.try_get::<i32, _>(i).map(|v| Value::Number(v as f64)),
@@ -93,9 +67,9 @@ fn column_to_value<'gc>(
         //     .map(|v| Value::Number(v.to_string().parse::<f64>().unwrap_or(0.0))),
 
         // Character types
-        "VARCHAR" | "CHAR" | "TEXT" | "BPCHAR" | "NAME" => {
-            dbg!(row.try_get::<String, _>(i)).map(|v| Value::String(ctx.intern(v.as_bytes())))
-        }
+        "VARCHAR" | "CHAR" | "TEXT" | "BPCHAR" | "NAME" => row
+            .try_get::<String, _>(i)
+            .map(|v| Value::String(ctx.intern(v.as_bytes()))),
 
         // Boolean type
         "BOOL" | "BOOLEAN" => row.try_get::<bool, _>(i).map(Value::Boolean),
@@ -326,6 +300,43 @@ where
         .map_err(|e| VmError::RuntimeError(format!("Database query error: {}", e)))
 }
 
+fn execute_typed_query<'gc, 'a, E>(
+    ctx: Context<'gc>,
+    executor: E,
+    class: GcRefLock<'gc, Class<'gc>>,
+    query: &str,
+    bindings: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    // Execute the query
+    let rows = execute_query(executor, query, bindings)?;
+
+    // TODO: Validate first row's columns against class fields?
+    // if let Some(first_row) = rows.first() {
+    //     validate_query_columns(ctx, class, first_row)?;
+    // }
+
+    // Convert rows to class instances
+    let mut results = Vec::new();
+    for row in rows {
+        // Create new instance
+        let mut instance = Instance::new(class);
+
+        // Set fields from row data
+        for (i, column) in row.columns().iter().enumerate() {
+            let field_name = ctx.intern(column.name().as_bytes());
+            let value = column_to_value(ctx, &row, i, column.type_info())?;
+            instance.fields.insert(field_name, value);
+        }
+
+        results.push(Value::Instance(Gc::new(&ctx, RefLock::new(instance))));
+    }
+
+    Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+}
+
 // Native function implementations
 fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
     if args.is_empty() {
@@ -356,8 +367,66 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     )))
 }
 
+fn pg_query_as<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+    if args.len() < 2 {
+        return Err(VmError::RuntimeError(
+            "query_as() requires a class and SQL query string.".into(),
+        ));
+    }
+
+    // First argument should be a class
+    let class = match args[0] {
+        Value::Class(class) => class,
+        _ => {
+            return Err(VmError::RuntimeError(
+                "First argument to query_as() must be a class.".into(),
+            ))
+        }
+    };
+
+    let sql = args[1].as_string()?;
+    let ctx = state.get_context();
+    let conn = state.pg_connection.as_ref().unwrap();
+
+    execute_typed_query(
+        ctx,
+        conn,
+        class,
+        sql.to_str().unwrap(),
+        args.into_iter().skip(2).collect(),
+    )
+}
+
 mod transaction {
     use super::*;
+
+    fn create_transaction_class(ctx: Context) -> Gc<RefLock<Class>> {
+        let methods = [
+            (ctx.intern(b"query"), Value::NativeFunction(NativeFn(query))),
+            (
+                ctx.intern(b"query_as"),
+                Value::NativeFunction(NativeFn(query_as)),
+            ),
+            (
+                ctx.intern(b"commit"),
+                Value::NativeFunction(NativeFn(commit)),
+            ),
+            (
+                ctx.intern(b"rollback"),
+                Value::NativeFunction(NativeFn(rollback)),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        Gc::new(
+            &ctx,
+            RefLock::new(Class {
+                name: ctx.intern(b"Transaction"),
+                methods,
+                static_methods: HashMap::default(),
+            }),
+        )
+    }
 
     pub(super) fn begin_transaction<'gc>(
         state: &mut State<'gc>,
@@ -385,10 +454,7 @@ mod transaction {
         Ok(Value::Instance(Gc::new(&ctx, RefLock::new(instance))))
     }
 
-    pub(super) fn query<'gc>(
-        state: &mut State<'gc>,
-        args: Vec<Value<'gc>>,
-    ) -> Result<Value<'gc>, VmError> {
+    fn query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
         if args.is_empty() {
             return Err(VmError::RuntimeError(
                 "query() requires a SQL query string.".into(),
@@ -426,10 +492,49 @@ mod transaction {
         }
     }
 
-    pub(super) fn commit<'gc>(
-        _state: &mut State<'gc>,
-        _args: Vec<Value<'gc>>,
-    ) -> Result<Value<'gc>, VmError> {
+    fn query_as<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+        if args.len() < 2 {
+            return Err(VmError::RuntimeError(
+                "query_as() requires a class and SQL query string.".into(),
+            ));
+        }
+
+        // First argument should be a class
+        let class = match args[0] {
+            Value::Class(class) => class,
+            _ => {
+                return Err(VmError::RuntimeError(
+                    "First argument to query_as() must be a class.".into(),
+                ))
+            }
+        };
+
+        let query = args[1].as_string()?;
+        let ctx = state.get_context();
+
+        // Execute query using the active transaction
+        let result = ACTIVE_TRANSACTION.with(|cell| {
+            if let Some(tx) = (*cell.borrow_mut()).as_mut() {
+                let bindings = args.into_iter().skip(2).collect();
+                Some(execute_typed_query(
+                    ctx,
+                    &mut **tx,
+                    class,
+                    query.to_str().unwrap(),
+                    bindings,
+                ))
+            } else {
+                None
+            }
+        });
+
+        match result {
+            Some(result) => result,
+            None => Err(VmError::RuntimeError("No active transaction".into())),
+        }
+    }
+
+    fn commit<'gc>(_state: &mut State<'gc>, _args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
         let result = ACTIVE_TRANSACTION.with(|cell| {
             cell.borrow_mut()
                 .take() // Set ACTIVE_TRANSACTION to None
@@ -445,7 +550,7 @@ mod transaction {
         }
     }
 
-    pub(super) fn rollback<'gc>(
+    fn rollback<'gc>(
         _state: &mut State<'gc>,
         _args: Vec<Value<'gc>>,
     ) -> Result<Value<'gc>, VmError> {
