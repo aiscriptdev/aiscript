@@ -61,161 +61,166 @@ pub fn create_pg_module(ctx: Context) -> ModuleKind {
     ModuleKind::Native { name, exports }
 }
 
+fn column_to_value<'gc>(
+    ctx: Context<'gc>,
+    row: &sqlx::postgres::PgRow,
+    i: usize,
+    type_info: &sqlx::postgres::PgTypeInfo,
+) -> Result<Value<'gc>, VmError> {
+    // Handle NULL values first
+    if row.try_get_raw(i).map_or(true, |v| v.is_null()) {
+        return Ok(Value::Nil);
+    }
+
+    let value = match dbg!(type_info.name()) {
+        // Integer types
+        "INT2" | "SMALLINT" => row.try_get::<i16, _>(i).map(|v| Value::Number(v as f64)),
+        "INT4" | "INTEGER" => row.try_get::<i32, _>(i).map(|v| Value::Number(v as f64)),
+        "INT8" | "BIGINT" => row.try_get::<i64, _>(i).map(|v| Value::Number(v as f64)),
+
+        // Serial types (same as integer types)
+        "SERIAL2" | "SMALLSERIAL" => row.try_get::<i16, _>(i).map(|v| Value::Number(v as f64)),
+        "SERIAL4" | "SERIAL" => row.try_get::<i32, _>(i).map(|v| Value::Number(v as f64)),
+        "SERIAL8" | "BIGSERIAL" => row.try_get::<i64, _>(i).map(|v| Value::Number(v as f64)),
+
+        // Floating-point types
+        "FLOAT4" | "REAL" => row.try_get::<f32, _>(i).map(|v| Value::Number(v as f64)),
+        "FLOAT8" | "DOUBLE PRECISION" => row.try_get::<f64, _>(i).map(Value::Number),
+
+        // Decimal/numeric types
+        // "NUMERIC" | "DECIMAL" => row
+        //     .try_get::<sqlx::types::Decimal, _>(i)
+        //     .map(|v| Value::Number(v.to_string().parse::<f64>().unwrap_or(0.0))),
+
+        // Character types
+        "VARCHAR" | "CHAR" | "TEXT" | "BPCHAR" | "NAME" => {
+            dbg!(row.try_get::<String, _>(i)).map(|v| Value::String(ctx.intern(v.as_bytes())))
+        }
+
+        // Boolean type
+        "BOOL" | "BOOLEAN" => row.try_get::<bool, _>(i).map(Value::Boolean),
+
+        // UUID type
+        "UUID" => row
+            .try_get::<sqlx::types::Uuid, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+
+        // Date/Time types
+        "DATE" => row
+            .try_get::<sqlx::types::chrono::NaiveDate, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+        "TIME" => row
+            .try_get::<sqlx::types::chrono::NaiveTime, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+        "TIMESTAMP" => row
+            .try_get::<sqlx::types::chrono::NaiveDateTime, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+        "TIMESTAMPTZ" => row
+            .try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+
+        // JSON types
+        "JSON" | "JSONB" => row
+            .try_get::<serde_json::Value, _>(i)
+            .map(|v| Value::String(ctx.intern(v.to_string().as_bytes()))),
+
+        // Array types
+        t if t.starts_with("_") => {
+            match &t[1..] {
+                // Integer arrays
+                "INT2" | "SMALLINT" => row.try_get::<Vec<i16>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
+                    ))
+                }),
+                "INT4" | "INTEGER" => row.try_get::<Vec<i32>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
+                    ))
+                }),
+                "INT8" | "BIGINT" => row.try_get::<Vec<i64>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
+                    ))
+                }),
+
+                // Float arrays
+                "FLOAT4" | "REAL" => row.try_get::<Vec<f32>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
+                    ))
+                }),
+                "FLOAT8" | "DOUBLE PRECISION" => row.try_get::<Vec<f64>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(Value::Number).collect()),
+                    ))
+                }),
+
+                // Text arrays
+                "VARCHAR" | "TEXT" => row.try_get::<Vec<String>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(
+                            v.into_iter()
+                                .map(|s| Value::String(ctx.intern(s.as_bytes())))
+                                .collect(),
+                        ),
+                    ))
+                }),
+
+                // Boolean arrays
+                "BOOL" | "BOOLEAN" => row.try_get::<Vec<bool>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(v.into_iter().map(Value::Boolean).collect()),
+                    ))
+                }),
+
+                // Default to string representation for unknown array types
+                _ => row.try_get::<Vec<String>, _>(i).map(|v| {
+                    Value::Array(Gc::new(
+                        &ctx,
+                        RefLock::new(
+                            v.into_iter()
+                                .map(|s| Value::String(ctx.intern(s.as_bytes())))
+                                .collect(),
+                        ),
+                    ))
+                }),
+            }
+        }
+
+        // Binary data
+        "BYTEA" => row
+            .try_get::<Vec<u8>, _>(i)
+            .map(|v| Value::String(ctx.intern(&v))),
+
+        // Default to string for unknown types
+        _ => row
+            .try_get::<String, _>(i)
+            .map(|v| Value::String(ctx.intern(v.as_bytes()))),
+    }
+    .unwrap_or_else(|_| {
+        // If conversion fails, try to get as string
+        row.try_get::<String, _>(i)
+            .map(|v| Value::String(ctx.intern(v.as_bytes())))
+            .unwrap_or(Value::Nil)
+    });
+    Ok(value)
+}
+
 // Convert database row to AIScript object
-fn row_to_object<'gc>(state: &mut State<'gc>, row: &sqlx::postgres::PgRow) -> Value<'gc> {
+fn row_to_object<'gc>(ctx: Context<'gc>, row: &sqlx::postgres::PgRow) -> Value<'gc> {
     let mut obj = Object::default();
-    let ctx = state.get_context();
 
     for (i, column) in row.columns().iter().enumerate() {
-        let column_name = state.intern(column.name().as_bytes());
-        let type_info = column.type_info();
-
-        // Handle NULL values first
-        if row.try_get_raw(i).map_or(true, |v| v.is_null()) {
-            obj.fields.insert(column_name, Value::Nil);
-            continue;
-        }
-
-        let value = match type_info.name() {
-            // Integer types
-            "INT2" | "SMALLINT" => row.try_get::<i16, _>(i).map(|v| Value::Number(v as f64)),
-            "INT4" | "INTEGER" => row.try_get::<i32, _>(i).map(|v| Value::Number(v as f64)),
-            "INT8" | "BIGINT" => row.try_get::<i64, _>(i).map(|v| Value::Number(v as f64)),
-
-            // Serial types (same as integer types)
-            "SERIAL2" | "SMALLSERIAL" => row.try_get::<i16, _>(i).map(|v| Value::Number(v as f64)),
-            "SERIAL4" | "SERIAL" => row.try_get::<i32, _>(i).map(|v| Value::Number(v as f64)),
-            "SERIAL8" | "BIGSERIAL" => row.try_get::<i64, _>(i).map(|v| Value::Number(v as f64)),
-
-            // Floating-point types
-            "FLOAT4" | "REAL" => row.try_get::<f32, _>(i).map(|v| Value::Number(v as f64)),
-            "FLOAT8" | "DOUBLE PRECISION" => row.try_get::<f64, _>(i).map(Value::Number),
-
-            // Decimal/numeric types
-            // "NUMERIC" | "DECIMAL" => row
-            //     .try_get::<sqlx::types::Decimal, _>(i)
-            //     .map(|v| Value::Number(v.to_string().parse::<f64>().unwrap_or(0.0))),
-
-            // Character types
-            "VARCHAR" | "CHAR" | "TEXT" | "BPCHAR" | "NAME" => row
-                .try_get::<String, _>(i)
-                .map(|v| Value::String(state.intern(v.as_bytes()))),
-
-            // Boolean type
-            "BOOL" | "BOOLEAN" => row.try_get::<bool, _>(i).map(Value::Boolean),
-
-            // UUID type
-            "UUID" => row
-                .try_get::<sqlx::types::Uuid, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-
-            // Date/Time types
-            "DATE" => row
-                .try_get::<sqlx::types::chrono::NaiveDate, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-            "TIME" => row
-                .try_get::<sqlx::types::chrono::NaiveTime, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-            "TIMESTAMP" => row
-                .try_get::<sqlx::types::chrono::NaiveDateTime, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-            "TIMESTAMPTZ" => row
-                .try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-
-            // JSON types
-            "JSON" | "JSONB" => row
-                .try_get::<serde_json::Value, _>(i)
-                .map(|v| Value::String(state.intern(v.to_string().as_bytes()))),
-
-            // Array types
-            t if t.starts_with("_") => {
-                match &t[1..] {
-                    // Integer arrays
-                    "INT2" | "SMALLINT" => row.try_get::<Vec<i16>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                        ))
-                    }),
-                    "INT4" | "INTEGER" => row.try_get::<Vec<i32>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                        ))
-                    }),
-                    "INT8" | "BIGINT" => row.try_get::<Vec<i64>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                        ))
-                    }),
-
-                    // Float arrays
-                    "FLOAT4" | "REAL" => row.try_get::<Vec<f32>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                        ))
-                    }),
-                    "FLOAT8" | "DOUBLE PRECISION" => row.try_get::<Vec<f64>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(Value::Number).collect()),
-                        ))
-                    }),
-
-                    // Text arrays
-                    "VARCHAR" | "TEXT" => row.try_get::<Vec<String>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(
-                                v.into_iter()
-                                    .map(|s| Value::String(state.intern(s.as_bytes())))
-                                    .collect(),
-                            ),
-                        ))
-                    }),
-
-                    // Boolean arrays
-                    "BOOL" | "BOOLEAN" => row.try_get::<Vec<bool>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(v.into_iter().map(Value::Boolean).collect()),
-                        ))
-                    }),
-
-                    // Default to string representation for unknown array types
-                    _ => row.try_get::<Vec<String>, _>(i).map(|v| {
-                        Value::Array(Gc::new(
-                            &ctx,
-                            RefLock::new(
-                                v.into_iter()
-                                    .map(|s| Value::String(state.intern(s.as_bytes())))
-                                    .collect(),
-                            ),
-                        ))
-                    }),
-                }
-            }
-
-            // Binary data
-            "BYTEA" => row
-                .try_get::<Vec<u8>, _>(i)
-                .map(|v| Value::String(state.intern(&v))),
-
-            // Default to string for unknown types
-            _ => row
-                .try_get::<String, _>(i)
-                .map(|v| Value::String(state.intern(v.as_bytes()))),
-        }
-        .unwrap_or_else(|_| {
-            // If conversion fails, try to get as string
-            row.try_get::<String, _>(i)
-                .map(|v| Value::String(state.intern(v.as_bytes())))
-                .unwrap_or(Value::Nil)
-        });
-
+        let column_name = ctx.intern(column.name().as_bytes());
+        let value = column_to_value(ctx, row, i, column.type_info()).unwrap_or(Value::Nil);
         obj.fields.insert(column_name, value);
     }
 
@@ -330,8 +335,8 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     }
 
     let sql = args[0].as_string()?;
+    let ctx = state.get_context();
     let conn = state.pg_connection.as_ref().unwrap();
-
     // Execute query in runtime
     let rows = execute_query(
         conn,
@@ -342,7 +347,7 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     // Convert rows to array of objects
     let mut results = Vec::new();
     for row in rows {
-        results.push(row_to_object(state, &row));
+        results.push(row_to_object(ctx, &row));
     }
 
     Ok(Value::Array(Gc::new(
@@ -412,7 +417,7 @@ mod transaction {
                 // Convert rows to array of objects
                 let mut results = Vec::new();
                 for row in rows {
-                    results.push(row_to_object(state, &row));
+                    results.push(row_to_object(ctx, &row));
                 }
                 Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
             }
