@@ -3,9 +3,11 @@ use std::{path::PathBuf, process};
 use aiscript_vm::Vm;
 
 use clap::{Parser, Subcommand};
+use config::Config;
 use repr::Repl;
 use tokio::task;
 
+mod config;
 mod repr;
 
 #[derive(Parser)]
@@ -38,6 +40,8 @@ enum Commands {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+    Config::load("project.toml");
+
     let cli = AIScriptCli::parse();
     match cli.command {
         Some(Commands::Serve { file, port, reload }) => {

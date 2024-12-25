@@ -23,6 +23,8 @@ tokio = { version = "1.41.0", features = ["rt-multi-thread", "macros"] }
 dotenv = "0.15.0"
 rustyline = "15.0"
 dirs = "5.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8.19"
 
 [features]
 ai_test = ["aiscript-vm/ai_test"]
