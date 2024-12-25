@@ -7,7 +7,7 @@ use axum::{
     Form, Json,
 };
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx::{PgPool, SqlitePool};
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -49,6 +49,7 @@ pub struct Endpoint {
     pub script: String,
     pub path_specs: Vec<PathSpec>,
     pub pg_connection: Option<PgPool>,
+    pub sqlite_connection: Option<SqlitePool>,
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
 }
 
@@ -238,10 +239,12 @@ impl Future for RequestProcessor {
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
                     let pg_connection = self.endpoint.pg_connection.clone();
+                    let sqlite_connection = self.endpoint.sqlite_connection.clone();
                     let redis_connection = self.endpoint.redis_connection.clone();
                     let handle: JoinHandle<Result<ReturnValue, VmError>> =
                         task::spawn_blocking(move || {
-                            let mut vm = Vm::new(pg_connection, redis_connection);
+                            let mut vm =
+                                Vm::new(pg_connection, sqlite_connection, redis_connection);
                             vm.compile(script)?;
                             vm.eval_function(
                                 0,

@@ -11,7 +11,7 @@ use gc_arena::{
     lock::{GcRefLock, RefLock},
     Collect, Collection, Gc, Mutation,
 };
-use sqlx::PgPool;
+use sqlx::{PgPool, SqlitePool};
 
 use crate::{
     ai,
@@ -107,6 +107,7 @@ pub struct State<'gc> {
     pub(super) builtin_methods: BuiltinMethods<'gc>,
     current_module: Option<InternedString<'gc>>,
     pub pg_connection: Option<PgPool>,
+    pub sqlite_connection: Option<SqlitePool>,
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
 }
 
@@ -148,6 +149,7 @@ impl<'gc> State<'gc> {
             builtin_methods: BuiltinMethods::new(),
             current_module: None,
             pg_connection: None,
+            sqlite_connection: None,
             redis_connection: None,
         }
     }

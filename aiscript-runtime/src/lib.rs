@@ -2,7 +2,8 @@ use ast::HttpMethod;
 use axum::{response::Html, routing::*};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
+use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{PgPool, SqlitePool};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,6 +14,7 @@ use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
 mod ast;
+mod db;
 mod endpoint;
 mod error;
 mod openapi;
@@ -134,6 +136,17 @@ pub async fn get_pg_connection() -> Option<PgPool> {
     }
 }
 
+pub async fn get_sqlite_connection() -> Option<SqlitePool> {
+    match std::env::var("DATABASE_URL") {
+        Ok(url) => SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&url)
+            .await
+            .ok(),
+        Err(_) => None,
+    }
+}
+
 pub async fn get_redis_connection() -> Option<redis::aio::MultiplexedConnection> {
     match std::env::var("REDIS_URL") {
         Ok(url) => {
@@ -171,6 +184,7 @@ async fn run_server(
         );
 
     let pg_connection = get_pg_connection().await;
+    let sqlite_connection = get_sqlite_connection().await;
     let redis_connection = get_redis_connection().await;
     for route in routes {
         let mut r = Router::new();
@@ -187,6 +201,7 @@ async fn run_server(
                 script: endpoint_spec.statements,
                 path_specs: endpoint_spec.path_specs,
                 pg_connection: pg_connection.as_ref().cloned(),
+                sqlite_connection: sqlite_connection.as_ref().cloned(),
                 redis_connection: redis_connection.as_ref().cloned(),
             };
 

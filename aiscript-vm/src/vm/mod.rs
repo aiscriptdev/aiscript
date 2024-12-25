@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, fs, ops, path::PathBuf};
 
 use gc_arena::{arena::CollectionPhase, lock::RefLock, Arena, Gc, Mutation, Rootable};
-use sqlx::PgPool;
+use sqlx::{PgPool, SqlitePool};
 pub use state::State;
 
 use crate::{
@@ -36,7 +36,7 @@ impl Display for VmError {
 
 impl Default for Vm {
     fn default() -> Self {
-        Self::new(None, None)
+        Self::new(None, None, None)
     }
 }
 
@@ -47,12 +47,14 @@ pub struct Vm {
 impl Vm {
     pub fn new(
         pg_connection: Option<PgPool>,
+        sqlite_connection: Option<SqlitePool>,
         redis_connection: Option<redis::aio::MultiplexedConnection>,
     ) -> Self {
         let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| {
                 let mut state = State::new(mc);
                 state.pg_connection = pg_connection;
+                state.sqlite_connection = sqlite_connection;
                 state.redis_connection = redis_connection;
                 state
             }),
@@ -103,6 +105,10 @@ impl Vm {
             state
                 .module_manager
                 .register_native_module(ctx.intern(b"std.db.pg"), stdlib::create_pg_module(ctx));
+            state.module_manager.register_native_module(
+                ctx.intern(b"std.db.sqlite"),
+                stdlib::create_sqlite_module(ctx),
+            );
             state.module_manager.register_native_module(
                 ctx.intern(b"std.db.redis"),
                 stdlib::create_redis_module(ctx),

@@ -47,9 +47,10 @@ async fn main() {
         None => {
             if let Some(path) = cli.file {
                 let pg_connection = aiscript_runtime::get_pg_connection().await;
+                let sqlite_connection = aiscript_runtime::get_sqlite_connection().await;
                 let redis_connection = aiscript_runtime::get_redis_connection().await;
                 task::spawn_blocking(move || {
-                    let mut vm = Vm::new(pg_connection, redis_connection);
+                    let mut vm = Vm::new(pg_connection, sqlite_connection, redis_connection);
                     vm.run_file(path);
                 })
                 .await // must use await to wait for the thread to finish
