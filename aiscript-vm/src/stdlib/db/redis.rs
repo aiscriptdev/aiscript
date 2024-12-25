@@ -12,7 +12,7 @@ use crate::{
 };
 
 thread_local! {
-    static ACTIVE_TRANSACTION: RefCell<Option<redis::Pipeline>> = const { RefCell::new(None) };
+    static ACTIVE_PIPELINE: RefCell<Option<redis::Pipeline>> = const { RefCell::new(None) };
 }
 
 // Create the Redis module with native functions
@@ -21,8 +21,10 @@ pub fn create_redis_module(ctx: Context) -> ModuleKind {
 
     let exports = [
         ("cmd", Value::NativeFunction(NativeFn(redis_cmd))),
-        ("pipeline", Value::NativeFunction(NativeFn(redis_pipeline))),
-        ("exec", Value::NativeFunction(NativeFn(redis_exec))),
+        (
+            "pipeline",
+            Value::NativeFunction(NativeFn(pipeline::begin_pipeline)),
+        ),
     ]
     .into_iter()
     .map(|(name, f)| (ctx.intern_static(name), f))
@@ -164,47 +166,116 @@ fn redis_cmd<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value
         Err(e) => Err(VmError::RuntimeError(format!("Redis error: {}", e))),
     }
 }
+mod pipeline {
+    use std::collections::HashMap;
 
-// Start a pipeline
-fn redis_pipeline<'gc>(
-    _state: &mut State<'gc>,
-    _args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
-    let has_active = ACTIVE_TRANSACTION.with(|tx| tx.borrow().is_some());
-    if has_active {
-        return Err(VmError::RuntimeError("Pipeline already active".into()));
+    use crate::object::{Class, Instance};
+
+    use super::*;
+
+    fn create_pipeline_class(ctx: Context) -> Gc<RefLock<Class>> {
+        let methods = [
+            (ctx.intern(b"cmd"), Value::NativeFunction(NativeFn(cmd))),
+            (ctx.intern(b"exec"), Value::NativeFunction(NativeFn(exec))),
+            (
+                ctx.intern(b"discard"),
+                Value::NativeFunction(NativeFn(discard)),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        Gc::new(
+            &ctx,
+            RefLock::new(Class {
+                name: ctx.intern(b"Pipeline"),
+                methods,
+                static_methods: HashMap::default(),
+            }),
+        )
     }
 
-    // Create new pipeline
-    let pipeline = redis::pipe();
-    ACTIVE_TRANSACTION.with(|cell| {
-        *cell.borrow_mut() = Some(pipeline);
-    });
+    pub(super) fn begin_pipeline<'gc>(
+        state: &mut State<'gc>,
+        _args: Vec<Value<'gc>>,
+    ) -> Result<Value<'gc>, VmError> {
+        let has_active = ACTIVE_PIPELINE.with(|tx| tx.borrow().is_some());
+        if has_active {
+            return Err(VmError::RuntimeError("Pipeline already active".into()));
+        }
 
-    Ok(Value::Boolean(true))
-}
-
-// Execute the pipeline
-fn redis_exec<'gc>(state: &mut State<'gc>, _args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
-    let ctx = state.get_context();
-    let conn = state.redis_connection.as_mut().unwrap();
-
-    let result: std::option::Option<RedisResult<Vec<RedisValue>>> =
-        ACTIVE_TRANSACTION.with(|cell| {
-            cell.borrow_mut().take().map(|mut pipeline| {
-                Handle::current().block_on(async {
-                    // Convert pipeline to vec of values using atomic()
-                    pipeline.atomic().query_async(conn).await
-                })
-            })
+        // Create new pipeline
+        let pipeline = redis::pipe();
+        ACTIVE_PIPELINE.with(|cell| {
+            *cell.borrow_mut() = Some(pipeline);
         });
 
-    match result {
-        Some(Ok(values)) => {
-            let elements = values.into_iter().map(|v| redis_to_value(ctx, v)).collect();
-            Ok(Value::Array(Gc::new(&ctx, RefLock::new(elements))))
+        let ctx = state.get_context();
+        let instance = Instance::new(create_pipeline_class(ctx));
+        Ok(Value::Instance(Gc::new(&ctx, RefLock::new(instance))))
+    }
+
+    fn cmd<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+        if args.is_empty() {
+            return Err(VmError::RuntimeError(
+                "cmd() requires a command string".into(),
+            ));
         }
-        Some(Err(e)) => Err(VmError::RuntimeError(format!("Redis error: {}", e))),
-        None => Err(VmError::RuntimeError("No active pipeline".into())),
+
+        let cmd_str = args[0].as_string()?.to_str().unwrap();
+        let (command, mut redis_args) = parse_redis_cmd(cmd_str);
+        if command.is_empty() {
+            return Err(VmError::RuntimeError("Empty command string".into()));
+        }
+
+        // Add any additional arguments passed as values
+        for arg in args.iter().skip(1) {
+            redis_args.push(format!("{}", arg));
+        }
+
+        // Add command to pipeline
+        ACTIVE_PIPELINE.with(|cell| {
+            if let Some(pipeline) = cell.borrow_mut().as_mut() {
+                let mut cmd = redis::cmd(&command);
+                for arg in redis_args {
+                    cmd.arg(arg);
+                }
+                pipeline.add_command(cmd);
+                Ok(Value::Boolean(true))
+            } else {
+                Err(VmError::RuntimeError("No active pipeline".into()))
+            }
+        })
+    }
+
+    fn exec<'gc>(state: &mut State<'gc>, _args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
+        let ctx = state.get_context();
+        let conn = state.redis_connection.as_mut().unwrap();
+
+        let result: std::option::Option<RedisResult<Vec<RedisValue>>> =
+            ACTIVE_PIPELINE.with(|cell| {
+                cell.borrow_mut().take().map(|mut pipeline| {
+                    Handle::current().block_on(async { pipeline.atomic().query_async(conn).await })
+                })
+            });
+
+        match result {
+            Some(Ok(values)) => {
+                let elements = values.into_iter().map(|v| redis_to_value(ctx, v)).collect();
+                Ok(Value::Array(Gc::new(&ctx, RefLock::new(elements))))
+            }
+            Some(Err(e)) => Err(VmError::RuntimeError(format!("Redis error: {}", e))),
+            None => Err(VmError::RuntimeError("No active pipeline".into())),
+        }
+    }
+
+    fn discard<'gc>(
+        _state: &mut State<'gc>,
+        _args: Vec<Value<'gc>>,
+    ) -> Result<Value<'gc>, VmError> {
+        ACTIVE_PIPELINE.with(|cell| {
+            *cell.borrow_mut() = None;
+        });
+        Ok(Value::Boolean(true))
     }
 }
