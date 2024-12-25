@@ -134,6 +134,17 @@ pub async fn get_pg_connection() -> Option<PgPool> {
     }
 }
 
+pub async fn get_redis_connection() -> Option<redis::aio::MultiplexedConnection> {
+    match std::env::var("REDIS_URL") {
+        Ok(url) => {
+            let client = redis::Client::open(url).unwrap();
+            let conn = client.get_multiplexed_async_connection().await.unwrap();
+            Some(conn)
+        }
+        Err(_) => None,
+    }
+}
+
 async fn run_server(
     path: Option<PathBuf>,
     port: u16,
@@ -160,6 +171,7 @@ async fn run_server(
         );
 
     let pg_connection = get_pg_connection().await;
+    let redis_connection = get_redis_connection().await;
     for route in routes {
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
@@ -175,6 +187,7 @@ async fn run_server(
                 script: endpoint_spec.statements,
                 path_specs: endpoint_spec.path_specs,
                 pg_connection: pg_connection.as_ref().cloned(),
+                redis_connection: redis_connection.as_ref().cloned(),
             };
 
             for path_spec in &endpoint.path_specs[..endpoint.path_specs.len() - 1] {

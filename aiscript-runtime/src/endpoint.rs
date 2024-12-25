@@ -49,6 +49,7 @@ pub struct Endpoint {
     pub script: String,
     pub path_specs: Vec<PathSpec>,
     pub pg_connection: Option<PgPool>,
+    pub redis_connection: Option<redis::aio::MultiplexedConnection>,
 }
 
 enum ProcessingState {
@@ -237,9 +238,10 @@ impl Future for RequestProcessor {
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
                     let pg_connection = self.endpoint.pg_connection.clone();
+                    let redis_connection = self.endpoint.redis_connection.clone();
                     let handle: JoinHandle<Result<ReturnValue, VmError>> =
                         task::spawn_blocking(move || {
-                            let mut vm = Vm::new(pg_connection);
+                            let mut vm = Vm::new(pg_connection, redis_connection);
                             vm.compile(script)?;
                             vm.eval_function(
                                 0,

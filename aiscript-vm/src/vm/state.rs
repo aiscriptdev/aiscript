@@ -107,6 +107,7 @@ pub struct State<'gc> {
     pub(super) builtin_methods: BuiltinMethods<'gc>,
     current_module: Option<InternedString<'gc>>,
     pub pg_connection: Option<PgPool>,
+    pub redis_connection: Option<redis::aio::MultiplexedConnection>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {
@@ -147,6 +148,7 @@ impl<'gc> State<'gc> {
             builtin_methods: BuiltinMethods::new(),
             current_module: None,
             pg_connection: None,
+            redis_connection: None,
         }
     }
 
@@ -1085,7 +1087,7 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn call_constructor(
+    pub(crate) fn call_constructor(
         &mut self,
         callee: Value<'gc>,
         args_count: u8,
@@ -1587,7 +1589,7 @@ impl<'gc> State<'gc> {
     }
 
     #[cfg(feature = "debug")]
-    fn print_stack(&self) {
+    pub fn print_stack(&self) {
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
             print!("[ ");

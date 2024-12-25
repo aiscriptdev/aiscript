@@ -18,7 +18,7 @@ thread_local! {
 
 // Create the PostgreSQL module with native functions
 pub fn create_pg_module(ctx: Context) -> ModuleKind {
-    let name = ctx.intern(b"std.sql.pg");
+    let name = ctx.intern(b"std.db.pg");
 
     let exports = [
         ("query", Value::NativeFunction(NativeFn(pg_query))),
