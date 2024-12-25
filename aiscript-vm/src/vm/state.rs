@@ -876,6 +876,16 @@ impl<'gc> State<'gc> {
 
                 self.push_stack(Value::Boolean(result));
             }
+            OpCode::EnvLookup => {
+                let name = self.pop_stack().as_string()?;
+                let value = match std::env::var(name.to_str().unwrap()) {
+                    Ok(value) => Value::String(self.intern(value.as_bytes())),
+                    Err(_) => {
+                        Value::String(self.intern(b"")) // Empty string for non-existent vars
+                    }
+                };
+                self.push_stack(value);
+            }
             OpCode::Prompt(model_idx) => {
                 let message = self.pop_stack().as_string()?.to_string();
                 let model = if model_idx == u8::MAX {

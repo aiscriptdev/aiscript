@@ -575,6 +575,12 @@ impl<'gc> CodeGen<'gc> {
         let expr = expr.into();
         self.current_line = expr.line();
         match expr {
+            Expr::EnvLookup { expr, .. } => {
+                // Generate code to evaluate the name first
+                self.generate_expr(*expr)?;
+                // Then emit env lookup instruction
+                self.emit(OpCode::EnvLookup);
+            }
             Expr::Array { elements, .. } => {
                 let len = elements.len();
                 // Generate code for each element

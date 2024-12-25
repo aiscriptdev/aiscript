@@ -227,6 +227,10 @@ impl<'gc> MatchPattern<'gc> {
 
 #[derive(Debug)]
 pub enum Expr<'gc> {
+    EnvLookup {
+        expr: Box<Expr<'gc>>,
+        line: u32,
+    },
     Object {
         properties: Vec<ObjectProperty<'gc>>,
         line: u32,
@@ -359,7 +363,8 @@ pub enum Expr<'gc> {
 impl<'gc> Expr<'gc> {
     pub fn line(&self) -> u32 {
         match self {
-            Self::Object { line, .. }
+            Self::EnvLookup { line, .. }
+            | Self::Object { line, .. }
             | Self::EnumVariant { line, .. }
             | Self::EvaluateVariant { line, .. }
             | Self::Binary { line, .. }

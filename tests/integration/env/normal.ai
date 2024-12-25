@@ -1,0 +1,5 @@
+let home = $HOME;
+print(home.is_empty());       // expect: false
+let h = "HOME";
+print($h.is_empty());         // expect: false
+print("empty env:", $NON_EXISTENT);  // expect: "empty env: "

@@ -1502,6 +1502,32 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn env(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let name = self.previous;
+        let identifier = &name.lexeme[1..]; // Skip the $ prefix
+
+        // Check if it's an uppercase env var (direct access)
+        let expr = if identifier.chars().all(|c| c.is_uppercase() || c == '_') {
+            // For literal env vars, create a string literal expression
+            Expr::Literal {
+                value: Literal::String(self.ctx.intern(identifier.as_bytes())),
+                line: name.line,
+            }
+        } else {
+            // For variable-based lookup, create a variable expression
+            Expr::Variable {
+                name: Token::new(TokenType::Identifier, identifier, name.line),
+                line: name.line,
+            }
+        };
+
+        // Wrap in EnvLookup
+        Some(Expr::EnvLookup {
+            expr: Box::new(expr),
+            line: name.line,
+        })
+    }
+
     fn unary(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         let operator = self.previous;
         let right = Box::new(self.parse_precedence(Precedence::Unary)?);
@@ -2227,6 +2253,7 @@ impl<'gc> ParseRule<'gc> {
 
 fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
     match kind {
+        TokenType::Env => ParseRule::new(Some(Parser::env), None, Precedence::Primary),
         TokenType::OpenBrace => ParseRule::new(
             Some(Parser::object),
             Some(Parser::object),

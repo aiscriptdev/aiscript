@@ -1,0 +1,1 @@
+let env = $a; // expect runtime error: Undefined variable 'a'.

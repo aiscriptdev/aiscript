@@ -94,6 +94,7 @@ pub enum OpCode {
     SetIndex,
     GetIndex,
     In,
+    EnvLookup,
     // Import a module, constant index contains module name
     ImportModule(u8),
     // Get variable from module (module name index, var name index)
@@ -335,6 +336,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::GetIndex => simple_instruction("GET_INDEX"),
                 OpCode::SetIndex => simple_instruction("SET_INDEX"),
                 OpCode::In => simple_instruction("IN"),
+                OpCode::EnvLookup => simple_instruction("ENV_LOOKUP"),
                 OpCode::ImportModule(c) => self.constant_instruction("IMPORT_MODULE", c),
                 OpCode::GetModuleVar {
                     module_name_constant,
