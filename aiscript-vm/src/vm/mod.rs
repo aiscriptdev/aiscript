@@ -36,7 +36,7 @@ impl Display for VmError {
 
 impl Default for Vm {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(None, None)
     }
 }
 
@@ -45,11 +45,15 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new(pg_connection: Option<PgPool>) -> Self {
+    pub fn new(
+        pg_connection: Option<PgPool>,
+        redis_connection: Option<redis::aio::MultiplexedConnection>,
+    ) -> Self {
         let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| {
                 let mut state = State::new(mc);
                 state.pg_connection = pg_connection;
+                state.redis_connection = redis_connection;
                 state
             }),
         };
@@ -98,7 +102,11 @@ impl Vm {
                 .register_native_module(ctx.intern(b"std.serde"), stdlib::create_serde_module(ctx));
             state
                 .module_manager
-                .register_native_module(ctx.intern(b"std.sql.pg"), stdlib::create_pg_module(ctx));
+                .register_native_module(ctx.intern(b"std.db.pg"), stdlib::create_pg_module(ctx));
+            state.module_manager.register_native_module(
+                ctx.intern(b"std.db.redis"),
+                stdlib::create_redis_module(ctx),
+            );
         });
     }
 

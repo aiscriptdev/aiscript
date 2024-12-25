@@ -1,15 +1,16 @@
+mod db;
 mod io;
 mod math;
 mod random;
 mod serde;
-mod sql;
 mod time;
 
+pub use db::create_pg_module;
+pub use db::create_redis_module;
 pub use io::create_io_module;
 pub use math::create_math_module;
 pub use random::create_random_module;
 pub use serde::create_serde_module;
-pub use sql::create_pg_module;
 pub use time::create_time_module;
 
 /// Macro to get and validate a float argument from a slice of Values
