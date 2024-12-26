@@ -1,1 +1,1 @@
-let env = $a; // expect runtime error: Undefined variable 'a'.
+let env = $(a); // expect runtime error: Undefined variable 'a'.

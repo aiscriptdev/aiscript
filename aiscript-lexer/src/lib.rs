@@ -37,6 +37,7 @@ pub enum TokenType {
     Bang,       // !
     Question,   // ?
     At,         // @
+    Dollar,     // $
     Underscore, // _
     StarStar,   // **
     ColonColon, // ::
@@ -68,7 +69,6 @@ pub enum TokenType {
     String,     // "string literal"
     RawString,  // r"raw string \n\t"
     Number,     // 123, 123.45
-    Env,        // $ENV_VAR, $env_var
     Doc,        // """docstring"""
 
     // Keywords
@@ -480,6 +480,7 @@ impl<'a> Lexer<'a> {
             ';' => self.make_token(TokenType::Semicolon),
             ',' => self.make_token(TokenType::Comma),
             '@' => self.make_token(TokenType::At),
+            '$' => self.make_token(TokenType::Dollar),
             '?' => self.make_token(TokenType::Question),
             '_' => self.make_token(TokenType::Underscore),
             '.' => {
@@ -628,7 +629,6 @@ impl<'a> Lexer<'a> {
                     self.scan_identifier()
                 }
             }
-            '$' => self.scan_env(),
             c if c.is_ascii_digit() => self.scan_number(),
             c if c.is_alphabetic() || c == '_' => self.scan_identifier(),
             _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
@@ -661,43 +661,6 @@ impl<'a> Lexer<'a> {
         }
 
         Token::new(TokenType::Invalid, "Unterminated string.", self.line)
-    }
-
-    fn scan_env(&mut self) -> Token<'a> {
-        // The start will include the $
-
-        // Check first character after $
-        if let Some(c) = self.peek() {
-            if !c.is_alphabetic() && c != '_' {
-                self.advance(); // Consume the invalid character
-                return Token::new(
-                    TokenType::Invalid,
-                    "Invalid environment variable name.",
-                    self.line,
-                );
-            }
-        } else {
-            return Token::new(
-                TokenType::Invalid,
-                "Expected environment variable name after $.",
-                self.line,
-            );
-        }
-
-        // Consume first character (already validated)
-        self.advance();
-
-        // Consume rest of valid chars (alphanumeric and underscore)
-        while let Some(c) = self.peek() {
-            if c.is_alphanumeric() || c == '_' {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        // Make token (including the $)
-        self.make_token(TokenType::Env)
     }
 }
 

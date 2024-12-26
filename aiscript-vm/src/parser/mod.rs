@@ -1502,29 +1502,30 @@ impl<'gc> Parser<'gc> {
         })
     }
 
-    fn env(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
-        let name = self.previous;
-        let identifier = &name.lexeme[1..]; // Skip the $ prefix
+    fn env_lookup(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let line = self.previous.line;
 
-        // Check if it's an uppercase env var (direct access)
-        let expr = if identifier.chars().all(|c| c.is_uppercase() || c == '_') {
-            // For literal env vars, create a string literal expression
-            Expr::Literal {
-                value: Literal::String(self.ctx.intern(identifier.as_bytes())),
-                line: name.line,
-            }
+        let expr = if self.match_token(TokenType::OpenParen) {
+            // Handle $(expr) case
+            let expr = self.expression()?;
+            self.consume(TokenType::CloseParen, "Expect ')' after expression.");
+            expr
         } else {
-            // For variable-based lookup, create a variable expression
-            Expr::Variable {
-                name: Token::new(TokenType::Identifier, identifier, name.line),
-                line: name.line,
+            // Handle $IDENTIFIER case
+            self.consume(
+                TokenType::Identifier,
+                "Expect environment variable name after '$'.",
+            );
+            // Convert identifier to string literal
+            Expr::Literal {
+                value: Literal::String(self.ctx.intern(self.previous.lexeme.as_bytes())),
+                line: self.previous.line,
             }
         };
 
-        // Wrap in EnvLookup
         Some(Expr::EnvLookup {
             expr: Box::new(expr),
-            line: name.line,
+            line,
         })
     }
 
@@ -2253,7 +2254,7 @@ impl<'gc> ParseRule<'gc> {
 
 fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
     match kind {
-        TokenType::Env => ParseRule::new(Some(Parser::env), None, Precedence::Primary),
+        TokenType::Dollar => ParseRule::new(Some(Parser::env_lookup), None, Precedence::Unary),
         TokenType::OpenBrace => ParseRule::new(
             Some(Parser::object),
             Some(Parser::object),
