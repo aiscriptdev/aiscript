@@ -1,4 +1,5 @@
 mod db;
+mod env;
 mod io;
 mod math;
 mod random;
@@ -8,6 +9,7 @@ mod time;
 pub use db::create_pg_module;
 pub use db::create_redis_module;
 pub use db::create_sqlite_module;
+pub use env::create_env_module;
 pub use io::create_io_module;
 pub use math::create_math_module;
 pub use random::create_random_module;
