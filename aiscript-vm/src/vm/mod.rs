@@ -86,6 +86,10 @@ impl Vm {
             );
 
             // Initialize standard library modules
+            state.module_manager.register_native_module(
+                ctx.intern(b"std.auth.jwt"),
+                stdlib::create_jwt_module(ctx),
+            );
             state
                 .module_manager
                 .register_native_module(ctx.intern(b"std.env"), stdlib::create_env_module(ctx));

@@ -1,3 +1,4 @@
+mod auth;
 mod db;
 mod env;
 mod io;
@@ -6,6 +7,7 @@ mod random;
 mod serde;
 mod time;
 
+pub use auth::create_jwt_module;
 pub use db::create_pg_module;
 pub use db::create_redis_module;
 pub use db::create_sqlite_module;
