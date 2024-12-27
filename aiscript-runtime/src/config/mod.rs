@@ -8,6 +8,7 @@ use db::DatabaseConfig;
 
 mod db;
 mod security;
+mod tests;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -53,6 +54,7 @@ impl AsRef<str> for EnvString {
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Config {
+    #[serde(default)]
     pub database: DatabaseConfig,
     pub apidoc: Option<ApiDocConfig>,
     pub security: Option<SecurityConfig>,
