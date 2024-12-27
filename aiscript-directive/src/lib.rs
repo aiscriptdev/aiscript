@@ -27,6 +27,16 @@ impl Directive {
             Directive::In(_) => "in".into(),
         }
     }
+
+    pub fn is_directive_of(&self, name: &str) -> bool {
+        match self {
+            Directive::Simple {
+                name: directive_name,
+                ..
+            } => directive_name == name,
+            _ => false,
+        }
+    }
 }
 
 pub struct DirectiveParser<'a, 'b: 'a> {

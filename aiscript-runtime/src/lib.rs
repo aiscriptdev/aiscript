@@ -14,7 +14,6 @@ use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
 mod ast;
-mod db;
 mod endpoint;
 mod error;
 mod openapi;
@@ -190,6 +189,7 @@ async fn run_server(
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
             let endpoint = Endpoint {
+                auth: endpoint_spec.auth,
                 query_params: endpoint_spec.query.into_iter().map(convert_field).collect(),
                 body_type: endpoint_spec.body.kind,
                 body_fields: endpoint_spec

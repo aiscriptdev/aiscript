@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ServerError {
+    #[error("Authentication error: {message}")]
+    AuthenticationError { message: String },
     #[error("Field validation failed: {field}: {message}")]
     ValidationError { field: String, message: String },
 

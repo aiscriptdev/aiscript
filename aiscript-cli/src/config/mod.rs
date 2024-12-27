@@ -1,11 +1,13 @@
 #![allow(unused)]
 use std::{fs, path::Path, sync::OnceLock};
 
+use security::SecurityConfig;
 use serde::Deserialize;
 
 use db::DatabaseConfig;
 
 mod db;
+mod security;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -13,6 +15,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 pub struct Config {
     pub database: DatabaseConfig,
     pub apidoc: Option<ApiDocConfig>,
+    pub security: Option<SecurityConfig>,
 }
 
 #[derive(Debug, Deserialize)]
