@@ -1,13 +1,12 @@
 use std::{path::PathBuf, process};
 
+use aiscript_runtime::Config;
 use aiscript_vm::Vm;
 
 use clap::{Parser, Subcommand};
-use config::Config;
 use repr::Repl;
 use tokio::task;
 
-mod config;
 mod repr;
 
 #[derive(Parser)]

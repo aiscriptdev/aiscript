@@ -13,7 +13,9 @@ use tokio::sync::broadcast;
 use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
+pub use config::Config;
 mod ast;
+mod config;
 mod endpoint;
 mod error;
 mod openapi;

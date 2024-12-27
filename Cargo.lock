@@ -55,7 +55,6 @@ dependencies = [
  "rustyline",
  "serde",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -92,6 +91,7 @@ dependencies = [
  "sqlx",
  "thiserror",
  "tokio",
+ "toml",
  "tower",
  "walkdir",
 ]
