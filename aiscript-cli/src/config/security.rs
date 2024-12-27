@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use super::EnvString;
+
 #[derive(Debug, Deserialize)]
 pub struct SecurityConfig {
     pub jwt: JwtConfig,
@@ -7,6 +9,6 @@ pub struct SecurityConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct JwtConfig {
-    pub secret: String,
+    pub secret: EnvString,
     pub expiration: u64, // expiration time in seconds
 }
