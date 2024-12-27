@@ -4,8 +4,13 @@ use axum::{
     body::Body,
     extract::{self, FromRequest, Request},
     response::{IntoResponse, Response},
-    Form, Json,
+    Form, Json, RequestExt,
 };
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
 use serde_json::Value;
 use sqlx::{PgPool, SqlitePool};
 use std::{
@@ -20,7 +25,10 @@ use std::{
 use tokio::task::{self, JoinHandle};
 use tower::Service;
 
-use crate::ast::{self, *};
+use crate::{
+    ast::{self, *},
+    Config,
+};
 
 use crate::error::ServerError;
 
@@ -43,6 +51,7 @@ pub struct Field {
 
 #[derive(Clone)]
 pub struct Endpoint {
+    pub auth: bool,
     pub query_params: Vec<Field>,
     pub body_type: BodyKind,
     pub body_fields: Vec<Field>,
@@ -54,6 +63,7 @@ pub struct Endpoint {
 }
 
 enum ProcessingState {
+    ValidatingAuth,
     ValidatingQuery,
     ValidatingBody,
     Executing(JoinHandle<Result<ReturnValue, VmError>>),
@@ -62,6 +72,7 @@ enum ProcessingState {
 pub struct RequestProcessor {
     endpoint: Endpoint,
     request: Request<Body>,
+    jwt_claim: Option<Value>,
     query_data: HashMap<String, Value>,
     body_data: HashMap<String, Value>,
     state: ProcessingState,
@@ -69,14 +80,21 @@ pub struct RequestProcessor {
 
 impl RequestProcessor {
     fn new(endpoint: Endpoint, request: Request<Body>) -> Self {
+        let state = if endpoint.auth {
+            ProcessingState::ValidatingAuth
+        } else {
+            ProcessingState::ValidatingQuery
+        };
         Self {
             endpoint,
             request,
+            jwt_claim: None,
             query_data: HashMap::new(),
             body_data: HashMap::new(),
-            state: ProcessingState::ValidatingQuery,
+            state,
         }
     }
+
     fn validate_field(field: &Field, value: &Value) -> Result<(), ServerError> {
         let type_valid = matches!(
             (field.field_type, value),
@@ -160,8 +178,37 @@ impl Future for RequestProcessor {
     type Output = Result<Response, Infallible>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let config = Config::get();
         loop {
             match &mut self.state {
+                ProcessingState::ValidatingAuth => {
+                    self.jwt_claim = {
+                        // Extract the token from the authorization header
+                        let future = self
+                            .request
+                            .extract_parts::<TypedHeader<Authorization<Bearer>>>();
+                        tokio::pin!(future);
+                        match future.poll(cx) {
+                            Poll::Pending => return Poll::Pending,
+                            Poll::Ready(Ok(bearer)) => {
+                                let key =
+                                    DecodingKey::from_secret(config.auth.jwt.secret.as_bytes());
+                                let validation = Validation::new(Algorithm::HS256);
+                                // Decode token
+                                let token_data: TokenData<Value> =
+                                    decode(bearer.token(), &key, &validation).unwrap();
+                                Some(token_data.claims)
+                            }
+                            Poll::Ready(Err(e)) => {
+                                return Poll::Ready(Ok(ServerError::AuthenticationError {
+                                    message: e.to_string(),
+                                }
+                                .into_response()))
+                            }
+                        }
+                    };
+                    self.state = ProcessingState::ValidatingQuery;
+                }
                 ProcessingState::ValidatingQuery => {
                     let query = extract::Query::<Value>::try_from_uri(self.request.uri())
                         .map(|extract::Query(q)| q)

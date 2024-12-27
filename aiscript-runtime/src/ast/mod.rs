@@ -78,6 +78,7 @@ pub struct Field {
 }
 
 pub struct Endpoint {
+    pub auth: bool,
     pub path_specs: Vec<PathSpec>,
     #[allow(unused)]
     pub return_type: Option<String>,

@@ -13,8 +13,9 @@ use tokio::sync::broadcast;
 use walkdir::WalkDir;
 
 use crate::endpoint::{convert_field, Endpoint};
+pub use config::Config;
 mod ast;
-mod db;
+mod config;
 mod endpoint;
 mod error;
 mod openapi;
@@ -126,35 +127,38 @@ where
 }
 
 pub async fn get_pg_connection() -> Option<PgPool> {
-    match std::env::var("DATABASE_URL") {
-        Ok(url) => PgPoolOptions::new()
+    let config = Config::get();
+    match config.database.get_postgres_url() {
+        Some(url) => PgPoolOptions::new()
             .max_connections(5)
             .connect(&url)
             .await
             .ok(),
-        Err(_) => None,
+        None => None,
     }
 }
 
 pub async fn get_sqlite_connection() -> Option<SqlitePool> {
-    match std::env::var("DATABASE_URL") {
-        Ok(url) => SqlitePoolOptions::new()
+    let config = Config::get();
+    match config.database.get_sqlite_url() {
+        Some(url) => SqlitePoolOptions::new()
             .max_connections(5)
             .connect(&url)
             .await
             .ok(),
-        Err(_) => None,
+        None => None,
     }
 }
 
 pub async fn get_redis_connection() -> Option<redis::aio::MultiplexedConnection> {
-    match std::env::var("REDIS_URL") {
-        Ok(url) => {
+    let config = Config::get();
+    match config.database.get_redis_url() {
+        Some(url) => {
             let client = redis::Client::open(url).unwrap();
             let conn = client.get_multiplexed_async_connection().await.unwrap();
             Some(conn)
         }
-        Err(_) => None,
+        None => None,
     }
 }
 
@@ -163,6 +167,8 @@ async fn run_server(
     port: u16,
     reload_rx: Option<broadcast::Receiver<ReloadSignal>>,
 ) {
+    let config = Config::get();
+
     let routes = if let Some(file_path) = path {
         read_single_route(&file_path).into_iter().collect()
     } else {
@@ -176,12 +182,24 @@ async fn run_server(
 
     let mut router = Router::new();
     let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
-    router = router
-        .route("/openapi.json", get(move || async { openapi }))
-        .route(
-            "/redoc",
-            get(|| async { Html(include_str!("openapi/redoc.html")) }),
-        );
+    router = router.route("/openapi.json", get(move || async { openapi }));
+
+    if config.apidoc.enabled {
+        match config.apidoc.doc_type {
+            config::ApiDocType::Swagger => {
+                // router = router.route(
+                //     &config.apidoc.path,
+                //     get(move || async { Html(include_str!("openapi/swagger.html")) }),
+                // );
+            }
+            config::ApiDocType::Redoc => {
+                router = router.route(
+                    &config.apidoc.path,
+                    get(|| async { Html(include_str!("openapi/redoc.html")) }),
+                );
+            }
+        }
+    }
 
     let pg_connection = get_pg_connection().await;
     let sqlite_connection = get_sqlite_connection().await;
@@ -190,6 +208,7 @@ async fn run_server(
         let mut r = Router::new();
         for endpoint_spec in route.endpoints {
             let endpoint = Endpoint {
+                auth: endpoint_spec.auth,
                 query_params: endpoint_spec.query.into_iter().map(convert_field).collect(),
                 body_type: endpoint_spec.body.kind,
                 body_fields: endpoint_spec

@@ -75,6 +75,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_endpoint(&mut self) -> Result<Endpoint, String> {
+        let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
         let path_specs = self.parse_path_specs()?;
 
         self.consume(TokenType::OpenBrace, "Expect '{' before endpoint")?;
@@ -125,6 +126,7 @@ impl<'a> Parser<'a> {
         let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
+            auth: directives.iter().any(|d| d.is_directive_of("auth")),
             path_specs,
             return_type: None,
             query,

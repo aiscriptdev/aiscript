@@ -1,0 +1,18 @@
+use std.auth.jwt;
+
+// Create payload with claims
+let payload = {
+    sub: "user123",
+    name: "John Doe",
+    role: "admin"
+};
+
+// Create access token that expires in 1 hour (3600 seconds)
+let token = jwt.create_access_token(payload, 3600, "your-secret");
+
+// Or with custom algorithm
+let token = jwt.create_access_token(payload, 3600, "your-secret", jwt.HS256);
+
+// Decode and verify the token
+let decoded = jwt.decode(token, "your-secret", jwt.HS256);
+print(decoded.name);  // expect: "John Doe"
