@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::{Duration, Utc};
 use gc_arena::{Gc, GcRefLock, RefLock};
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
@@ -40,6 +41,10 @@ pub fn create_jwt_module(ctx: Context) -> ModuleKind {
     let exports = [
         ("encode", Value::NativeFunction(NativeFn(jwt_encode))),
         ("decode", Value::NativeFunction(NativeFn(jwt_decode))),
+        (
+            "create_access_token",
+            Value::NativeFunction(NativeFn(create_access_token)),
+        ),
         ("HS256", Value::String(ctx.intern(b"HS256"))),
         ("HS384", Value::String(ctx.intern(b"HS384"))),
         ("HS512", Value::String(ctx.intern(b"HS512"))),
@@ -235,4 +240,108 @@ fn jwt_decode<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Valu
 
     // Convert claims to AIScript object
     Ok(claims_to_object(state.get_context(), token_data.claims))
+}
+
+fn create_access_token<'gc>(
+    state: &mut State<'gc>,
+    args: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError> {
+    match args.len() {
+        2..=4 => { /* Valid number of arguments */ }
+        _ => return Err(VmError::RuntimeError(
+            "create_access_token() requires payload object and duration in seconds. Secret and algorithm are optional.".into()
+        )),
+    }
+
+    // Get payload object
+    let payload = match &args[0] {
+        Value::Object(obj) => obj,
+        _ => {
+            return Err(VmError::RuntimeError(
+                "First argument must be payload object".into(),
+            ))
+        }
+    };
+
+    // Get duration
+    let duration_secs = args[1].as_number()?;
+    if duration_secs <= 0.0 {
+        return Err(VmError::RuntimeError("Duration must be positive".into()));
+    }
+
+    // Get secret (required)
+    let secret = if args.len() >= 3 {
+        args[2].as_string()?
+    } else {
+        return Err(VmError::RuntimeError("Secret key is required".into()));
+    };
+    let secret_str = secret.to_str().unwrap();
+
+    // Get algorithm (optional, defaults to HS256)
+    let algorithm = if args.len() == 4 {
+        let alg = args[3].as_string()?;
+        parse_algorithm(alg.to_str().unwrap())?
+    } else {
+        Algorithm::HS256
+    };
+
+    // Create a claims object from the payload
+    let payload_obj = payload.borrow();
+    let now = Utc::now();
+    let exp = now + Duration::seconds(duration_secs as i64);
+
+    let mut claims = Claims {
+        iss: None,
+        sub: None,
+        aud: None,
+        exp: Some(exp.timestamp()),
+        nbf: Some(now.timestamp()),
+        iat: Some(now.timestamp()),
+        jti: None,
+        extra: HashMap::new(),
+    };
+
+    // Copy all fields from payload to claims
+    for (key, value) in &payload_obj.fields {
+        let key_str = key.to_str().unwrap();
+        match key_str {
+            // Skip standard claims that we set automatically
+            "exp" | "nbf" | "iat" => continue,
+            // Copy standard claims
+            "iss" => claims.iss = Some(value.as_string()?.to_string()),
+            "sub" => claims.sub = Some(value.as_string()?.to_string()),
+            "aud" => claims.aud = Some(value.as_string()?.to_string()),
+            "jti" => claims.jti = Some(value.as_string()?.to_string()),
+            // Handle custom claims
+            _ => {
+                let json_value = match value {
+                    Value::String(s) => serde_json::Value::String(s.to_string()),
+                    Value::Number(n) => {
+                        serde_json::Value::Number(serde_json::Number::from_f64(*n).unwrap())
+                    }
+                    Value::Boolean(b) => serde_json::Value::Bool(*b),
+                    Value::Nil => serde_json::Value::Null,
+                    _ => {
+                        return Err(VmError::RuntimeError(format!(
+                            "Unsupported claim value type for key: {}",
+                            key_str
+                        )))
+                    }
+                };
+                claims.extra.insert(key_str.to_string(), json_value);
+            }
+        }
+    }
+
+    // Build header
+    let header = Header::new(algorithm);
+
+    // Create encoding key
+    let key = EncodingKey::from_secret(secret_str.as_bytes());
+
+    // Generate token
+    let token = encode(&header, &claims, &key)
+        .map_err(|e| VmError::RuntimeError(format!("JWT encoding error: {}", e)))?;
+
+    Ok(Value::String(state.intern(token.as_bytes())))
 }
