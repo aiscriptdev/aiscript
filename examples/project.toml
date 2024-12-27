@@ -32,10 +32,9 @@ allowed_headers = ["Content-Type", "Authorization"]
 allow_credentials = true
 max_age = 600
 
-[security]
-jwt_secret = "secret"
-jwt_expiration = 3600
-allow_host = "http://localhost:3000"
+[auth.jwt]
+secret = "secret"
+expiration = 3600
 
 [logging]
 level = "info"

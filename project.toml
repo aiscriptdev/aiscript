@@ -1,0 +1,10 @@
+[apidoc]
+enabled = true
+path = "/redoc"
+
+[database.postgresql]
+url = "$DATABASE_URL"
+
+[auth.jwt]
+secret = "$JWT_SECRET"
+expiration = 3600

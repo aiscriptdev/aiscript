@@ -1,13 +1,12 @@
-#![allow(unused)]
-use std::{env, fmt::Display, fs, path::Path, sync::OnceLock};
+use std::{env, fmt::Display, fs, ops::Deref, path::Path, sync::OnceLock};
 
-use security::SecurityConfig;
+use auth::AuthConfig;
 use serde::Deserialize;
 
 use db::DatabaseConfig;
 
+mod auth;
 mod db;
-mod security;
 mod tests;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -46,6 +45,14 @@ impl From<EnvString> for String {
     }
 }
 
+impl Deref for EnvString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl AsRef<str> for EnvString {
     fn as_ref(&self) -> &str {
         &self.0
@@ -56,31 +63,39 @@ impl AsRef<str> for EnvString {
 pub struct Config {
     #[serde(default)]
     pub database: DatabaseConfig,
-    pub apidoc: Option<ApiDocConfig>,
-    pub security: Option<SecurityConfig>,
+    #[serde(default)]
+    pub apidoc: ApiDocConfig,
+    #[serde(default)]
+    pub auth: AuthConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiDocType {
     Swagger,
+    #[default]
     Redoc,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ApiDocConfig {
     pub enabled: bool,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     pub doc_type: ApiDocType,
+    #[serde(default = "default_path")]
     pub path: String,
+}
+
+fn default_path() -> String {
+    "/doc".to_string()
 }
 
 impl Default for ApiDocConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            doc_type: ApiDocType::Redoc,
-            path: "/reddoc".to_string(),
+            doc_type: ApiDocType::default(),
+            path: default_path(),
         }
     }
 }
@@ -103,5 +118,9 @@ impl Config {
                 Config::default()
             })
         })
+    }
+
+    pub fn get() -> &'static Config {
+        CONFIG.get().expect("Config not initialized")
     }
 }

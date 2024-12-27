@@ -25,7 +25,10 @@ use std::{
 use tokio::task::{self, JoinHandle};
 use tower::Service;
 
-use crate::ast::{self, *};
+use crate::{
+    ast::{self, *},
+    Config,
+};
 
 use crate::error::ServerError;
 
@@ -175,6 +178,7 @@ impl Future for RequestProcessor {
     type Output = Result<Response, Infallible>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let config = Config::get();
         loop {
             match &mut self.state {
                 ProcessingState::ValidatingAuth => {
@@ -187,7 +191,8 @@ impl Future for RequestProcessor {
                         match future.poll(cx) {
                             Poll::Pending => return Poll::Pending,
                             Poll::Ready(Ok(bearer)) => {
-                                let key = DecodingKey::from_secret("secret_str".as_bytes());
+                                let key =
+                                    DecodingKey::from_secret(config.auth.jwt.secret.as_bytes());
                                 let validation = Validation::new(Algorithm::HS256);
                                 // Decode token
                                 let token_data: TokenData<Value> =
