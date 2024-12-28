@@ -57,6 +57,7 @@ pub enum FieldType {
     #[allow(unused)]
     Array,
 }
+
 impl FieldType {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -77,8 +78,24 @@ pub struct Field {
     pub docs: String,
 }
 
+#[derive(Debug, Clone)]
+pub enum Auth {
+    Jwt,
+    Basic,
+    None,
+}
+
+impl Auth {
+    pub fn is_required(&self) -> bool {
+        match self {
+            Auth::Jwt | Auth::Basic => true,
+            Auth::None => false,
+        }
+    }
+}
+
 pub struct Endpoint {
-    pub auth: bool,
+    pub auth: Auth,
     pub path_specs: Vec<PathSpec>,
     #[allow(unused)]
     pub return_type: Option<String>,

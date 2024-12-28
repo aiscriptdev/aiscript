@@ -126,7 +126,14 @@ impl<'a> Parser<'a> {
         let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
-            auth: directives.iter().any(|d| d.is_directive_of("auth")),
+            auth: directives
+                .iter()
+                .rfind(|d| ["auth", "basic_auth"].contains(&&*d.name()))
+                .map_or(Auth::None, |d| match &*d.name() {
+                    "auth" => Auth::Jwt,
+                    "basic_auth" => Auth::Basic,
+                    _ => Auth::None,
+                }),
             path_specs,
             return_type: None,
             query,

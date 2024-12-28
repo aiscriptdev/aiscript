@@ -7,7 +7,10 @@ use axum::{
     Form, Json, RequestExt,
 };
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
+    headers::{
+        authorization::{Basic, Bearer},
+        Authorization,
+    },
     TypedHeader,
 };
 use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
@@ -51,7 +54,7 @@ pub struct Field {
 
 #[derive(Clone)]
 pub struct Endpoint {
-    pub auth: bool,
+    pub auth: Auth,
     pub query_params: Vec<Field>,
     pub body_type: BodyKind,
     pub body_fields: Vec<Field>,
@@ -80,7 +83,7 @@ pub struct RequestProcessor {
 
 impl RequestProcessor {
     fn new(endpoint: Endpoint, request: Request<Body>) -> Self {
-        let state = if endpoint.auth {
+        let state = if endpoint.auth.is_required() {
             ProcessingState::ValidatingAuth
         } else {
             ProcessingState::ValidatingQuery
@@ -182,22 +185,56 @@ impl Future for RequestProcessor {
         loop {
             match &mut self.state {
                 ProcessingState::ValidatingAuth => {
-                    self.jwt_claim = {
+                    if matches!(self.endpoint.auth, Auth::Jwt) {
+                        self.jwt_claim = {
+                            let future = self
+                                .request
+                                .extract_parts::<TypedHeader<Authorization<Bearer>>>();
+                            tokio::pin!(future);
+                            match future.poll(cx) {
+                                Poll::Pending => return Poll::Pending,
+                                Poll::Ready(Ok(bearer)) => {
+                                    let key =
+                                        DecodingKey::from_secret(config.auth.jwt.secret.as_bytes());
+                                    let validation = Validation::new(Algorithm::HS256);
+                                    // Decode token
+                                    let token_data: TokenData<Value> =
+                                        decode(bearer.token(), &key, &validation).unwrap();
+                                    Some(token_data.claims)
+                                }
+                                Poll::Ready(Err(e)) => {
+                                    return Poll::Ready(Ok(ServerError::AuthenticationError {
+                                        message: e.to_string(),
+                                    }
+                                    .into_response()))
+                                }
+                            }
+                        };
+                    } else {
+                        // Baisc auth
                         // Extract the token from the authorization header
                         let future = self
                             .request
-                            .extract_parts::<TypedHeader<Authorization<Bearer>>>();
+                            .extract_parts::<TypedHeader<Authorization<Basic>>>();
                         tokio::pin!(future);
                         match future.poll(cx) {
                             Poll::Pending => return Poll::Pending,
-                            Poll::Ready(Ok(bearer)) => {
-                                let key =
-                                    DecodingKey::from_secret(config.auth.jwt.secret.as_bytes());
-                                let validation = Validation::new(Algorithm::HS256);
-                                // Decode token
-                                let token_data: TokenData<Value> =
-                                    decode(bearer.token(), &key, &validation).unwrap();
-                                Some(token_data.claims)
+                            Poll::Ready(Ok(basic)) => {
+                                if let Some(b) = config.auth.basic.as_ref() {
+                                    if *b.username != basic.username()
+                                        || *b.password != basic.password()
+                                    {
+                                        return Poll::Ready(Ok(ServerError::AuthenticationError {
+                                            message: "Invalid username or password".to_string(),
+                                        }
+                                        .into_response()));
+                                    }
+                                } else {
+                                    return Poll::Ready(Ok(ServerError::AuthenticationError {
+                                        message: "Basic auth is not configured".to_string(),
+                                    }
+                                    .into_response()));
+                                }
                             }
                             Poll::Ready(Err(e)) => {
                                 return Poll::Ready(Ok(ServerError::AuthenticationError {
@@ -206,7 +243,7 @@ impl Future for RequestProcessor {
                                 .into_response()))
                             }
                         }
-                    };
+                    }
                     self.state = ProcessingState::ValidatingQuery;
                 }
                 ProcessingState::ValidatingQuery => {
