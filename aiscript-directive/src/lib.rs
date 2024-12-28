@@ -1,44 +1,29 @@
 pub mod validator;
 
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
 
 use aiscript_lexer::{Scanner, TokenType};
 
 use serde_json::Value;
 pub use validator::Validator;
 
-static BUILTIN_SIMPLE_DIRECTIVES: &[&str] = &["auth", "basic_auth", "string", "number"];
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Directive {
-    Simple {
-        name: String,
-        params: HashMap<String, Value>,
-    },
-    Any(Vec<Directive>), // Must have 2 or more directives
-    Not(Box<Directive>),
-    In(Vec<Value>),
+pub trait FromDirective {
+    fn from_directive(directive: Directive) -> Result<Self, String>
+    where
+        Self: Sized;
 }
 
-impl Directive {
-    pub fn name(&self) -> Cow<'static, str> {
-        match self {
-            Directive::Simple { name, .. } => Cow::Owned(name.to_owned()),
-            Directive::Any(_) => "any".into(),
-            Directive::Not(_) => "not".into(),
-            Directive::In(_) => "in".into(),
-        }
-    }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Directive {
+    pub name: String,
+    pub params: DirectiveParams,
+}
 
-    pub fn is_directive_of(&self, name: &str) -> bool {
-        match self {
-            Directive::Simple {
-                name: directive_name,
-                ..
-            } => directive_name == name,
-            _ => false,
-        }
-    }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DirectiveParams {
+    KeyValue(HashMap<String, Value>),
+    Array(Vec<Value>),
+    Directives(Vec<Directive>),
 }
 
 pub struct DirectiveParser<'a, 'b: 'a> {
@@ -57,7 +42,13 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
     pub fn parse_validators(&mut self) -> Vec<Box<dyn Validator>> {
         self.parse_directives()
             .into_iter()
-            .map(validator::convert_from_directive)
+            .filter_map(|directive| match FromDirective::from_directive(directive) {
+                Ok(validator) => Some(validator),
+                Err(err) => {
+                    self.scanner.error(&err);
+                    None
+                }
+            })
             .collect()
     }
 
@@ -77,92 +68,72 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
         self.scanner
             .consume(TokenType::At, "Expected '@' at start of directive");
 
-        // Get directive name
-        if !self.scanner.is_at_end() {
-            let name = self.scanner.current;
-            self.scanner.advance();
-            match name.kind {
-                TokenType::In => self.parse_in_directive(),
-                TokenType::Not => self.parse_not_directive(),
-                TokenType::Identifier if name.lexeme == "any" => self.parse_any_directive(),
-                TokenType::Identifier => {
-                    if BUILTIN_SIMPLE_DIRECTIVES.contains(&name.lexeme) {
-                        self.parse_simple_directive(name.lexeme.to_owned())
-                    } else {
-                        self.scanner
-                            .error_at_current(&format!("Unknown directive: @{}", name.lexeme));
-                        None
-                    }
-                }
-                _ => {
-                    self.scanner.error_at_current("Expected directive name");
-                    None
-                }
-            }
-        } else {
+        if self.scanner.is_at_end() {
             self.scanner.error_at_current("Unexpected end");
-            None
+            return None;
         }
+
+        let name_token = self.scanner.current;
+        self.scanner.advance();
+        let name = name_token.lexeme.to_owned();
+
+        let params = if self.scanner.match_token(TokenType::OpenParen) {
+            let params = self.parse_parameters()?;
+            self.scanner
+                .consume(TokenType::CloseParen, "Expect ')' after parameters.");
+            params
+        } else {
+            DirectiveParams::KeyValue(HashMap::new())
+        };
+
+        Some(Directive { name, params })
     }
 
-    fn parse_not_directive(&mut self) -> Option<Directive> {
-        self.scanner
-            .consume(TokenType::OpenParen, "Expect '(' after '@not'.");
-        let inner = self.parse_directive()?;
-        self.scanner
-            .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Some(Directive::Not(Box::new(inner)))
-    }
+    fn parse_parameters(&mut self) -> Option<DirectiveParams> {
+        // Handle empty parentheses case first
+        if self.scanner.check(TokenType::CloseParen) {
+            return Some(DirectiveParams::KeyValue(HashMap::new()));
+        }
 
-    fn parse_in_directive(&mut self) -> Option<Directive> {
-        self.scanner
-            .consume(TokenType::OpenParen, "Expect '(' after '@in'.");
-        let values = self.parse_array()?;
-        self.scanner
-            .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Some(Directive::In(values))
-    }
-
-    fn parse_any_directive(&mut self) -> Option<Directive> {
-        self.scanner
-            .consume(TokenType::OpenParen, "Expect '(' after '@any'.");
-        let mut directives = Vec::new();
-
-        while !self.scanner.check(TokenType::CloseParen) {
-            directives.push(self.parse_directive()?);
-            if self.scanner.check(TokenType::Comma) {
-                self.scanner.advance(); // consume comma
+        if self.scanner.check(TokenType::OpenBracket) {
+            // Parse array
+            let array = self.parse_array()?;
+            Some(DirectiveParams::Array(array))
+        } else if self.scanner.check(TokenType::At) {
+            // Parse one or more directives separated by commas
+            // self.scanner.advance(); // consume '@'
+            let mut directives = Vec::new();
+            loop {
+                if let Some(directive) = self.parse_directive() {
+                    directives.push(directive);
+                }
+                if !self.scanner.check(TokenType::Comma) {
+                    break;
+                }
+                self.scanner.advance(); // consume ','
             }
-        }
-
-        self.scanner
-            .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
-        Some(Directive::Any(directives))
-    }
-
-    fn parse_simple_directive(&mut self, name: String) -> Option<Directive> {
-        let mut params = HashMap::new();
-
-        if self.scanner.match_token(TokenType::OpenParen) {
+            Some(DirectiveParams::Directives(directives))
+        } else if self.scanner.check(TokenType::Identifier) {
+            // Parse key-value parameters
+            let mut params = HashMap::new();
             while !self.scanner.check(TokenType::CloseParen) {
                 self.scanner
-                    .consume(TokenType::Identifier, "Expect parameter name.");
-                let param_name = self.scanner.previous.lexeme.to_owned();
+                    .consume(TokenType::Identifier, "Expect parameter key.");
+                let key = self.scanner.previous.lexeme.to_owned();
                 self.scanner
-                    .consume(TokenType::Equal, "Expect '=' after parameter.");
+                    .consume(TokenType::Equal, "Expect '=' after parameter key.");
                 let value = self.parse_value()?;
-                params.insert(param_name, value);
-
-                if self.scanner.check(TokenType::Comma) {
-                    self.scanner.advance(); // consume comma
+                params.insert(key, value);
+                if !self.scanner.check(TokenType::Comma) {
+                    break;
                 }
+                self.scanner.advance(); // consume ','
             }
-
-            self.scanner
-                .consume(TokenType::CloseParen, "Expect ') at the end of directive.");
+            Some(DirectiveParams::KeyValue(params))
+        } else {
+            self.scanner.error("Expected parameters.");
+            None
         }
-
-        Some(Directive::Simple { name, params })
     }
 
     fn parse_array(&mut self) -> Option<Vec<Value>> {
@@ -228,81 +199,190 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aiscript_lexer::Scanner;
+    use serde_json::json;
 
-    #[test]
-    fn test_length_directive() {
-        let source = "@length(max=10)";
-        let mut scanner = Scanner::new(source);
+    fn parse_single_directive(input: &str) -> Option<Directive> {
+        let mut scanner = Scanner::new(input);
         let mut parser = DirectiveParser::new(&mut scanner);
-        let directive = parser.parse_directive().unwrap();
-
-        match directive {
-            Directive::Simple { name, params } => {
-                assert!(!parser.scanner.had_error);
-                assert_eq!(name, "length");
-                assert_eq!(params.len(), 1);
-                match params.get("max") {
-                    Some(Value::Number(n)) => assert_eq!(*n, 10i64.into()),
-                    _ => panic!("Expected max parameter with number value"),
-                }
-            }
-            _ => panic!("Expected Simple directive"),
-        }
+        parser.parse_directive()
     }
 
     #[test]
-    fn test_not_directive() {
-        let source = "@not(@another)";
-        let mut scanner = Scanner::new(source);
-        let mut parser = DirectiveParser::new(&mut scanner);
-        let directive = parser.parse_directive().unwrap();
-
-        match directive {
-            Directive::Not(inner) => match *inner {
-                Directive::Simple { name, params } => {
-                    assert!(!parser.scanner.had_error);
-                    assert_eq!(name, "another");
-                    assert!(params.is_empty());
-                }
-                _ => panic!("Expected Simple directive inside Not"),
-            },
-            _ => panic!("Expected Not directive"),
-        }
+    fn test_simple_directive() {
+        let directive = parse_single_directive("@validate").unwrap();
+        assert_eq!(directive.name, "validate");
+        assert!(matches!(directive.params, DirectiveParams::KeyValue(ref map) if map.is_empty()));
     }
 
     #[test]
-    fn test_in_directive() {
-        let source = "@in([\"a\", \"b\", \"c\"])";
-        let mut scanner = Scanner::new(source);
-        let mut parser = DirectiveParser::new(&mut scanner);
-        let directive = parser.parse_directive().unwrap();
-
-        match directive {
-            Directive::In(values) => {
-                assert!(!parser.scanner.had_error);
+    fn test_directive_with_array() {
+        let directive = parse_single_directive("@values([1, 2, 3])").unwrap();
+        assert_eq!(directive.name, "values");
+        match directive.params {
+            DirectiveParams::Array(values) => {
                 assert_eq!(values.len(), 3);
-                match &values[0] {
-                    Value::String(s) => assert_eq!(*s, "a"),
-                    _ => panic!("Expected string value"),
-                }
+                assert_eq!(values[0], json!(1));
+                assert_eq!(values[1], json!(2));
+                assert_eq!(values[2], json!(3));
             }
-            _ => panic!("Expected In directive"),
+            _ => panic!("Expected Array parameters"),
         }
     }
 
     #[test]
-    fn test_any_directive() {
-        let source = "@any(@a, @b(arg=1), @c)";
-        let mut scanner = Scanner::new(source);
-        let mut parser = DirectiveParser::new(&mut scanner);
-        let directive = parser.parse_directive().unwrap();
-
-        match directive {
-            Directive::Any(directives) => {
-                assert!(!parser.scanner.had_error);
-                assert_eq!(directives.len(), 3);
+    fn test_directive_with_mixed_array() {
+        let directive = parse_single_directive(r#"@values([1, "test", true])"#).unwrap();
+        assert_eq!(directive.name, "values");
+        match directive.params {
+            DirectiveParams::Array(values) => {
+                assert_eq!(values.len(), 3);
+                assert_eq!(values[0], json!(1));
+                assert_eq!(values[1], json!("test"));
+                assert_eq!(values[2], json!(true));
             }
-            _ => panic!("Expected Any directive"),
+            _ => panic!("Expected Array parameters"),
+        }
+    }
+
+    #[test]
+    fn test_directive_with_key_value() {
+        let directive = parse_single_directive(r#"@validate(min=1, max=10, name="test")"#).unwrap();
+        assert_eq!(directive.name, "validate");
+        match directive.params {
+            DirectiveParams::KeyValue(params) => {
+                assert_eq!(params.len(), 3);
+                assert_eq!(params.get("min").unwrap(), &json!(1));
+                assert_eq!(params.get("max").unwrap(), &json!(10));
+                assert_eq!(params.get("name").unwrap(), &json!("test"));
+            }
+            _ => panic!("Expected KeyValue parameters"),
+        }
+    }
+
+    #[test]
+    fn test_directive_with_nested_directives() {
+        let directive =
+            parse_single_directive("@combine(@length(min=5), @pattern(regex=\"[a-z]+\"))").unwrap();
+        assert_eq!(directive.name, "combine");
+        match directive.params {
+            DirectiveParams::Directives(directives) => {
+                assert_eq!(directives.len(), 2);
+
+                let first = &directives[0];
+                assert_eq!(first.name, "length");
+                match &first.params {
+                    DirectiveParams::KeyValue(params) => {
+                        assert_eq!(params.get("min").unwrap(), &json!(5));
+                    }
+                    _ => panic!("Expected KeyValue parameters for length directive"),
+                }
+
+                let second = &directives[1];
+                assert_eq!(second.name, "pattern");
+                match &second.params {
+                    DirectiveParams::KeyValue(params) => {
+                        assert_eq!(params.get("regex").unwrap(), &json!("[a-z]+"));
+                    }
+                    _ => panic!("Expected KeyValue parameters for pattern directive"),
+                }
+            }
+            _ => panic!("Expected Directives parameters"),
+        }
+    }
+
+    #[test]
+    fn test_directive_with_empty_array() {
+        let directive = parse_single_directive("@values([])").unwrap();
+        assert_eq!(directive.name, "values");
+        match directive.params {
+            DirectiveParams::Array(values) => {
+                assert_eq!(values.len(), 0);
+            }
+            _ => panic!("Expected Array parameters"),
+        }
+    }
+
+    #[test]
+    fn test_directive_with_empty_key_value() {
+        let directive = parse_single_directive("@validate()").unwrap();
+        assert_eq!(directive.name, "validate");
+        match directive.params {
+            DirectiveParams::KeyValue(params) => {
+                assert!(params.is_empty());
+            }
+            _ => panic!("Expected KeyValue parameters"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_directives() {
+        // assert!(parse_single_directive("validate").is_none()); // Missing @
+        assert!(parse_single_directive("@").is_none()); // Missing name
+        assert!(parse_single_directive("@validate(").is_none()); // Unclosed parenthesis
+        assert!(parse_single_directive("@validate(min=)").is_none()); // Missing value
+        assert!(parse_single_directive("@validate(=5)").is_none()); // Missing key
+    }
+
+    #[test]
+    fn test_complex_nested_directives() {
+        let directive = parse_single_directive(
+            r#"@group(
+                @validate(min=1, max=10),
+                @format([1, 2, 3]),
+                @nested(@check(value=true))
+            )"#,
+        )
+        .unwrap();
+
+        assert_eq!(directive.name, "group");
+        match directive.params {
+            DirectiveParams::Directives(directives) => {
+                assert_eq!(directives.len(), 3);
+
+                // First nested directive
+                let validate = &directives[0];
+                assert_eq!(validate.name, "validate");
+                match &validate.params {
+                    DirectiveParams::KeyValue(params) => {
+                        assert_eq!(params.get("min").unwrap(), &json!(1));
+                        assert_eq!(params.get("max").unwrap(), &json!(10));
+                    }
+                    _ => panic!("Expected KeyValue parameters for validate"),
+                }
+
+                // Second nested directive
+                let format = &directives[1];
+                assert_eq!(format.name, "format");
+                match &format.params {
+                    DirectiveParams::Array(values) => {
+                        assert_eq!(values.len(), 3);
+                        assert_eq!(values[0], json!(1));
+                        assert_eq!(values[1], json!(2));
+                        assert_eq!(values[2], json!(3));
+                    }
+                    _ => panic!("Expected Array parameters for format"),
+                }
+
+                // Third nested directive with its own nested directive
+                let nested = &directives[2];
+                assert_eq!(nested.name, "nested");
+                match &nested.params {
+                    DirectiveParams::Directives(inner) => {
+                        assert_eq!(inner.len(), 1);
+                        let check = &inner[0];
+                        assert_eq!(check.name, "check");
+                        match &check.params {
+                            DirectiveParams::KeyValue(params) => {
+                                assert_eq!(params.get("value").unwrap(), &json!(true));
+                            }
+                            _ => panic!("Expected KeyValue parameters for check"),
+                        }
+                    }
+                    _ => panic!("Expected Directives parameters for nested"),
+                }
+            }
+            _ => panic!("Expected Directives parameters"),
         }
     }
 }

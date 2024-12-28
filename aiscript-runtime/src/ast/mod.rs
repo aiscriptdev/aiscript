@@ -74,7 +74,7 @@ pub struct Field {
     pub _type: FieldType,
     pub required: bool,
     pub default: Option<Value>,
-    pub directives: Vec<Directive>,
+    pub validators: Vec<Box<dyn Validator>>,
     pub docs: String,
 }
 

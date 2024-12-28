@@ -1,10 +1,18 @@
+use std::any::Any;
+
 use serde_json::Value;
 
-use crate::Directive;
+use crate::{Directive, DirectiveParams, FromDirective};
 
-pub trait Validator: Send + Sync {
+pub trait Validator: Send + Sync + Any {
     fn name(&self) -> &'static str;
     fn validate(&self, value: &Value) -> Result<(), String>;
+    fn downcast_ref<T: Validator + 'static>(&self) -> Option<&T>
+    where
+        Self: Sized + 'static,
+    {
+        (self as &dyn Any).downcast_ref::<T>()
+    }
 }
 
 impl Validator for Box<dyn Validator> {
@@ -17,17 +25,28 @@ impl Validator for Box<dyn Validator> {
     }
 }
 
-pub struct AnyValidator<V>(Box<[V]>);
+impl<T: Validator> Validator for Box<T> {
+    fn name(&self) -> &'static str {
+        self.as_ref().name()
+    }
 
-pub struct NotValidator<V>(V);
+    fn validate(&self, value: &Value) -> Result<(), String> {
+        self.as_ref().validate(value)
+    }
+}
 
+pub struct AnyValidator<V>(pub Box<[V]>);
+
+pub struct NotValidator<V>(pub V);
+
+#[derive(Default)]
 pub struct StringValidator {
-    min_len: Option<u32>,
-    max_len: Option<u32>,
-    exact_len: Option<u32>,
+    pub min_len: Option<u32>,
+    pub max_len: Option<u32>,
+    pub exact_len: Option<u32>,
     // regex: Option<String>,
-    start_with: Option<String>,
-    end_with: Option<String>,
+    pub start_with: Option<String>,
+    pub end_with: Option<String>,
 }
 
 pub struct NumberValidator {
@@ -38,7 +57,7 @@ pub struct NumberValidator {
     strict_float: Option<bool>,
 }
 
-pub struct InValidator(Vec<Value>);
+pub struct InValidator(pub Vec<Value>);
 
 impl<V: Validator> Validator for AnyValidator<V> {
     fn name(&self) -> &'static str {
@@ -192,49 +211,231 @@ impl Validator for InValidator {
     }
 }
 
-pub fn convert_from_directive(directive: Directive) -> Box<dyn Validator> {
-    match directive {
-        Directive::Simple { name, params } => match &*name {
-            // TODO: validate params
-            "string" => Box::new(StringValidator {
-                min_len: params
-                    .get("min_len")
-                    .and_then(|v| v.as_u64().map(|v| v as u32)),
-                max_len: params
-                    .get("max_len")
-                    .and_then(|v| v.as_u64().map(|v| v as u32)),
-                exact_len: params
-                    .get("exact_len")
-                    .and_then(|v| v.as_u64().map(|v| v as u32)),
-                // regex: params
-                //     .get("regex")
-                //     .and_then(|v| v.as_str().map(|v| v.to_string())),
-                start_with: params
-                    .get("start_with")
-                    .and_then(|v| v.as_str().map(|v| v.to_string())),
-                end_with: params
-                    .get("end_with")
-                    .and_then(|v| v.as_str().map(|v| v.to_string())),
-            }),
-            "number" => Box::new(NumberValidator {
+impl FromDirective for Box<dyn Validator> {
+    fn from_directive(directive: Directive) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        match directive.name.as_str() {
+            "string" => Ok(Box::new(StringValidator::from_directive(directive)?)),
+            "number" => Ok(Box::new(NumberValidator::from_directive(directive)?)),
+            "in" => Ok(Box::new(InValidator::from_directive(directive)?)),
+            "any" => Ok(Box::new(AnyValidator::from_directive(directive)?)),
+            "not" => Ok(Box::new(NotValidator::from_directive(directive)?)),
+            v => Err(format!("Invalid validators: @{}", v)),
+        }
+    }
+}
+
+impl FromDirective for StringValidator {
+    fn from_directive(Directive { params, .. }: Directive) -> Result<Self, String> {
+        match params {
+            DirectiveParams::KeyValue(params) => {
+                Ok(Self {
+                    min_len: params
+                        .get("min_len")
+                        .and_then(|v| v.as_u64().map(|v| v as u32)),
+                    max_len: params
+                        .get("max_len")
+                        .and_then(|v| v.as_u64().map(|v| v as u32)),
+                    exact_len: params
+                        .get("exact_len")
+                        .and_then(|v| v.as_u64().map(|v| v as u32)),
+                    // regex: params
+                    //     .get("regex")
+                    //     .and_then(|v| v.as_str().map(|v| v.to_string())),
+                    start_with: params
+                        .get("start_with")
+                        .and_then(|v| v.as_str().map(|v| v.to_string())),
+                    end_with: params
+                        .get("end_with")
+                        .and_then(|v| v.as_str().map(|v| v.to_string())),
+                })
+            }
+            _ => Err("Invalid params for @string directive".into()),
+        }
+    }
+}
+
+impl FromDirective for InValidator {
+    fn from_directive(Directive { params, .. }: Directive) -> Result<Self, String> {
+        match params {
+            DirectiveParams::Array(values) => Ok(Self(values)),
+            _ => Err("Invalid params for @in directive".into()),
+        }
+    }
+}
+
+impl FromDirective for AnyValidator<Box<dyn Validator>> {
+    fn from_directive(Directive { params, .. }: Directive) -> Result<Self, String> {
+        match params {
+            DirectiveParams::Directives(directives) => {
+                let mut validators = Vec::with_capacity(directives.len());
+                for directive in directives {
+                    validators.push(FromDirective::from_directive(directive)?);
+                }
+                Ok(Self(validators.into_boxed_slice()))
+            }
+            _ => Err("Invalid params for @any directive".into()),
+        }
+    }
+}
+
+impl FromDirective for NotValidator<Box<dyn Validator>> {
+    fn from_directive(Directive { params, .. }: Directive) -> Result<Self, String> {
+        match params {
+            DirectiveParams::Directives(mut directives) => {
+                if let Some(directive) = directives.pop() {
+                    let validator = FromDirective::from_directive(directive)?;
+                    if !directives.is_empty() {
+                        return Err("@not directive only support one directive".into());
+                    }
+
+                    Ok(Self(validator))
+                } else {
+                    Err("@not directive requires one directive".into())
+                }
+            }
+            _ => Err("Invalid params for @not directive, expect a directive".into()),
+        }
+    }
+}
+
+impl FromDirective for NumberValidator {
+    fn from_directive(Directive { params, .. }: Directive) -> Result<Self, String> {
+        match params {
+            DirectiveParams::KeyValue(params) => Ok(Self {
                 min: params.get("min").and_then(|v| v.as_f64()),
                 max: params.get("max").and_then(|v| v.as_f64()),
                 equal: params.get("equal").and_then(|v| v.as_f64()),
                 strict_int: params.get("strict_int").and_then(|v| v.as_bool()),
                 strict_float: params.get("strict_float").and_then(|v| v.as_bool()),
             }),
-            _ => {
-                panic!("Unsupported directive: @{}", name)
+            _ => Err("Invalid params for @number directive".into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Simple validator implementations for testing
+    #[derive(Debug)]
+    struct RangeValidator {
+        min: i64,
+        max: i64,
+    }
+
+    impl RangeValidator {
+        fn new(min: i64, max: i64) -> Self {
+            Self { min, max }
+        }
+    }
+
+    impl Validator for RangeValidator {
+        fn name(&self) -> &'static str {
+            "range"
+        }
+
+        fn validate(&self, value: &Value) -> Result<(), String> {
+            if let Some(num) = value.as_i64() {
+                if num >= self.min && num <= self.max {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "Value must be between {} and {}",
+                        self.min, self.max
+                    ))
+                }
+            } else {
+                Err("Value must be an integer".to_string())
             }
-        },
-        Directive::Any(directives) => Box::new(AnyValidator(
-            directives
-                .into_iter()
-                .map(|directive| convert_from_directive(directive))
-                .collect::<Vec<Box<dyn Validator>>>()
-                .into_boxed_slice(),
-        )),
-        Directive::Not(directive) => Box::new(NotValidator(convert_from_directive(*directive))),
-        Directive::In(values) => Box::new(InValidator(values)),
+        }
+    }
+
+    #[test]
+    fn test_direct_downcast() {
+        let range_validator = RangeValidator::new(1, 10);
+
+        // Downcast using concrete type
+        let downcast_result = range_validator.downcast_ref::<RangeValidator>();
+        assert!(downcast_result.is_some());
+
+        let range = downcast_result.unwrap();
+        assert_eq!(range.min, 1);
+        assert_eq!(range.max, 10);
+    }
+
+    #[test]
+    fn test_nested_downcast() {
+        let inner_validator = Box::new(RangeValidator::new(1, 10));
+        let not_validator = NotValidator(inner_validator);
+
+        // Test successful downcast
+        let downcast_result = not_validator.downcast_ref::<NotValidator<Box<RangeValidator>>>();
+        assert!(downcast_result.is_some());
+    }
+
+    #[test]
+    fn test_any_validator_downcast() {
+        let validators = vec![
+            Box::new(RangeValidator::new(1, 10)),
+            Box::new(RangeValidator::new(0, 5)),
+        ];
+        let any_validator = AnyValidator(validators.into_boxed_slice());
+
+        // Test successful downcast
+        let downcast_result = any_validator.downcast_ref::<AnyValidator<Box<RangeValidator>>>();
+        assert!(downcast_result.is_some());
+
+        // Verify the inner validators
+        let any = downcast_result.unwrap();
+        assert_eq!(any.0.len(), 2);
+    }
+
+    #[test]
+    fn test_wrong_downcast() {
+        let range_validator = RangeValidator::new(1, 10);
+
+        // Try to downcast to wrong types
+        let not_result = range_validator.downcast_ref::<NotValidator<Box<dyn Validator>>>();
+        assert!(not_result.is_none());
+
+        let any_result = range_validator.downcast_ref::<AnyValidator<Box<dyn Validator>>>();
+        assert!(any_result.is_none());
+    }
+
+    #[test]
+    fn test_downcast_and_validate() {
+        let range_validator = RangeValidator::new(1, 10);
+
+        // Downcast and validate
+        if let Some(range) = range_validator.downcast_ref::<RangeValidator>() {
+            assert!(range.validate(&json!(5)).is_ok());
+            assert!(range.validate(&json!(0)).is_err());
+            assert!(range.validate(&json!(11)).is_err());
+            assert!(range.validate(&json!("not a number")).is_err());
+        } else {
+            panic!("Downcast failed");
+        }
+    }
+
+    #[test]
+    fn test_nested_validator_chain() {
+        let range = Box::new(RangeValidator::new(1, 10));
+        let not = NotValidator(range);
+        let any = AnyValidator(vec![not].into_boxed_slice());
+
+        // Test validation behavior of the chain
+        assert!(any.validate(&json!(0)).is_ok()); // Outside range, so NotValidator makes it valid
+        assert!(any.validate(&json!(5)).is_err()); // Inside range, so NotValidator makes it invalid
+
+        // Test downcasting of each layer
+        let any_downcast = any
+            .downcast_ref::<AnyValidator<NotValidator<Box<RangeValidator>>>>()
+            .expect("Should downcast to AnyValidator");
+        assert_eq!(any_downcast.0.len(), 1);
     }
 }

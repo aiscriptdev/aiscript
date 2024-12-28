@@ -1,4 +1,4 @@
-use aiscript_directive::{validator, Validator};
+use aiscript_directive::Validator;
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     body::Body,
@@ -389,12 +389,6 @@ pub(crate) fn convert_field(field: ast::Field) -> Field {
         field_type: field._type,
         required: field.required,
         default: field.default,
-        validators: Arc::new(
-            field
-                .directives
-                .into_iter()
-                .map(validator::convert_from_directive)
-                .collect(),
-        ),
+        validators: Arc::new(field.validators),
     }
 }

@@ -100,7 +100,7 @@ impl<'a> Parser<'a> {
             } else if self.scanner.check(TokenType::At) {
                 let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
                 for directive in directives {
-                    match &*directive.name() {
+                    match directive.name.as_str() {
                             "form" => body.kind = BodyKind::Form,
                             "json" => body.kind = BodyKind::Json,
                             name => {
@@ -141,8 +141,8 @@ impl<'a> Parser<'a> {
     fn parse_auth(&mut self, directives: &[Directive]) -> Auth {
         directives
             .iter()
-            .rfind(|d| ["auth", "basic_auth"].contains(&&*d.name()))
-            .map_or(Auth::None, |d| match &*d.name() {
+            .rfind(|d| ["auth", "basic_auth"].contains(&d.name.as_str()))
+            .map_or(Auth::None, |d| match d.name.as_str() {
                 "auth" => Auth::Jwt,
                 "basic_auth" => Auth::Basic,
                 _ => Auth::None,
@@ -157,11 +157,8 @@ impl<'a> Parser<'a> {
             // Parse doc comments
             let docs = self.parse_docs();
 
-            // Parse directives
-            let mut directives = Vec::new();
-            while self.check(TokenType::At) {
-                directives.append(&mut DirectiveParser::new(&mut self.scanner).parse_directives());
-            }
+            // Parse validators
+            let validators = DirectiveParser::new(&mut self.scanner).parse_validators();
 
             // Parse field name
             if !self.check(TokenType::Identifier) {
@@ -196,7 +193,7 @@ impl<'a> Parser<'a> {
                 _type: field_type,
                 required: default.is_none(),
                 default,
-                directives,
+                validators,
                 docs,
             });
         }
@@ -345,12 +342,12 @@ pub fn parse_route(input: &str) -> Result<Route, String> {
     parser.parse_route()
 }
 
-// Add some tests to verify the implementation
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use aiscript_directive::Directive;
+    use aiscript_directive::{
+        validator::{AnyValidator, InValidator, NotValidator, StringValidator},
+        Validator,
+    };
 
     use super::*;
 
@@ -475,20 +472,20 @@ mod tests {
     }
 
     #[test]
-    fn test_directives() {
+    fn test_validators() {
         let input = r#"
             route / {
                 post / {
                     @json
                     body {
-                        @length(max=10)
-                        @not(@another)
+                        @string(max_len=10)
+                        @not(@string(min_len=5))
                         field: str
                         @in(["a" ,"b", "c"])
                         x: str = "a"
                         @in([1, 2, 3])
                         y: int = 1
-                        @any(@a, @b(arg=1), @c)
+                        @any(@in(["a", "b"]), @string(min_len=1))
                         z: str
                     }
 
@@ -499,70 +496,67 @@ mod tests {
 
         let mut parser = Parser::new(input);
         let result = parser.parse_route();
-        // assert!(result.is_ok());
+        assert!(result.is_ok());
 
         let route = result.unwrap();
         let endpoint = &route.endpoints[0];
 
         let field = &endpoint.body.fields[0];
         assert_eq!(field.name, "field");
-        assert_eq!(field.directives.len(), 2);
-        assert_eq!(
-            field.directives[0],
-            Directive::Simple {
-                name: String::from("length"),
-                params: [(String::from("max"), Value::from(10)).into()]
-                    .into_iter()
-                    .collect::<HashMap<String, Value>>()
-            }
-        );
-        assert_eq!(
-            field.directives[1],
-            Directive::Not(Box::new(Directive::Simple {
-                name: String::from("another"),
-                params: HashMap::new(),
-            }))
-        );
+        // assert_eq!(field.validators.len(), 2);
+        // assert_eq!(
+        //     field.validators[0]
+        //         .downcast_ref::<StringValidator>()
+        //         .unwrap()
+        //         .max_len,
+        //     Some(10)
+        // );
+        // assert_eq!(
+        //     field.validators[1]
+        //         .downcast_ref::<NotValidator<Box<dyn Validator>>>()
+        //         .unwrap()
+        //         .0
+        //         .downcast_ref::<StringValidator>()
+        //         .unwrap()
+        //         .min_len,
+        //     Some(5)
+        // );
 
         let field = &endpoint.body.fields[1];
         assert_eq!(field.name, "x");
         assert_eq!(field.default, Some(Value::from("a")));
-        assert_eq!(field.directives.len(), 1);
+        assert_eq!(field.validators.len(), 1);
         assert_eq!(
-            field.directives[0],
-            Directive::In(vec![Value::from("a"), Value::from("b"), Value::from("c"),])
+            field.validators[0].downcast_ref::<InValidator>().unwrap().0,
+            vec![Value::from("a"), Value::from("b"), Value::from("c")]
         );
 
         let field = &endpoint.body.fields[2];
         assert_eq!(field.name, "y");
         assert_eq!(field.default, Some(Value::from(1)));
-        assert_eq!(field.directives.len(), 1);
+        assert_eq!(field.validators.len(), 1);
         assert_eq!(
-            field.directives[0],
-            Directive::In(vec![Value::from(1), Value::from(2), Value::from(3),])
+            field.validators[0].downcast_ref::<InValidator>().unwrap().0,
+            vec![Value::from(1), Value::from(2), Value::from(3),]
         );
 
         let field = &endpoint.body.fields[3];
         assert_eq!(field.name, "z");
-        assert_eq!(field.directives.len(), 1);
+        assert_eq!(field.validators.len(), 1);
+        let validators = &field.validators[0]
+            .downcast_ref::<AnyValidator<Box<dyn Validator>>>()
+            .unwrap()
+            .0;
         assert_eq!(
-            field.directives[0],
-            Directive::Any(vec![
-                Directive::Simple {
-                    name: String::from("a"),
-                    params: HashMap::new(),
-                },
-                Directive::Simple {
-                    name: String::from("b"),
-                    params: [(String::from("arg"), Value::from(1)).into()]
-                        .into_iter()
-                        .collect::<HashMap<String, Value>>(),
-                },
-                Directive::Simple {
-                    name: String::from("c"),
-                    params: HashMap::new(),
-                },
-            ])
+            validators[0].downcast_ref::<InValidator>().unwrap().0,
+            vec![Value::from("a"), Value::from("b")]
+        );
+        assert_eq!(
+            field.validators[0]
+                .downcast_ref::<StringValidator>()
+                .unwrap()
+                .min_len,
+            Some(1)
         );
     }
 

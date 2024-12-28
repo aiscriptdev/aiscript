@@ -1,4 +1,9 @@
-use aiscript_directive::Directive;
+use std::any::Any;
+
+use aiscript_directive::{
+    validator::{InValidator, StringValidator},
+    Validator,
+};
 
 use super::*;
 use crate::{
@@ -189,38 +194,30 @@ impl OpenAPIGenerator {
         };
 
         // Process directives
-        for directive in &field.directives {
-            Self::apply_directive(&mut schema, directive);
+        for validators in &field.validators {
+            Self::apply_validators(&mut schema, validators);
         }
 
         schema
     }
 
-    fn apply_directive(schema: &mut Schema, directive: &Directive) {
-        match directive {
-            Directive::Simple { name, params } => {
-                if let "string" = name.as_str() {
-                    if let Some(min_len) = params.get("min_len") {
-                        if let Some(val) = min_len.as_u64() {
-                            schema.min_length = Some(val);
-                        }
-                    }
-                    if let Some(max_len) = params.get("max_len") {
-                        if let Some(val) = max_len.as_u64() {
-                            schema.max_length = Some(val);
-                        }
-                    }
-                }
+    #[allow(clippy::borrowed_box)]
+    fn apply_validators(schema: &mut Schema, validator: &Box<dyn Validator>) {
+        if let Some(string_validator) = (validator as &dyn Any).downcast_ref::<StringValidator>() {
+            if let Some(min_len) = string_validator.min_len {
+                schema.min_length = Some(min_len as u64);
             }
-            Directive::In(values) => {
-                schema.enum_values = Some(
-                    values
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect(),
-                );
+            if let Some(max_len) = string_validator.max_len {
+                schema.max_length = Some(max_len as u64);
             }
-            _ => {}
+        } else if let Some(in_validator) = (validator as &dyn Any).downcast_ref::<InValidator>() {
+            schema.enum_values = Some(
+                in_validator
+                    .0
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+            );
         }
     }
 
