@@ -78,7 +78,7 @@ pub struct Field {
     pub docs: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Auth {
     Jwt,
     Basic,
@@ -90,6 +90,13 @@ impl Auth {
         match self {
             Auth::Jwt | Auth::Basic => true,
             Auth::None => false,
+        }
+    }
+
+    pub fn or(self, other: Auth) -> Auth {
+        match self {
+            Auth::None => other,
+            _ => self,
         }
     }
 }
@@ -106,6 +113,7 @@ pub struct Endpoint {
 }
 
 pub struct Route {
+    pub auth: Auth,
     pub prefix: String,
     pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,

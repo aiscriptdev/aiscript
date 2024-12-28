@@ -1,4 +1,4 @@
-use aiscript_directive::DirectiveParser;
+use aiscript_directive::{Directive, DirectiveParser};
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
@@ -44,6 +44,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_route(&mut self) -> Result<Route, String> {
+        let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
         let mut docs = String::new();
         let mut path = (String::from("/"), Vec::new());
 
@@ -67,6 +68,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Route {
+            auth: self.parse_auth(&directives),
             prefix: path.0,
             params: path.1,
             endpoints,
@@ -126,14 +128,7 @@ impl<'a> Parser<'a> {
         let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
-            auth: directives
-                .iter()
-                .rfind(|d| ["auth", "basic_auth"].contains(&&*d.name()))
-                .map_or(Auth::None, |d| match &*d.name() {
-                    "auth" => Auth::Jwt,
-                    "basic_auth" => Auth::Basic,
-                    _ => Auth::None,
-                }),
+            auth: self.parse_auth(&directives),
             path_specs,
             return_type: None,
             query,
@@ -141,6 +136,17 @@ impl<'a> Parser<'a> {
             statements,
             docs,
         })
+    }
+
+    fn parse_auth(&mut self, directives: &[Directive]) -> Auth {
+        directives
+            .iter()
+            .rfind(|d| ["auth", "basic_auth"].contains(&&*d.name()))
+            .map_or(Auth::None, |d| match &*d.name() {
+                "auth" => Auth::Jwt,
+                "basic_auth" => Auth::Basic,
+                _ => Auth::None,
+            })
     }
 
     fn parse_fields(&mut self) -> Result<Vec<Field>, String> {
