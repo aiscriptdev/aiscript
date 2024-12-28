@@ -7,6 +7,8 @@ use aiscript_lexer::{Scanner, TokenType};
 use serde_json::Value;
 pub use validator::Validator;
 
+static BUILTIN_SIMPLE_DIRECTIVES: &[&str] = &["auth", "basic_auth", "string", "number"];
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Directive {
     Simple {
@@ -83,7 +85,15 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
                 TokenType::In => self.parse_in_directive(),
                 TokenType::Not => self.parse_not_directive(),
                 TokenType::Identifier if name.lexeme == "any" => self.parse_any_directive(),
-                TokenType::Identifier => self.parse_simple_directive(name.lexeme.to_owned()),
+                TokenType::Identifier => {
+                    if BUILTIN_SIMPLE_DIRECTIVES.contains(&name.lexeme) {
+                        self.parse_simple_directive(name.lexeme.to_owned())
+                    } else {
+                        self.scanner
+                            .error_at_current(&format!("Unknown directive: @{}", name.lexeme));
+                        None
+                    }
+                }
                 _ => {
                     self.scanner.error_at_current("Expected directive name");
                     None
