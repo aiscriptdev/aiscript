@@ -1,4 +1,4 @@
-use aiscript_directive::Validator;
+use aiscript_directive::{route::RouteAnnotation, Validator};
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     body::Body,
@@ -54,7 +54,7 @@ pub struct Field {
 
 #[derive(Clone)]
 pub struct Endpoint {
-    pub auth: Auth,
+    pub annotation: RouteAnnotation,
     pub query_params: Vec<Field>,
     pub body_type: BodyKind,
     pub body_fields: Vec<Field>,
@@ -83,7 +83,7 @@ pub struct RequestProcessor {
 
 impl RequestProcessor {
     fn new(endpoint: Endpoint, request: Request<Body>) -> Self {
-        let state = if endpoint.auth.is_required() {
+        let state = if endpoint.annotation.is_auth_required() {
             ProcessingState::ValidatingAuth
         } else {
             ProcessingState::ValidatingQuery
@@ -185,7 +185,7 @@ impl Future for RequestProcessor {
         loop {
             match &mut self.state {
                 ProcessingState::ValidatingAuth => {
-                    if matches!(self.endpoint.auth, Auth::Jwt) {
+                    if self.endpoint.annotation.is_jwt_auth() {
                         self.jwt_claim = {
                             let future = self
                                 .request

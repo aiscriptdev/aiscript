@@ -1,4 +1,5 @@
-use aiscript_directive::{Directive, DirectiveParser};
+use aiscript_directive::route::RouteAnnotation;
+use aiscript_directive::DirectiveParser;
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
@@ -44,7 +45,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_route(&mut self) -> Result<Route, String> {
-        let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
+        let annotation = self.parse_route_annotation();
         let mut docs = String::new();
         let mut path = (String::from("/"), Vec::new());
 
@@ -68,7 +69,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Route {
-            auth: self.parse_auth(&directives),
+            annotation,
             prefix: path.0,
             params: path.1,
             endpoints,
@@ -77,7 +78,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_endpoint(&mut self) -> Result<Endpoint, String> {
-        let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
+        let annotation = self.parse_route_annotation();
         let path_specs = self.parse_path_specs()?;
 
         self.consume(TokenType::OpenBrace, "Expect '{' before endpoint")?;
@@ -128,7 +129,7 @@ impl<'a> Parser<'a> {
         let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
-            auth: self.parse_auth(&directives),
+            annotation,
             path_specs,
             return_type: None,
             query,
@@ -138,15 +139,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_auth(&mut self, directives: &[Directive]) -> Auth {
-        directives
-            .iter()
-            .rfind(|d| ["auth", "basic_auth"].contains(&d.name.as_str()))
-            .map_or(Auth::None, |d| match d.name.as_str() {
-                "auth" => Auth::Jwt,
-                "basic_auth" => Auth::Basic,
-                _ => Auth::None,
-            })
+    fn parse_route_annotation(&mut self) -> RouteAnnotation {
+        let mut annotation = RouteAnnotation::default();
+        let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
+        for directive in directives {
+            let line = directive.line;
+            if let Err(error) = annotation.parse_directive(directive) {
+                self.error_with_line(line, &error);
+            }
+        }
+        annotation
     }
 
     fn parse_fields(&mut self) -> Result<Vec<Field>, String> {

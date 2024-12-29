@@ -1,7 +1,5 @@
 #![allow(unused)]
-use std::{borrow::Cow, collections::HashMap};
-
-use aiscript_directive::{Directive, Validator};
+use aiscript_directive::{route::RouteAnnotation, Validator};
 use serde_json::Value;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,31 +76,8 @@ pub struct Field {
     pub docs: String,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum Auth {
-    Jwt,
-    Basic,
-    None,
-}
-
-impl Auth {
-    pub fn is_required(&self) -> bool {
-        match self {
-            Auth::Jwt | Auth::Basic => true,
-            Auth::None => false,
-        }
-    }
-
-    pub fn or(self, other: Auth) -> Auth {
-        match self {
-            Auth::None => other,
-            _ => self,
-        }
-    }
-}
-
 pub struct Endpoint {
-    pub auth: Auth,
+    pub annotation: RouteAnnotation,
     pub path_specs: Vec<PathSpec>,
     #[allow(unused)]
     pub return_type: Option<String>,
@@ -113,7 +88,7 @@ pub struct Endpoint {
 }
 
 pub struct Route {
-    pub auth: Auth,
+    pub annotation: RouteAnnotation,
     pub prefix: String,
     pub params: Vec<PathParameter>,
     pub endpoints: Vec<Endpoint>,

@@ -1,11 +1,12 @@
-pub mod validator;
-
 use std::collections::HashMap;
 
 use aiscript_lexer::{Scanner, TokenType};
 
 use serde_json::Value;
+
 pub use validator::Validator;
+pub mod route;
+pub mod validator;
 
 pub trait FromDirective {
     fn from_directive(directive: Directive) -> Result<Self, String>
@@ -17,6 +18,7 @@ pub trait FromDirective {
 pub struct Directive {
     pub name: String,
     pub params: DirectiveParams,
+    pub line: u32,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -86,7 +88,11 @@ impl<'a, 'b> DirectiveParser<'a, 'b> {
             DirectiveParams::KeyValue(HashMap::new())
         };
 
-        Some(Directive { name, params })
+        Some(Directive {
+            name,
+            params,
+            line: name_token.line,
+        })
     }
 
     fn parse_parameters(&mut self) -> Option<DirectiveParams> {
