@@ -7,13 +7,21 @@ use crate::{Directive, DirectiveParams, FromDirective};
 pub trait Validator: Send + Sync + Any {
     fn name(&self) -> &'static str;
     fn validate(&self, value: &Value) -> Result<(), String>;
-    fn downcast_ref<T: Validator + 'static>(&self) -> Option<&T>
+    fn as_any(&self) -> &dyn Any;
+    fn downcast_ref<U: Any>(&self) -> Option<&U>
     where
-        Self: Sized + 'static,
+        Self: Sized,
     {
-        (self as &dyn Any).downcast_ref::<T>()
+        self.as_any().downcast_ref::<U>()
     }
 }
+
+// Nighly feature gate required
+// impl dyn Validator {
+//     pub fn as_any(&self) -> &dyn Any where Self: 'static {
+//         self
+//     }
+// }
 
 impl Validator for Box<dyn Validator> {
     fn name(&self) -> &'static str {
@@ -22,6 +30,10 @@ impl Validator for Box<dyn Validator> {
 
     fn validate(&self, value: &Value) -> Result<(), String> {
         self.as_ref().validate(value)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self.as_ref().as_any()
     }
 }
 
@@ -32,6 +44,10 @@ impl<T: Validator> Validator for Box<T> {
 
     fn validate(&self, value: &Value) -> Result<(), String> {
         self.as_ref().validate(value)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self.as_ref().as_any()
     }
 }
 
@@ -70,6 +86,10 @@ impl<V: Validator> Validator for AnyValidator<V> {
         }
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl<V: Validator> Validator for NotValidator<V> {
@@ -83,6 +103,10 @@ impl<V: Validator> Validator for NotValidator<V> {
             return Err("Value does not meet the validation criteria".into());
         }
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -149,6 +173,10 @@ impl Validator for StringValidator {
 
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Validator for NumberValidator {
@@ -195,6 +223,10 @@ impl Validator for NumberValidator {
         }
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl Validator for InValidator {
@@ -208,6 +240,10 @@ impl Validator for InValidator {
         } else {
             Err("Value is not in the list of allowed values".into())
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -353,6 +389,10 @@ mod tests {
                 Err("Value must be an integer".to_string())
             }
         }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
     }
 
     #[test]
@@ -366,6 +406,12 @@ mod tests {
         let range = downcast_result.unwrap();
         assert_eq!(range.min, 1);
         assert_eq!(range.max, 10);
+
+        let range_validator = RangeValidator::new(1, 10);
+        let validator: Box<dyn Validator> = Box::new(range_validator);
+        let v = validator.downcast_ref::<RangeValidator>().unwrap();
+        assert_eq!(v.min, 1);
+        assert_eq!(v.max, 10);
     }
 
     #[test]

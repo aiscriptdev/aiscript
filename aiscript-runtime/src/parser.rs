@@ -193,7 +193,7 @@ impl<'a> Parser<'a> {
                 _type: field_type,
                 required: default.is_none(),
                 default,
-                validators,
+                validators: validators.into_boxed_slice(),
                 docs,
             });
         }
@@ -503,24 +503,25 @@ mod tests {
 
         let field = &endpoint.body.fields[0];
         assert_eq!(field.name, "field");
-        // assert_eq!(field.validators.len(), 2);
-        // assert_eq!(
-        //     field.validators[0]
-        //         .downcast_ref::<StringValidator>()
-        //         .unwrap()
-        //         .max_len,
-        //     Some(10)
-        // );
-        // assert_eq!(
-        //     field.validators[1]
-        //         .downcast_ref::<NotValidator<Box<dyn Validator>>>()
-        //         .unwrap()
-        //         .0
-        //         .downcast_ref::<StringValidator>()
-        //         .unwrap()
-        //         .min_len,
-        //     Some(5)
-        // );
+        assert_eq!(field.validators.len(), 2);
+        assert_eq!(field.validators[0].name(), "@string");
+        assert_eq!(
+            field.validators[0]
+                .downcast_ref::<StringValidator>()
+                .unwrap()
+                .max_len,
+            Some(10)
+        );
+        assert_eq!(
+            field.validators[1]
+                .downcast_ref::<NotValidator<Box<dyn Validator>>>()
+                .unwrap()
+                .0
+                .downcast_ref::<StringValidator>()
+                .unwrap()
+                .min_len,
+            Some(5)
+        );
 
         let field = &endpoint.body.fields[1];
         assert_eq!(field.name, "x");
@@ -552,7 +553,7 @@ mod tests {
             vec![Value::from("a"), Value::from("b")]
         );
         assert_eq!(
-            field.validators[0]
+            validators[1]
                 .downcast_ref::<StringValidator>()
                 .unwrap()
                 .min_len,

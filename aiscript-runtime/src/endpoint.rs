@@ -49,7 +49,7 @@ pub struct Field {
     field_type: FieldType,
     required: bool,
     default: Option<Value>,
-    validators: Arc<Vec<Box<dyn Validator>>>,
+    validators: Arc<[Box<dyn Validator>]>,
 }
 
 #[derive(Clone)]
@@ -389,6 +389,6 @@ pub(crate) fn convert_field(field: ast::Field) -> Field {
         field_type: field._type,
         required: field.required,
         default: field.default,
-        validators: Arc::new(field.validators),
+        validators: Arc::from(field.validators),
     }
 }
