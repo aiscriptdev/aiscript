@@ -105,20 +105,9 @@ impl OpenAPIGenerator {
 
     fn create_path_item(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> PathItem {
         let mut path_item = PathItem {
-            reference: None,
-            summary: None,
             description: Some(endpoint.docs.clone()),
-            get: None,
-            put: None,
-            post: None,
-            delete: None,
-            options: None,
-            head: None,
-            patch: None,
-            trace: None,
-            servers: vec![],
             parameters: Self::create_path_parameters(&path_spec.params),
-            extensions: BTreeMap::new(),
+            ..Default::default()
         };
 
         let operation = Self::create_operation(route, endpoint, path_spec);
@@ -150,9 +139,7 @@ impl OpenAPIGenerator {
 
         Operation {
             tags: vec![tag],
-            summary: None,
             description: Some(endpoint.docs.clone()),
-            external_docs: None,
             operation_id: Some(format!(
                 "{}_{}",
                 path_spec.method.as_str().to_lowercase(),
@@ -161,10 +148,7 @@ impl OpenAPIGenerator {
             parameters,
             request_body,
             responses: Some(Self::create_default_responses()),
-            callbacks: BTreeMap::new(),
-            deprecated: None,
-            servers: vec![],
-            extensions: BTreeMap::new(),
+            ..Default::default()
         }
     }
 
@@ -231,7 +215,7 @@ impl OpenAPIGenerator {
             properties,
             required,
             schema_type: Some(SchemaTypeSet::Single(Type::Object)),
-            ..Self::create_default_schema()
+            ..ObjectSchema::default()
         });
 
         let mut content = BTreeMap::new();
@@ -261,7 +245,7 @@ impl OpenAPIGenerator {
             })),
             description: Some(field.docs.clone()),
             default: field.default.clone(),
-            ..Self::create_default_schema()
+            ..ObjectSchema::default()
         };
 
         // Process validators
@@ -292,7 +276,7 @@ impl OpenAPIGenerator {
                 "bool" => Type::Boolean,
                 _ => Type::String,
             })),
-            ..Self::create_default_schema()
+            ..ObjectSchema::default()
         })
     }
 
@@ -312,44 +296,5 @@ impl OpenAPIGenerator {
         );
 
         responses
-    }
-
-    fn create_default_schema() -> ObjectSchema {
-        ObjectSchema {
-            all_of: vec![],
-            any_of: vec![],
-            one_of: vec![],
-            items: None,
-            properties: BTreeMap::new(),
-            additional_properties: None,
-            schema_type: None,
-            enum_values: vec![],
-            const_value: None,
-            multiple_of: None,
-            maximum: None,
-            exclusive_maximum: None,
-            minimum: None,
-            exclusive_minimum: None,
-            max_length: None,
-            min_length: None,
-            pattern: None,
-            max_items: None,
-            min_items: None,
-            unique_items: None,
-            max_properties: None,
-            min_properties: None,
-            required: vec![],
-            format: None,
-            title: None,
-            description: None,
-            default: None,
-            deprecated: None,
-            read_only: None,
-            write_only: None,
-            examples: vec![],
-            discriminator: None,
-            example: None,
-            extensions: BTreeMap::new(),
-        }
     }
 }
