@@ -1,3 +1,4 @@
+#[allow(unused)]
 pub fn normalize_path(path: &str) -> String {
     let mut result = String::with_capacity(path.len());
     let mut last_was_slash = false;

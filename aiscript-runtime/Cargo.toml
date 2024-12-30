@@ -27,3 +27,5 @@ notify = "7.0.0"
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
 redis = { version = "0.27.6", features = ["tokio-comp", "aio"] }
 toml = "0.8.19"
+# should exclude yaml feature
+oas3 = "0.13.1"

@@ -1,4 +1,5 @@
 use ast::HttpMethod;
+use axum::Json;
 use axum::{response::Html, routing::*};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::postgres::PgPoolOptions;
@@ -181,8 +182,8 @@ async fn run_server(
     }
 
     let mut router = Router::new();
-    let openapi = serde_json::to_string(&openapi::OpenAPIGenerator::generate(&routes)).unwrap();
-    router = router.route("/openapi.json", get(move || async { openapi }));
+    let openapi = openapi::OpenAPIGenerator::generate(&routes);
+    router = router.route("/openapi.json", get(move || async { Json(openapi) }));
 
     if config.apidoc.enabled {
         match config.apidoc.doc_type {
