@@ -1,3 +1,4 @@
+use aiscript_directive::route::{Auth, RouteAnnotation};
 use aiscript_directive::validator::{InValidator, StringValidator};
 use aiscript_directive::Validator;
 use oas3::{
@@ -22,19 +23,30 @@ impl OpenAPIGenerator {
         let mut tags = Vec::new();
 
         for route in routes {
-            // Create a tag for the route
-            tags.push(Tag {
-                name: route.prefix.trim_matches('/').to_string(),
-                description: Some(route.docs.clone()),
-                extensions: BTreeMap::new(),
-            });
+            let route_name = route.prefix.trim_matches('/').to_string();
 
-            // Process endpoints for this route
+            if !route_name.is_empty() {
+                tags.push(Tag {
+                    name: route_name.clone(),
+                    description: Some(route.docs.clone()),
+                    extensions: BTreeMap::new(),
+                });
+            }
+
             for endpoint in &route.endpoints {
                 for path_spec in &endpoint.path_specs {
                     let path_item = Self::create_path_item(route, endpoint, path_spec);
-                    let full_path = format!("{}{}", route.prefix, path_spec.path);
-                    paths.insert(full_path, path_item);
+                    let path = if route.prefix.starts_with('/') {
+                        route.prefix.clone()
+                    } else {
+                        format!("/{}", route.prefix)
+                    };
+                    let full_path = if path_spec.path.starts_with('/') {
+                        format!("{}{}", path, path_spec.path)
+                    } else {
+                        format!("{}/{}", path, path_spec.path)
+                    };
+                    paths.insert(full_path.replace("//", "/"), path_item);
                 }
             }
         }
@@ -68,7 +80,6 @@ impl OpenAPIGenerator {
     fn create_default_components() -> Components {
         let mut security_schemes = BTreeMap::new();
 
-        // Add JWT auth scheme
         security_schemes.insert(
             "jwtAuth".to_string(),
             ObjectOrReference::Object(SecurityScheme::Http {
@@ -78,7 +89,6 @@ impl OpenAPIGenerator {
             }),
         );
 
-        // Add Basic auth scheme
         security_schemes.insert(
             "basicAuth".to_string(),
             ObjectOrReference::Object(SecurityScheme::Http {
@@ -105,7 +115,7 @@ impl OpenAPIGenerator {
 
     fn create_path_item(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> PathItem {
         let mut path_item = PathItem {
-            description: Some(endpoint.docs.clone()),
+            summary: Some(endpoint.docs.clone()),
             parameters: Self::create_path_parameters(&path_spec.params),
             ..Default::default()
         };
@@ -122,11 +132,34 @@ impl OpenAPIGenerator {
         path_item
     }
 
-    fn create_operation(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> Operation {
-        let tag = route.prefix.trim_matches('/').to_string();
-        let mut parameters = Self::create_path_parameters(&path_spec.params);
+    #[allow(unused)]
+    fn get_security_requirement(
+        annotation: RouteAnnotation,
+    ) -> Option<Vec<BTreeMap<String, Vec<String>>>> {
+        match annotation.auth {
+            Auth::Jwt => {
+                let mut requirement = BTreeMap::new();
+                requirement.insert("jwtAuth".to_string(), vec![]);
+                Some(vec![requirement])
+            }
+            Auth::Basic => {
+                let mut requirement = BTreeMap::new();
+                requirement.insert("basicAuth".to_string(), vec![]);
+                Some(vec![requirement])
+            }
+            Auth::None => None,
+        }
+    }
 
-        // Add query parameters
+    fn create_operation(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> Operation {
+        let route_name = route.prefix.trim_matches('/').to_string();
+        let tags = if route_name.is_empty() {
+            vec!["default".to_string()]
+        } else {
+            vec![route_name]
+        };
+
+        let mut parameters = Self::create_path_parameters(&path_spec.params);
         for query_field in &endpoint.query {
             parameters.push(Self::create_query_parameter(query_field));
         }
@@ -137,17 +170,22 @@ impl OpenAPIGenerator {
             None
         };
 
+        let method = path_spec.method.as_str().to_lowercase();
+        let path = path_spec.path.trim_matches('/');
+        let operation_id = if path.is_empty() {
+            method
+        } else {
+            format!("{}_{}", method, path.replace('/', "_"))
+        };
+
         Operation {
-            tags: vec![tag],
-            description: Some(endpoint.docs.clone()),
-            operation_id: Some(format!(
-                "{}_{}",
-                path_spec.method.as_str().to_lowercase(),
-                path_spec.path.replace("/", "_")
-            )),
+            tags,
+            summary: Some(endpoint.docs.clone()),
+            operation_id: Some(operation_id),
             parameters,
             request_body,
             responses: Some(Self::create_default_responses()),
+            // security: Self::get_security_requirement(endpoint.annotation),
             ..Default::default()
         }
     }
@@ -159,7 +197,7 @@ impl OpenAPIGenerator {
                 ObjectOrReference::Object(Parameter {
                     name: param.name.clone(),
                     location: ParameterIn::Path,
-                    description: None,
+                    description: Some(String::new()),
                     required: Some(true),
                     deprecated: None,
                     allow_empty_value: None,
@@ -211,27 +249,24 @@ impl OpenAPIGenerator {
             BodyKind::Form => "application/x-www-form-urlencoded",
         };
 
-        let schema = ObjectOrReference::Object(ObjectSchema {
-            properties,
-            required,
-            schema_type: Some(SchemaTypeSet::Single(Type::Object)),
-            ..ObjectSchema::default()
-        });
-
         let mut content = BTreeMap::new();
         content.insert(
             content_type.to_string(),
             MediaType {
-                schema: Some(schema),
-                examples: None,
-                encoding: BTreeMap::new(),
+                schema: Some(ObjectOrReference::Object(ObjectSchema {
+                    properties,
+                    required,
+                    schema_type: Some(SchemaTypeSet::Single(Type::Object)),
+                    ..Default::default()
+                })),
+                ..Default::default()
             },
         );
 
         ObjectOrReference::Object(RequestBody {
-            description: None,
             content,
             required: Some(true),
+            ..Default::default()
         })
     }
 
@@ -245,10 +280,9 @@ impl OpenAPIGenerator {
             })),
             description: Some(field.docs.clone()),
             default: field.default.clone(),
-            ..ObjectSchema::default()
+            ..Default::default()
         };
 
-        // Process validators
         for validator in field.validators.iter() {
             if let Some(string_validator) = validator.downcast_ref::<StringValidator>() {
                 if let Some(min_len) = string_validator.min_len {
@@ -261,7 +295,6 @@ impl OpenAPIGenerator {
             if let Some(in_validator) = validator.downcast_ref::<InValidator>() {
                 schema.enum_values = in_validator.0.clone();
             }
-            // Add other validator types as needed
         }
 
         ObjectOrReference::Object(schema)
@@ -276,25 +309,20 @@ impl OpenAPIGenerator {
                 "bool" => Type::Boolean,
                 _ => Type::String,
             })),
-            ..ObjectSchema::default()
+            description: Some(String::new()),
+            ..Default::default()
         })
     }
 
     fn create_default_responses() -> BTreeMap<String, ObjectOrReference<Response>> {
         let mut responses = BTreeMap::new();
-
-        // Default 200 response
         responses.insert(
             "200".to_string(),
             ObjectOrReference::Object(Response {
                 description: Some("Successful operation".to_string()),
-                headers: BTreeMap::new(),
-                content: BTreeMap::new(),
-                links: BTreeMap::new(),
-                extensions: BTreeMap::new(),
+                ..Default::default()
             }),
         );
-
         responses
     }
 }
