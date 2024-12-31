@@ -98,6 +98,9 @@ impl Vm {
                 .register_native_module(ctx.intern(b"std.math"), stdlib::create_math_module(ctx));
             state
                 .module_manager
+                .register_native_module(ctx.intern(b"std.http"), stdlib::create_http_module(ctx));
+            state
+                .module_manager
                 .register_native_module(ctx.intern(b"std.io"), stdlib::create_io_module(ctx));
             state
                 .module_manager
