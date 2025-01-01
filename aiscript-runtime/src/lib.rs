@@ -245,7 +245,13 @@ async fn run_server(
             };
             r = r.route(&last_path_specs.path.clone(), service_fn(endpoint));
         }
-        router = router.nest(&route.prefix, r);
+
+        if route.prefix == "/" {
+            // axum don't allow use nest() with root path
+            router = router.merge(r);
+        } else {
+            router = router.nest(&route.prefix, r);
+        }
     }
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
