@@ -29,3 +29,5 @@ redis = { version = "0.27.6", features = ["tokio-comp", "aio"] }
 toml = "0.8.19"
 # should exclude yaml feature
 oas3 = "0.13.1"
+openidconnect = "4.0.0-rc.1"
+reqwest = "0.12"

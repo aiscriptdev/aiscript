@@ -4,9 +4,11 @@ use auth::AuthConfig;
 use serde::Deserialize;
 
 use db::DatabaseConfig;
+use sso::SsoConfig;
 
 mod auth;
 mod db;
+mod sso;
 mod tests;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -67,6 +69,8 @@ pub struct Config {
     pub apidoc: ApiDocConfig,
     #[serde(default)]
     pub auth: AuthConfig,
+    #[serde(default)]
+    pub sso: SsoConfig,
 }
 
 #[derive(Debug, Deserialize, Default)]
