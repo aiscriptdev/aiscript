@@ -45,7 +45,7 @@ impl TryFrom<&String> for SsoProvider {
             "google" => Ok(Self::Google),
             "discord" => Ok(Self::Discord),
             "github" => Ok(Self::GitHub),
-            _ => Err("Invalid SSO provider".into()),
+            _ => Err(format!("Invalid SSO provider: `{value}`")),
         }
     }
 }
