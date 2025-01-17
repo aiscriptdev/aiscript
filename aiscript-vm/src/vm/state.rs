@@ -1503,28 +1503,11 @@ impl<'gc> State<'gc> {
         let function = &closure.function;
 
         let final_args = self.check_args(function, args_count, keyword_args_count)?;
-        self.stack_top -= args_count as usize + keyword_args_count as usize * 2;
-        let slot_start = self.stack_top - 1; // -1 for the function itself
-
-        for arg in final_args {
-            self.push_stack(arg);
-        }
-
-        // Create the call frame
-        let call_frame = CallFrame {
-            closure,
-            ip: 0,
-            slot_start,
-        };
-
-        #[cfg(feature = "debug")]
-        call_frame.disassemble();
-        self.frames.push(call_frame);
-        self.frame_count += 1;
-
+        self.call_inner(closure, args_count, keyword_args_count, final_args)?;
         Ok(())
     }
 
+    #[inline]
     fn call_inner(
         &mut self,
         closure: Gc<'gc, Closure<'gc>>,

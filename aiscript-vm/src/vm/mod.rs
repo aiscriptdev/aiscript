@@ -191,19 +191,12 @@ impl Vm {
 impl Vm {
     pub fn inject_variables(&mut self, variables: HashMap<String, serde_json::Value>) {
         self.arena.mutate_root(|_mc, state| {
+            let ctx = state.get_context();
             for (key, value) in variables {
                 let name = state.intern(key.as_bytes());
-                let v = match value {
-                    serde_json::Value::Bool(b) => Value::Boolean(b),
-                    serde_json::Value::Number(number) => Value::Number(number.as_f64().unwrap()),
-                    serde_json::Value::String(str) => {
-                        let s = state.intern(str.as_bytes());
-                        Value::String(s)
-                    }
-                    serde_json::Value::Null => Value::Nil,
-                    _ => continue,
-                };
-                state.globals.insert(name, v);
+                state
+                    .globals
+                    .insert(name, Value::from_serde_value(ctx, &value));
             }
         });
     }
@@ -213,23 +206,15 @@ impl Vm {
         K: AsRef<str> + Eq,
     {
         self.arena.mutate_root(|mc, state| {
+            let ctx = state.get_context();
             let name = state.intern_static(name);
             let class = Gc::new(mc, RefLock::new(Class::new(name)));
             let mut instance = Instance::new(class);
             for (key, value) in fields {
-                let v = match value {
-                    serde_json::Value::Bool(b) => Value::Boolean(b),
-                    serde_json::Value::Number(number) => Value::Number(number.as_f64().unwrap()),
-                    serde_json::Value::String(str) => {
-                        let s = state.intern(str.as_bytes());
-                        Value::from(s)
-                    }
-                    serde_json::Value::Null => Value::Nil,
-                    _ => continue,
-                };
-                instance
-                    .fields
-                    .insert(state.intern(key.as_ref().as_bytes()), v);
+                instance.fields.insert(
+                    state.intern(key.as_ref().as_bytes()),
+                    Value::from_serde_value(ctx, &value),
+                );
             }
             state
                 .globals
