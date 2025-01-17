@@ -12,3 +12,9 @@ expiration = 3600
 [auth.basic]
 username = "admin"
 password = "123456"
+
+[sso.google]
+client_id = "123"
+client_secret = "abc"
+redirect_url = "http://localhost:8080/callback"
+scopes = ["email"]

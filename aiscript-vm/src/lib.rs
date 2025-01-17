@@ -159,6 +159,7 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
             Value::Number(value) => ReturnValue::Number(value),
             Value::Boolean(value) => ReturnValue::Boolean(value),
             Value::String(value) => ReturnValue::String(value.to_string()),
+            Value::IoString(value) => ReturnValue::String(value.to_string()),
             Value::Array(value) => ReturnValue::Array(
                 value
                     .borrow()

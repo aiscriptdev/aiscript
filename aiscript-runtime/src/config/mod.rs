@@ -4,7 +4,7 @@ use auth::AuthConfig;
 use serde::Deserialize;
 
 use db::DatabaseConfig;
-use sso::SsoConfig;
+pub use sso::{get_sso_fields, SsoConfig};
 
 mod auth;
 mod db;

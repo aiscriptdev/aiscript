@@ -21,7 +21,6 @@ mod endpoint;
 mod error;
 mod openapi;
 mod parser;
-mod sso;
 mod utils;
 
 use aiscript_lexer as lexer;

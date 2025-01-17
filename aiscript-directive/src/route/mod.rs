@@ -1,9 +1,12 @@
+use serde_json::Value;
+
 use crate::{Directive, FromDirective};
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct RouteAnnotation {
     pub auth: Auth,
     pub deprecated: bool,
+    pub sso_provider: Option<SsoProvider>,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -12,6 +15,39 @@ pub enum Auth {
     Basic,
     #[default]
     None,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SsoProvider {
+    Facebook,
+    Google,
+    Discord,
+    GitHub,
+}
+
+impl SsoProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SsoProvider::Facebook => "facebook",
+            SsoProvider::Google => "google",
+            SsoProvider::Discord => "discord",
+            SsoProvider::GitHub => "github",
+        }
+    }
+}
+
+impl TryFrom<&String> for SsoProvider {
+    type Error = String;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        match value.as_ref() {
+            "facebook" => Ok(Self::Facebook),
+            "google" => Ok(Self::Google),
+            "discord" => Ok(Self::Discord),
+            "github" => Ok(Self::GitHub),
+            _ => Err("Invalid SSO provider".into()),
+        }
+    }
 }
 
 impl RouteAnnotation {
@@ -62,6 +98,13 @@ impl RouteAnnotation {
                     return Err("Duplicate deprecated directive".into());
                 } else {
                     self.deprecated = true;
+                }
+            }
+            "sso" => {
+                if let Some(Value::String(provider)) = directive.get_arg_value("provider") {
+                    self.sso_provider = Some(SsoProvider::try_from(provider)?);
+                } else {
+                    return Err("@sso required 'provider' argument.".into());
                 }
             }
             _ => {

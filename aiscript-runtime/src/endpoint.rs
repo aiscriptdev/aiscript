@@ -60,6 +60,7 @@ pub struct Endpoint {
     pub body_fields: Vec<Field>,
     pub script: String,
     pub path_specs: Vec<PathSpec>,
+    // pub provider_manager: Arc<ProviderManager>,
     pub pg_connection: Option<PgPool>,
     pub sqlite_connection: Option<SqlitePool>,
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
@@ -320,6 +321,20 @@ impl Future for RequestProcessor {
 
                     let script = mem::take(&mut self.endpoint.script);
                     let script = Box::leak(script.into_boxed_str());
+                    let sso_fields = if let Some(provider) = self.endpoint.annotation.sso_provider {
+                        match crate::config::get_sso_fields(provider) {
+                            Some(fields) => Some(fields),
+                            None => {
+                                return Poll::Ready(Ok(format!(
+                                    "Missing `[sso.{}]` config",
+                                    provider.as_str()
+                                )
+                                .into_response()))
+                            }
+                        }
+                    } else {
+                        None
+                    };
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
                     let pg_connection = self.endpoint.pg_connection.clone();
@@ -329,6 +344,9 @@ impl Future for RequestProcessor {
                         task::spawn_blocking(move || {
                             let mut vm =
                                 Vm::new(pg_connection, sqlite_connection, redis_connection);
+                            if let Some(fields) = sso_fields {
+                                vm.inject_sso_instance(fields);
+                            }
                             vm.compile(script)?;
                             vm.eval_function(
                                 0,

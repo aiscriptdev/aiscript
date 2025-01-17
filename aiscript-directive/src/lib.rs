@@ -28,6 +28,16 @@ pub enum DirectiveParams {
     Directives(Vec<Directive>),
 }
 
+impl Directive {
+    pub fn get_arg_value(&self, name: &'static str) -> Option<&Value> {
+        if let DirectiveParams::KeyValue(kv) = &self.params {
+            kv.get(name)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct DirectiveParser<'a, 'b: 'a> {
     scanner: &'a mut Scanner<'b>,
 }

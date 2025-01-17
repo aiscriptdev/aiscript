@@ -1557,7 +1557,7 @@ impl<'gc> State<'gc> {
     }
 
     #[inline(always)]
-    fn peek(&self, distance: usize) -> &Value<'gc> {
+    pub(crate) fn peek(&self, distance: usize) -> &Value<'gc> {
         debug_assert!(self.stack_top > distance, "Stack peek out of bounds");
         unsafe { self.stack.get_unchecked(self.stack_top - 1 - distance) }
     }
