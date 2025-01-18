@@ -1,0 +1,12 @@
+let a = (1, 2, 3);
+let b = (a, [4], 5);
+let c = (a, b, 100);
+
+print(a); // expect: (1, 2, 3)
+print(b); // expect: ((1, 2, 3), [4], 5)
+print(c); // expect: ((1, 2, 3), ((1, 2, 3), [4], 5), 100)
+
+print(a == (1, 2, 3)); // expect: true
+print(a == b[0]); // expect: true
+print(a == c[1][0]); // expect: true
+print(b[0] == c[1][0]); // expect: true

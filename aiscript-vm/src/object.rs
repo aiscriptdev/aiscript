@@ -15,6 +15,72 @@ use gc_arena::{
 
 use crate::{string::InternedString, Chunk, Value};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Collect)]
+#[collect(require_static)]
+pub enum ListKind {
+    Array,
+    Tuple,
+}
+
+#[derive(Collect)]
+#[collect(no_drop)]
+pub struct List<'gc> {
+    pub kind: ListKind,
+    pub data: Vec<Value<'gc>>,
+}
+
+impl<'gc> List<'gc> {
+    pub fn array(data: Vec<Value<'gc>>) -> Self {
+        Self {
+            kind: ListKind::Array,
+            data,
+        }
+    }
+
+    pub fn tuple(data: Vec<Value<'gc>>) -> Self {
+        Self {
+            kind: ListKind::Tuple,
+            data,
+        }
+    }
+
+    pub fn with_capacity(kind: ListKind, capacity: usize) -> Self {
+        Self {
+            kind,
+            data: Vec::with_capacity(capacity),
+        }
+    }
+
+    #[inline]
+    pub fn equals(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.data == other.data
+    }
+
+    pub fn push(&mut self, value: Value<'gc>) {
+        if self.kind == ListKind::Array {
+            self.data.push(value);
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<Value<'gc>> {
+        self.data.get(index).copied()
+    }
+
+    pub fn set(&mut self, index: usize, value: Value<'gc>) -> Result<(), &'static str> {
+        match self.kind {
+            ListKind::Array => {
+                if index < self.data.len() {
+                    self.data[index] = value;
+                    Ok(())
+                } else {
+                    Err("Index out of bounds")
+                }
+            }
+            ListKind::Tuple => Err("Cannot modify tuple - tuples are immutable"),
+        }
+    }
+}
+
 #[derive(Collect)]
 #[collect[no_drop]]
 pub struct UpvalueObj<'gc> {

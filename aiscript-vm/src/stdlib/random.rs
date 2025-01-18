@@ -167,15 +167,15 @@ fn random_choice<'gc>(
     }
 
     match &args[0] {
-        Value::Array(arr) => {
-            let arr = arr.borrow();
-            if arr.is_empty() {
+        Value::List(list) => {
+            let vec = &list.borrow().data;
+            if vec.is_empty() {
                 return Err(VmError::RuntimeError("choice(): array is empty".into()));
             }
 
             RNG.with(|rng| {
-                let idx = rng.borrow_mut().gen_range(0..arr.len());
-                Ok(arr[idx])
+                let idx = rng.borrow_mut().gen_range(0..vec.len());
+                Ok(vec[idx])
             })
         }
         _ => Err(VmError::RuntimeError(

@@ -103,68 +103,58 @@ fn column_to_value<'gc>(
             match &t[1..] {
                 // Integer arrays
                 "INT2" | "SMALLINT" => row.try_get::<Vec<i16>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                    ))
+                        v.into_iter().map(|n| Value::Number(n as f64)).collect(),
+                    )
                 }),
                 "INT4" | "INTEGER" => row.try_get::<Vec<i32>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                    ))
+                        v.into_iter().map(|n| Value::Number(n as f64)).collect(),
+                    )
                 }),
                 "INT8" | "BIGINT" => row.try_get::<Vec<i64>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                    ))
+                        v.into_iter().map(|n| Value::Number(n as f64)).collect(),
+                    )
                 }),
 
                 // Float arrays
                 "FLOAT4" | "REAL" => row.try_get::<Vec<f32>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(v.into_iter().map(|n| Value::Number(n as f64)).collect()),
-                    ))
+                        v.into_iter().map(|n| Value::Number(n as f64)).collect(),
+                    )
                 }),
-                "FLOAT8" | "DOUBLE PRECISION" => row.try_get::<Vec<f64>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
-                        &ctx,
-                        RefLock::new(v.into_iter().map(Value::Number).collect()),
-                    ))
-                }),
+                "FLOAT8" | "DOUBLE PRECISION" => row
+                    .try_get::<Vec<f64>, _>(i)
+                    .map(|v| Value::array(&ctx, v.into_iter().map(Value::Number).collect())),
 
                 // Text arrays
                 "VARCHAR" | "TEXT" => row.try_get::<Vec<String>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(
-                            v.into_iter()
-                                .map(|s| Value::String(ctx.intern(s.as_bytes())))
-                                .collect(),
-                        ),
-                    ))
+                        v.into_iter()
+                            .map(|s| Value::String(ctx.intern(s.as_bytes())))
+                            .collect(),
+                    )
                 }),
 
                 // Boolean arrays
-                "BOOL" | "BOOLEAN" => row.try_get::<Vec<bool>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
-                        &ctx,
-                        RefLock::new(v.into_iter().map(Value::Boolean).collect()),
-                    ))
-                }),
+                "BOOL" | "BOOLEAN" => row
+                    .try_get::<Vec<bool>, _>(i)
+                    .map(|v| Value::array(&ctx, v.into_iter().map(Value::Boolean).collect())),
 
                 // Default to string representation for unknown array types
                 _ => row.try_get::<Vec<String>, _>(i).map(|v| {
-                    Value::Array(Gc::new(
+                    Value::array(
                         &ctx,
-                        RefLock::new(
-                            v.into_iter()
-                                .map(|s| Value::String(ctx.intern(s.as_bytes())))
-                                .collect(),
-                        ),
-                    ))
+                        v.into_iter()
+                            .map(|s| Value::String(ctx.intern(s.as_bytes())))
+                            .collect(),
+                    )
                 }),
             }
         }
@@ -245,8 +235,8 @@ where
                     Value::Nil => {
                         query_builder = query_builder.bind(Option::<String>::None);
                     }
-                    Value::Array(arr) => {
-                        let arr = arr.borrow();
+                    Value::List(arr) => {
+                        let arr = &arr.borrow().data;
                         if let Some(first) = arr.first() {
                             match first {
                                 Value::Number(_) => {
@@ -334,7 +324,7 @@ where
         results.push(Value::Instance(Gc::new(&ctx, RefLock::new(instance))));
     }
 
-    Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+    Ok(Value::array(&ctx, results))
 }
 
 // Native function implementations
@@ -361,10 +351,7 @@ fn pg_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
         results.push(row_to_object(ctx, &row));
     }
 
-    Ok(Value::Array(Gc::new(
-        &state.get_context(),
-        RefLock::new(results),
-    )))
+    Ok(Value::array(state, results))
 }
 
 fn pg_query_as<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
@@ -485,7 +472,7 @@ mod transaction {
                 for row in rows {
                     results.push(row_to_object(ctx, &row));
                 }
-                Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+                Ok(Value::array(&ctx, results))
             }
             Some(Err(e)) => Err(VmError::RuntimeError(format!("Database error: {e}"))),
             None => Err(VmError::RuntimeError("No active transaction".into())),

@@ -8,6 +8,7 @@ use gc_arena::Collect;
 
 use crate::{
     ast::{ChunkId, Visibility},
+    object::ListKind,
     Value,
 };
 
@@ -90,7 +91,11 @@ pub enum OpCode {
         keyword_count: u8,
     },
     MakeObject(u8), //  number of key-value pairs in the object
-    MakeArray(u8),  // Number of elements
+    MakeList {
+        // Number of elements
+        size_constant: u8,
+        kind: ListKind,
+    },
     SetIndex,
     GetIndex,
     In,
@@ -332,7 +337,12 @@ impl<'gc> Chunk<'gc> {
                     ..
                 } => self.invoke_instruction("SUPER_INVOKE", method_constant, positional_count),
                 OpCode::MakeObject(c) => self.constant_instruction("MAKE_OBJECT", c),
-                OpCode::MakeArray(c) => self.constant_instruction("MAKE_ARRAY", c),
+                OpCode::MakeList {
+                    size_constant,
+                    kind,
+                } => {
+                    println!("{:-16} {:4} {:?}", "OP_MAKE_LIST", size_constant, kind);
+                }
                 OpCode::GetIndex => simple_instruction("GET_INDEX"),
                 OpCode::SetIndex => simple_instruction("SET_INDEX"),
                 OpCode::In => simple_instruction("IN"),

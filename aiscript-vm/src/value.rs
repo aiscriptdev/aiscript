@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use gc_arena::{lock::GcRefLock, Collect, Gc, RefLock};
+use gc_arena::{lock::GcRefLock, Collect, Gc, Mutation, RefLock};
 
 use crate::{
     ai::Agent,
-    object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, Object},
+    object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, List, ListKind, Object},
     string::{InternedString, StringValue},
     vm::{Context, VmError},
     NativeFn,
@@ -21,7 +21,8 @@ pub enum Value<'gc> {
     IoString(Gc<'gc, String>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
-    Array(GcRefLock<'gc, Vec<Value<'gc>>>),
+    // Array(GcRefLock<'gc, Vec<Value<'gc>>>),
+    List(GcRefLock<'gc, List<'gc>>),
     Object(GcRefLock<'gc, Object<'gc>>),
     Enum(GcRefLock<'gc, Enum<'gc>>),
     EnumVariant(Gc<'gc, EnumVariant<'gc>>),
@@ -55,16 +56,34 @@ impl<'gc> Display for Value<'gc> {
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
-            Value::Array(array) => {
-                let array = array.borrow();
-                write!(f, "[")?;
-                for (i, value) in array.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
+            Value::List(list) => {
+                let list = list.borrow();
+                match list.kind {
+                    ListKind::Array => {
+                        write!(f, "[")?;
+                        for (i, value) in list.data.iter().enumerate() {
+                            if i > 0 {
+                                write!(f, ", ")?;
+                            }
+                            write!(f, "{}", value)?;
+                        }
+                        write!(f, "]")
                     }
-                    write!(f, "{}", value)?;
+                    ListKind::Tuple => {
+                        write!(f, "(")?;
+                        for (i, value) in list.data.iter().enumerate() {
+                            if i > 0 {
+                                write!(f, ", ")?;
+                            }
+                            write!(f, "{}", value)?;
+                        }
+                        // Add trailing comma for 1-element tuples
+                        if list.data.len() == 1 {
+                            write!(f, ",")?;
+                        }
+                        write!(f, ")")
+                    }
                 }
-                write!(f, "]")
             }
             Value::Object(obj) => {
                 write!(f, "{{")?;
@@ -109,6 +128,11 @@ impl<'gc> Display for Value<'gc> {
 
 impl<'gc> Value<'gc> {
     #[inline]
+    pub fn array(mc: &Mutation<'gc>, data: Vec<Value<'gc>>) -> Self {
+        Value::List(Gc::new(mc, RefLock::new(List::array(data))))
+    }
+
+    #[inline]
     pub fn equals(&self, other: &Value<'gc>) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
@@ -117,7 +141,7 @@ impl<'gc> Value<'gc> {
             (Value::IoString(a), Value::IoString(b)) => *a == *b,
             (Value::String(a), Value::IoString(b)) => a.as_bytes() == b.as_bytes(),
             (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
-            (Value::Array(a), Value::Array(b)) => Gc::ptr_eq(*a, *b),
+            (Value::List(a), Value::List(b)) => a.borrow().equals(&b.borrow()),
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
             (Value::Enum(a), Value::Enum(b)) => Gc::ptr_eq(*a, *b),
             (Value::EnumVariant(a), Value::EnumVariant(b)) => {
@@ -291,9 +315,13 @@ impl<'gc> Value<'gc> {
             Value::Boolean(b) => (*b).into(),
             Value::String(str) => str.to_string().into(),
             Value::IoString(str) => str.to_string().into(),
-            Value::Array(vec) => {
-                serde_json::Value::Array(vec.borrow().iter().map(|v| v.to_serde_value()).collect())
-            }
+            Value::List(list) => serde_json::Value::Array(
+                list.borrow()
+                    .data
+                    .iter()
+                    .map(|v| v.to_serde_value())
+                    .collect(),
+            ),
             Value::Object(obj) => serde_json::Value::Object(
                 obj.borrow()
                     .fields

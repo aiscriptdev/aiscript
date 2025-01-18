@@ -581,13 +581,16 @@ impl<'gc> CodeGen<'gc> {
                 // Then emit env lookup instruction
                 self.emit(OpCode::EnvLookup);
             }
-            Expr::Array { elements, .. } => {
+            Expr::List { elements, kind, .. } => {
                 let len = elements.len();
                 // Generate code for each element
                 for element in elements {
                     self.generate_expr(element)?;
                 }
-                self.emit(OpCode::MakeArray(len as u8));
+                self.emit(OpCode::MakeList {
+                    size_constant: len as u8,
+                    kind,
+                });
             }
             Expr::EnumVariant {
                 enum_name, variant, ..

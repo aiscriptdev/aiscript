@@ -5,7 +5,7 @@ use aiscript_directive::Validator;
 use gc_arena::Collect;
 use indexmap::IndexMap;
 
-use crate::object::FunctionType;
+use crate::object::{FunctionType, ListKind};
 use crate::{lexer::Token, ty::PrimitiveType};
 use crate::{string::InternedString, Value};
 
@@ -255,8 +255,9 @@ pub enum Expr<'gc> {
         expression: Box<Expr<'gc>>,
         line: u32,
     },
-    Array {
+    List {
         elements: Vec<Expr<'gc>>,
+        kind: ListKind,
         line: u32,
     },
     Literal {
@@ -369,7 +370,7 @@ impl<'gc> Expr<'gc> {
             | Self::EvaluateVariant { line, .. }
             | Self::Binary { line, .. }
             | Self::Grouping { line, .. }
-            | Self::Array { line, .. }
+            | Self::List { line, .. }
             | Self::Literal { line, .. }
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }

@@ -27,7 +27,7 @@ pub fn create_error_info<'gc>(
     );
     fields.insert(
         ctx.intern(b"loc"),
-        Value::Array(Gc::new(&ctx, RefLock::new(vec![Value::String(field)]))),
+        Value::array(&ctx, vec![Value::String(field)]),
     );
     fields.insert(
         ctx.intern(b"msg"),

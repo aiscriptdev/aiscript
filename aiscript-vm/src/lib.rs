@@ -160,9 +160,10 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
             Value::Boolean(value) => ReturnValue::Boolean(value),
             Value::String(value) => ReturnValue::String(value.to_string()),
             Value::IoString(value) => ReturnValue::String(value.to_string()),
-            Value::Array(value) => ReturnValue::Array(
+            Value::List(value) => ReturnValue::Array(
                 value
                     .borrow()
+                    .data
                     .iter()
                     .map(|item| item.to_serde_value())
                     .collect::<Vec<_>>(),

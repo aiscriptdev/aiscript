@@ -280,7 +280,7 @@ impl<'gc> Expr<'gc> {
             }
             Self::Self_ { .. } => writeln!(f, "{ind}Self").unwrap(),
             Self::Super { method, .. } => writeln!(f, "{ind}Super {}", method.lexeme).unwrap(),
-            Self::Array { elements, .. } => {
+            Self::List { elements, .. } => {
                 writeln!(f, "{ind}Array").unwrap();
                 for elem in elements {
                     elem.fmt_with_indent(f, level + 1);

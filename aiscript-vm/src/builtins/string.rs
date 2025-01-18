@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Gc, Mutation, RefLock};
+use gc_arena::{Gc, Mutation};
 use regex::Regex;
 
 use crate::BuiltinMethod;
@@ -273,7 +273,7 @@ fn split<'gc>(
         .collect();
 
     // Convert to array
-    Ok(Value::Array(Gc::new(mc, RefLock::new(parts))))
+    Ok(Value::array(mc, parts))
 }
 
 fn join<'gc>(
@@ -291,8 +291,8 @@ fn join<'gc>(
     }
 
     // Get the array from args[0]
-    let array = match &args[0] {
-        Value::Array(arr) => arr,
+    let vec = match &args[0] {
+        Value::List(list) => &list.borrow().data,
         _ => {
             return Err(VmError::RuntimeError(
                 "join: argument must be an array".into(),
@@ -301,7 +301,7 @@ fn join<'gc>(
     };
 
     let mut result = String::new();
-    for (i, value) in array.borrow().iter().enumerate() {
+    for (i, value) in vec.iter().enumerate() {
         if i > 0 {
             result.push_str(separator);
         }
