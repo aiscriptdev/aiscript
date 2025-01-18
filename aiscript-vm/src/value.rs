@@ -141,7 +141,7 @@ impl<'gc> Value<'gc> {
             (Value::IoString(a), Value::IoString(b)) => *a == *b,
             (Value::String(a), Value::IoString(b)) => a.as_bytes() == b.as_bytes(),
             (Value::IoString(a), Value::String(b)) => a.as_bytes() == b.as_bytes(),
-            (Value::List(a), Value::List(b)) => Gc::ptr_eq(*a, *b),
+            (Value::List(a), Value::List(b)) => a.borrow().equals(&b.borrow()),
             (Value::Object(a), Value::Object(b)) => Gc::ptr_eq(*a, *b),
             (Value::Enum(a), Value::Enum(b)) => Gc::ptr_eq(*a, *b),
             (Value::EnumVariant(a), Value::EnumVariant(b)) => {

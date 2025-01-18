@@ -15,7 +15,7 @@ use gc_arena::{
 
 use crate::{string::InternedString, Chunk, Value};
 
-#[derive(Debug, Clone, Copy, PartialEq, Collect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Collect)]
 #[collect(require_static)]
 pub enum ListKind {
     Array,
@@ -49,6 +49,11 @@ impl<'gc> List<'gc> {
             kind,
             data: Vec::with_capacity(capacity),
         }
+    }
+
+    #[inline]
+    pub fn equals(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.data == other.data
     }
 
     pub fn push(&mut self, value: Value<'gc>) {
