@@ -15,7 +15,7 @@ use gc_arena::{
 
 use crate::{string::InternedString, Chunk, Value};
 
-#[derive(Clone, Copy, PartialEq, Collect)]
+#[derive(Debug, Clone, Copy, PartialEq, Collect)]
 #[collect(require_static)]
 pub enum ListKind {
     Array,

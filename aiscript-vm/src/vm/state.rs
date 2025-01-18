@@ -19,7 +19,8 @@ use crate::{
     builtins::BuiltinMethods,
     module::{ModuleKind, ModuleManager, ModuleSource},
     object::{
-        BoundMethod, Class, Closure, EnumVariant, Function, Instance, Object, Upvalue, UpvalueObj,
+        BoundMethod, Class, Closure, EnumVariant, Function, Instance, List, Object, Upvalue,
+        UpvalueObj,
     },
     string::{InternedString, InternedStringSet},
     NativeFn, OpCode, ReturnValue, Value,
@@ -770,11 +771,17 @@ impl<'gc> State<'gc> {
                 let object = Gc::new(self.mc, RefLock::new(object));
                 self.push_stack(Value::Object(object));
             }
-            OpCode::MakeArray(count) => {
-                let count = count as usize;
-                let elements: Vec<Value<'gc>> = self.pop_stack_n(count);
-                let array = Value::array(self.mc, elements);
-                self.push_stack(array);
+            OpCode::MakeList {
+                size_constant,
+                kind,
+            } => {
+                let count = size_constant as usize;
+                let mut list = List::with_capacity(kind, count);
+                let elements = self.pop_stack_n(count);
+                list.data = elements;
+
+                let list = Value::List(Gc::new(self.mc, RefLock::new(list)));
+                self.push_stack(list);
             }
             OpCode::GetIndex => {
                 // Stack: [object] [key]
@@ -827,6 +834,7 @@ impl<'gc> State<'gc> {
                         self.push_stack(value);
                     }
                     Value::List(list) => {
+                        // TODO: don't support tuple set index
                         let index = index.as_number().unwrap();
                         let index = index as usize;
 

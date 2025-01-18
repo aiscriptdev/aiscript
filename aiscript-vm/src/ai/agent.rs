@@ -138,7 +138,7 @@ impl<'gc> Agent<'gc> {
     where
         F: FnMut(&Token<'gc>) -> Option<FnDef>,
     {
-        if let Some(Expr::Array { elements, .. }) = fields.get("tools") {
+        if let Some(Expr::List { elements, .. }) = fields.get("tools") {
             for element in elements {
                 match element {
                     Expr::Variable { name, .. } => {

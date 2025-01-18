@@ -17,7 +17,7 @@ use crate::{
         AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FunctionDecl,
         MatchArm, MatchPattern, ObjectProperty, VariableDecl, Visibility,
     },
-    object::FunctionType,
+    object::{FunctionType, ListKind},
     ty::{
         ClassField, EnumVariantChecker, FunctionErrorResolver, Type, TypeResolver, ValidationError,
     },
@@ -280,7 +280,7 @@ impl<'gc> Parser<'gc> {
                     }
                 }
                 "tools" => {
-                    if !matches!(value, Expr::Array { .. }) {
+                    if !matches!(value, Expr::List { .. }) {
                         self.error("Field 'tools' in agent declaration should be an array.");
                         continue;
                     }
@@ -1494,12 +1494,51 @@ impl<'gc> Parser<'gc> {
     }
 
     fn grouping(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        if self.check(TokenType::CloseParen) {
+            // Empty tuple
+            self.advance();
+            return Some(Expr::List {
+                kind: ListKind::Tuple,
+                elements: Vec::new(),
+                line: self.previous.line,
+            });
+        }
+
+        // Parse the first expression
         let expr = self.expression()?;
-        self.consume(TokenType::CloseParen, "Expect ')' after expression.");
-        Some(Expr::Grouping {
-            expression: Box::new(expr),
-            line: self.previous.line,
-        })
+
+        if self.match_token(TokenType::Comma) {
+            // It's a tuple with at least one element
+            let mut elements = vec![expr];
+
+            // Parse remaining elements if any
+            while !self.check(TokenType::CloseParen) && !self.is_at_end() {
+                if self.match_token(TokenType::Comma) && self.check(TokenType::CloseParen) {
+                    break; // Allow trailing comma
+                }
+
+                elements.push(self.expression()?);
+
+                if !self.check(TokenType::CloseParen) {
+                    self.consume(TokenType::Comma, "Expect ',' after tuple element.");
+                }
+            }
+
+            self.consume(TokenType::CloseParen, "Expect ')' after tuple elements.");
+
+            Some(Expr::List {
+                kind: ListKind::Tuple,
+                elements,
+                line: self.previous.line,
+            })
+        } else {
+            // Just a parenthesized expression
+            self.consume(TokenType::CloseParen, "Expect ')' after expression.");
+            Some(Expr::Grouping {
+                expression: Box::new(expr),
+                line: self.previous.line,
+            })
+        }
     }
 
     fn env_lookup(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
@@ -1648,7 +1687,11 @@ impl<'gc> Parser<'gc> {
         }
 
         self.consume(TokenType::CloseBracket, "Expect ']' after array elements.");
-        Some(Expr::Array { elements, line })
+        Some(Expr::List {
+            elements,
+            kind: ListKind::Array,
+            line,
+        })
     }
 
     fn call(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
