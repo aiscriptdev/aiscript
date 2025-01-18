@@ -127,11 +127,11 @@ where
                     Value::Nil => {
                         query_builder = query_builder.bind(Option::<String>::None);
                     }
-                    Value::Array(arr) => {
-                        let arr = arr.borrow();
+                    Value::List(list) => {
+                        let vec = &list.borrow().data;
                         // SQLite doesn't have native array types, so convert to string representation
                         let json = serde_json::to_string(
-                            &arr.iter().map(Value::to_serde_value).collect::<Vec<_>>(),
+                            &vec.iter().map(Value::to_serde_value).collect::<Vec<_>>(),
                         )
                         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
                         query_builder = query_builder.bind(json);
@@ -174,7 +174,7 @@ where
         results.push(Value::Instance(Gc::new(&ctx, RefLock::new(instance))));
     }
 
-    Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+    Ok(Value::array(&ctx, results))
 }
 
 fn sqlite_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
@@ -199,7 +199,7 @@ fn sqlite_query<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Va
         results.push(row_to_object(ctx, &row));
     }
 
-    Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+    Ok(Value::array(&ctx, results))
 }
 
 fn sqlite_query_as<'gc>(
@@ -317,7 +317,7 @@ mod transaction {
                 for row in rows {
                     results.push(row_to_object(ctx, &row));
                 }
-                Ok(Value::Array(Gc::new(&ctx, RefLock::new(results))))
+                Ok(Value::array(&ctx, results))
             }
             Some(Err(e)) => Err(VmError::RuntimeError(format!("Database error: {e}"))),
             None => Err(VmError::RuntimeError("No active transaction".into())),

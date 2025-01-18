@@ -31,7 +31,7 @@ fn env_args<'gc>(state: &mut State<'gc>, _args: Vec<Value<'gc>>) -> Result<Value
         .map(|arg| Value::String(ctx.intern(arg.as_bytes())))
         .collect();
 
-    Ok(Value::Array(Gc::new(&ctx, RefLock::new(args))))
+    Ok(Value::array(&ctx, args))
 }
 
 // Returns all environment variables as an object

@@ -121,7 +121,7 @@ fn len<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     match &args[0] {
         Value::String(s) => Ok(Value::Number(s.len() as f64)),
         Value::IoString(s) => Ok(Value::Number(s.len() as f64)),
-        Value::Array(arr) => Ok(Value::Number(arr.borrow().len() as f64)),
+        Value::List(arr) => Ok(Value::Number(arr.borrow().data.len() as f64)),
         Value::Object(obj) => Ok(Value::Number(obj.borrow().fields.len() as f64)),
         _ => Err(VmError::RuntimeError(
             "len() argument must be a string, array or object.".into(),
@@ -137,8 +137,8 @@ fn any<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 
     match &args[0] {
-        Value::Array(arr) => {
-            let arr = arr.borrow();
+        Value::List(arr) => {
+            let arr = &arr.borrow().data;
             Ok(Value::Boolean(arr.iter().any(|x| x.is_true())))
         }
         _ => Err(VmError::RuntimeError(
@@ -155,9 +155,9 @@ fn all<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 
     match &args[0] {
-        Value::Array(arr) => {
+        Value::List(arr) => {
             let arr = arr.borrow();
-            Ok(Value::Boolean(arr.iter().all(|x| x.is_true())))
+            Ok(Value::Boolean(arr.data.iter().all(|x| x.is_true())))
         }
         _ => Err(VmError::RuntimeError(
             "all() argument must be an array.".into(),
@@ -175,8 +175,8 @@ fn min<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     if args.len() == 1 {
         // If single argument, it should be an array
         match &args[0] {
-            Value::Array(arr) => {
-                let arr = arr.borrow();
+            Value::List(arr) => {
+                let arr = &arr.borrow().data;
                 if arr.is_empty() {
                     return Err(VmError::RuntimeError("min() arg is an empty array".into()));
                 }
@@ -220,8 +220,8 @@ fn max<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     if args.len() == 1 {
         // If single argument, it should be an array
         match &args[0] {
-            Value::Array(arr) => {
-                let arr = arr.borrow();
+            Value::List(arr) => {
+                let arr = &arr.borrow().data;
                 if arr.is_empty() {
                     return Err(VmError::RuntimeError("max() arg is an empty array".into()));
                 }
@@ -278,8 +278,8 @@ fn sum<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>
     }
 
     match &args[0] {
-        Value::Array(arr) => {
-            let arr = arr.borrow();
+        Value::List(arr) => {
+            let arr = &arr.borrow().data;
             let mut sum = 0.0;
             for value in arr.iter() {
                 if let Value::Number(n) = value {

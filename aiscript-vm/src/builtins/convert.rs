@@ -17,7 +17,7 @@ pub(super) fn bool<'gc>(
         Value::IoString(s) => Ok(Value::Boolean(!s.is_empty())),
         Value::Boolean(b) => Ok(Value::Boolean(*b)),
         Value::Nil => Ok(Value::Boolean(false)),
-        Value::Array(arr) => Ok(Value::Boolean(!arr.borrow().is_empty())),
+        Value::List(list) => Ok(Value::Boolean(!list.borrow().data.is_empty())),
         Value::Object(obj) => Ok(Value::Boolean(!obj.borrow().fields.is_empty())),
         _ => Ok(Value::Boolean(true)),
     }

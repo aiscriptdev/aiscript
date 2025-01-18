@@ -1,5 +1,4 @@
 use crate::{vm::State, Value, VmError};
-use gc_arena::{Gc, RefLock};
 
 pub(super) fn map<'gc>(
     state: &mut State<'gc>,
@@ -12,8 +11,8 @@ pub(super) fn map<'gc>(
     }
 
     // Get the iterable
-    let arr = match &args[0] {
-        Value::Array(arr) => arr,
+    let vec = match &args[0] {
+        Value::List(list) => &list.borrow().data,
         _ => {
             return Err(VmError::RuntimeError(
                 "map() first argument must be an array.".into(),
@@ -36,12 +35,11 @@ pub(super) fn map<'gc>(
         }
     };
 
-    let arr = arr.borrow();
     // Create result array
-    let mut result = Vec::with_capacity(arr.len());
+    let mut result = Vec::with_capacity(vec.len());
 
     // Apply function to each element
-    for value in arr.iter() {
+    for value in vec.iter() {
         // Prepare arguments for the function call
         let call_args = vec![*value];
 
@@ -49,7 +47,7 @@ pub(super) fn map<'gc>(
         result.push(state.eval_function(function, &call_args)?);
     }
 
-    Ok(Value::Array(Gc::new(state, RefLock::new(result))))
+    Ok(Value::array(state, result))
 }
 
 pub(super) fn filter<'gc>(
@@ -63,8 +61,8 @@ pub(super) fn filter<'gc>(
     }
 
     // Get the iterable
-    let arr = match &args[0] {
-        Value::Array(arr) => arr,
+    let vec = match &args[0] {
+        Value::List(list) => &list.borrow().data,
         _ => {
             return Err(VmError::RuntimeError(
                 "filter() first argument must be an array.".into(),
@@ -87,12 +85,11 @@ pub(super) fn filter<'gc>(
         }
     };
 
-    let arr = arr.borrow();
     // Create result array
-    let mut result = Vec::with_capacity(arr.len());
+    let mut result = Vec::with_capacity(vec.len());
 
     // Filter elements based on predicate function
-    for value in arr.iter() {
+    for value in vec.iter() {
         // Prepare arguments for the function call
         let call_args = vec![*value];
 
@@ -102,7 +99,7 @@ pub(super) fn filter<'gc>(
         }
     }
 
-    Ok(Value::Array(Gc::new(state, RefLock::new(result))))
+    Ok(Value::array(state, result))
 }
 
 pub(super) fn zip<'gc>(
@@ -119,7 +116,7 @@ pub(super) fn zip<'gc>(
     let mut arrays = Vec::new();
     for arg in &args {
         match arg {
-            Value::Array(arr) => arrays.push(arr),
+            Value::List(list) => arrays.push(list),
             _ => {
                 return Err(VmError::RuntimeError(
                     "zip() arguments must be arrays.".into(),
@@ -131,7 +128,7 @@ pub(super) fn zip<'gc>(
     // Find the length of the shortest array
     let min_len = arrays
         .iter()
-        .map(|arr| arr.borrow().len())
+        .map(|arr| arr.borrow().data.len())
         .min()
         .unwrap_or(0);
 
@@ -142,10 +139,10 @@ pub(super) fn zip<'gc>(
     for i in 0..min_len {
         let mut tuple = Vec::new();
         for arr in arrays.iter() {
-            tuple.push(arr.borrow()[i]);
+            tuple.push(arr.borrow().data[i]);
         }
-        result.push(Value::Array(Gc::new(state, RefLock::new(tuple))));
+        result.push(Value::array(state, tuple));
     }
 
-    Ok(Value::Array(Gc::new(state, RefLock::new(result))))
+    Ok(Value::array(state, result))
 }

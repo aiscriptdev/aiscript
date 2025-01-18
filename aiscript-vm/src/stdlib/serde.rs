@@ -163,8 +163,13 @@ fn to_json_value(value: &Value) -> Result<serde_json::Value, VmError> {
             }
             Ok(serde_json::Value::Object(map))
         }
-        Value::Array(arr) => {
-            let values: Result<Vec<_>, _> = arr.borrow().iter().map(|v| to_json_value(v)).collect();
+        Value::List(list) => {
+            let values: Result<Vec<_>, _> = list
+                .borrow()
+                .data
+                .iter()
+                .map(|v| to_json_value(v))
+                .collect();
             Ok(serde_json::Value::Array(values?))
         }
         Value::Number(n) => Ok(serde_json::Value::Number(

@@ -773,7 +773,7 @@ impl<'gc> State<'gc> {
             OpCode::MakeArray(count) => {
                 let count = count as usize;
                 let elements: Vec<Value<'gc>> = self.pop_stack_n(count);
-                let array = Value::Array(Gc::new(self.mc, RefLock::new(elements)));
+                let array = Value::array(self.mc, elements);
                 self.push_stack(array);
             }
             OpCode::GetIndex => {
@@ -792,12 +792,12 @@ impl<'gc> State<'gc> {
                         let value = obj.borrow().fields.get(&key).copied().unwrap_or_default();
                         self.push_stack(value);
                     }
-                    Value::Array(array) => {
+                    Value::List(list) => {
                         let index = key.as_number().map_err(|_| {
                             self.runtime_error("Array index must be a number.".into())
                         })?;
-                        let array = array.borrow();
-                        let value = array.get(index as usize).copied().unwrap_or(Value::Nil);
+                        let vec = &list.borrow().data;
+                        let value = vec.get(index as usize).copied().unwrap_or(Value::Nil);
                         self.push_stack(value);
                     }
                     Value::Instance(_) => {
@@ -826,16 +826,16 @@ impl<'gc> State<'gc> {
                         // Push value back for assignment expressions
                         self.push_stack(value);
                     }
-                    Value::Array(array) => {
+                    Value::List(list) => {
                         let index = index.as_number().unwrap();
-                        let mut array = array.borrow_mut(self.mc);
                         let index = index as usize;
 
+                        let vec = &mut list.borrow_mut(self.mc).data;
                         // Grow array if needed
-                        if index >= array.len() {
-                            array.resize(index + 1, Value::Nil);
+                        if index >= vec.len() {
+                            vec.resize(index + 1, Value::Nil);
                         }
-                        array[index] = value;
+                        vec[index] = value;
                         self.push_stack(value);
                     }
                     Value::Instance(_) => {
@@ -855,9 +855,9 @@ impl<'gc> State<'gc> {
                 let value = self.pop_stack();
 
                 let result = match target {
-                    Value::Array(array) => {
-                        let array = array.borrow();
-                        array.contains(&value)
+                    Value::List(list) => {
+                        let vec = &list.borrow().data;
+                        vec.contains(&value)
                     }
                     Value::Object(obj) => {
                         let key = value.as_string().map_err(|_| {
@@ -1483,7 +1483,7 @@ impl<'gc> State<'gc> {
             let mut instance = Instance::new(error_class);
             instance.fields.insert(
                 self.intern(b"errors"),
-                Value::Array(Gc::new(self.mc, RefLock::new(validation_errors))),
+                Value::array(self.mc, validation_errors),
             );
             return Ok(CheckArgsResult::ValidationError(Value::Instance(Gc::new(
                 self.mc,

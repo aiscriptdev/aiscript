@@ -55,7 +55,7 @@ fn redis_to_value(ctx: Context, value: RedisValue) -> Value {
         }
         RedisValue::Array(values) => {
             let elements = values.into_iter().map(|v| redis_to_value(ctx, v)).collect();
-            Value::Array(Gc::new(&ctx, RefLock::new(elements)))
+            Value::array(&ctx, elements)
         }
         RedisValue::SimpleString(s) => Value::String(ctx.intern(s.as_bytes())),
         RedisValue::Boolean(b) => Value::Boolean(b),
@@ -80,7 +80,7 @@ fn redis_to_value(ctx: Context, value: RedisValue) -> Value {
         }
         RedisValue::Set(values) => {
             let elements = values.into_iter().map(|v| redis_to_value(ctx, v)).collect();
-            Value::Array(Gc::new(&ctx, RefLock::new(elements)))
+            Value::array(&ctx, elements)
         }
         _ => Value::Nil,
     }
@@ -98,8 +98,8 @@ fn value_to_redis(value: &Value) -> RedisValue {
         }
         Value::String(s) => RedisValue::BulkString(s.as_bytes().to_vec()),
         Value::Boolean(b) => RedisValue::Boolean(*b),
-        Value::Array(arr) => {
-            let values: Vec<RedisValue> = arr.borrow().iter().map(value_to_redis).collect();
+        Value::List(list) => {
+            let values: Vec<RedisValue> = list.borrow().data.iter().map(value_to_redis).collect();
             RedisValue::Array(values)
         }
         Value::Object(obj) => {
@@ -262,7 +262,7 @@ mod pipeline {
         match result {
             Some(Ok(values)) => {
                 let elements = values.into_iter().map(|v| redis_to_value(ctx, v)).collect();
-                Ok(Value::Array(Gc::new(&ctx, RefLock::new(elements))))
+                Ok(Value::array(&ctx, elements))
             }
             Some(Err(e)) => Err(VmError::RuntimeError(format!("Redis error: {}", e))),
             None => Err(VmError::RuntimeError("No active pipeline".into())),
