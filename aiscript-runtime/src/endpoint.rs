@@ -3,6 +3,7 @@ use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     body::Body,
     extract::{self, FromRequest, Request},
+    http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
     Form, Json, RequestExt,
 };
@@ -13,6 +14,7 @@ use axum_extra::{
     },
     TypedHeader,
 };
+use hyper::StatusCode;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
 use serde_json::Value;
 use sqlx::{PgPool, SqlitePool};
@@ -369,7 +371,38 @@ impl Future for RequestProcessor {
                 ProcessingState::Executing(handle) => {
                     return match Pin::new(handle).poll(cx) {
                         Poll::Ready(Ok(result)) => match result {
-                            Ok(value) => Poll::Ready(Ok(Json(value).into_response())),
+                            Ok(value) => {
+                                if let ReturnValue::Response(mut fields) = value {
+                                    let mut response =
+                                        Json(fields.remove("body").unwrap_or_default())
+                                            .into_response();
+                                    *response.status_mut() = StatusCode::from_u16(
+                                        fields
+                                            .remove("status_code")
+                                            .map(|v| v.as_f64().unwrap())
+                                            .unwrap_or(200f64)
+                                            as u16,
+                                    )
+                                    .unwrap();
+                                    if let Some(headers) = fields.remove("headers") {
+                                        response.headers_mut().extend(
+                                            headers.as_object().unwrap().into_iter().map(
+                                                |(name, value)| {
+                                                    (
+                                                        HeaderName::try_from(name).unwrap(),
+                                                        HeaderValue::from_str(&value.to_string())
+                                                            .unwrap(),
+                                                    )
+                                                },
+                                            ),
+                                        );
+                                    }
+
+                                    Poll::Ready(Ok(response))
+                                } else {
+                                    Poll::Ready(Ok(Json(value).into_response()))
+                                }
+                            }
                             Err(VmError::CompileError) => {
                                 Poll::Ready(Ok("Compile Error".into_response()))
                             }

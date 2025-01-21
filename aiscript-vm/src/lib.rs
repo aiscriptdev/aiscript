@@ -88,6 +88,7 @@ pub enum ReturnValue {
     String(String),
     Array(Vec<serde_json::Value>),
     Object(HashMap<String, serde_json::Value>),
+    Response(HashMap<String, serde_json::Value>),
     Agent(String), // agent name
     Nil,
 }
@@ -117,7 +118,7 @@ impl Serialize for ReturnValue {
                 }
                 s.end()
             }
-            ReturnValue::Object(obj) => {
+            ReturnValue::Object(obj) | ReturnValue::Response(obj) => {
                 let mut s = serializer.serialize_map(Some(obj.len()))?;
                 for (key, value) in obj {
                     s.serialize_entry(key, value)?;
@@ -147,7 +148,9 @@ impl Display for ReturnValue {
             }
             Self::Boolean(b) => write!(f, "{b}"),
             Self::Agent(name) => write!(f, "{name}"),
-            Self::Object(obj) => write!(f, "{}", serde_json::to_string(obj).unwrap()),
+            Self::Object(obj) | Self::Response(obj) => {
+                write!(f, "{}", serde_json::to_string(obj).unwrap())
+            }
             Self::Nil => write!(f, ""),
         }
     }
@@ -168,14 +171,27 @@ impl<'gc> From<Value<'gc>> for ReturnValue {
                     .map(|item| item.to_serde_value())
                     .collect::<Vec<_>>(),
             ),
-            Value::Instance(instance) => ReturnValue::Object(
-                instance
-                    .borrow()
-                    .fields
-                    .iter()
-                    .map(|(key, value)| (key.to_string(), value.to_serde_value()))
-                    .collect(),
-            ),
+            Value::Instance(instance) => {
+                if instance.borrow().class.borrow().name.to_str().unwrap() == "Response" {
+                    return ReturnValue::Response(
+                        instance
+                            .borrow()
+                            .fields
+                            .iter()
+                            .map(|(key, value)| (key.to_string(), value.to_serde_value()))
+                            .collect(),
+                    );
+                } else {
+                    ReturnValue::Object(
+                        instance
+                            .borrow()
+                            .fields
+                            .iter()
+                            .map(|(key, value)| (key.to_string(), value.to_serde_value()))
+                            .collect(),
+                    )
+                }
+            }
             Value::Object(obj) => ReturnValue::Object(
                 obj.borrow()
                     .fields
