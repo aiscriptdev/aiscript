@@ -347,6 +347,7 @@ impl Future for RequestProcessor {
                             if let Some(fields) = sso_fields {
                                 vm.inject_sso_instance(fields);
                             }
+                            vm.register_extra_native_functions();
                             vm.compile(script)?;
                             vm.eval_function(
                                 0,

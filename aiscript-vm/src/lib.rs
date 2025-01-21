@@ -92,6 +92,15 @@ pub enum ReturnValue {
     Nil,
 }
 
+impl ReturnValue {
+    pub fn as_object(&self) -> Option<&HashMap<String, serde_json::Value>> {
+        match self {
+            Self::Object(obj) => Some(obj),
+            _ => None,
+        }
+    }
+}
+
 impl Serialize for ReturnValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -117,15 +126,6 @@ impl Serialize for ReturnValue {
             }
             ReturnValue::Agent(name) => serializer.serialize_str(name),
             ReturnValue::Nil => serializer.serialize_none(),
-        }
-    }
-}
-
-impl ReturnValue {
-    pub fn as_object(&self) -> Option<HashMap<String, serde_json::Value>> {
-        match self {
-            Self::Object(obj) => Some(obj.clone()),
-            _ => None,
         }
     }
 }

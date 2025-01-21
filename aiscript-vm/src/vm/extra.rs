@@ -3,13 +3,35 @@ use std::collections::HashMap;
 use gc_arena::{Gc, RefLock};
 
 use crate::{
+    builtins::response,
     object::{Instance, Object},
-    Value,
+    NativeFn, ReturnValue, Value,
 };
 
 use super::Vm;
 
 impl Vm {
+    pub fn get_global(&mut self, name: &'static str) -> Option<ReturnValue> {
+        self.arena.mutate_root(|_mc, state| {
+            let name = state.intern_static(name);
+            state.globals.get(&name).copied().map(ReturnValue::from)
+        })
+    }
+
+    pub fn register_extra_native_functions(&mut self) {
+        self.arena.mutate_root(|_mc, state| {
+            state.define_native_function("response", NativeFn(response::response));
+            state.define_native_function(
+                "temporary_redirect",
+                NativeFn(response::temporary_redirect),
+            );
+            state.define_native_function(
+                "permanent_redirect",
+                NativeFn(response::permanent_redirect),
+            );
+        });
+    }
+
     pub fn inject_sso_instance<K>(&mut self, fields: HashMap<K, serde_json::Value>)
     where
         K: AsRef<str> + Eq,
@@ -30,9 +52,7 @@ impl Vm {
                 .insert(name, Gc::new(mc, RefLock::new(instance)).into());
         });
     }
-}
 
-impl Vm {
     pub fn inject_variables(&mut self, variables: HashMap<String, serde_json::Value>) {
         self.arena.mutate_root(|_mc, state| {
             let ctx = state.get_context();
