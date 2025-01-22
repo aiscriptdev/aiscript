@@ -215,6 +215,15 @@ impl<'gc> Value<'gc> {
         }
     }
 
+    pub fn as_array(self) -> Result<GcRefLock<'gc, List<'gc>>, VmError> {
+        match self {
+            Value::List(list) => Ok(list),
+            v => Err(VmError::RuntimeError(format!(
+                "cannot convert to array, the value is {v}"
+            ))),
+        }
+    }
+
     pub fn as_agent(self) -> Result<Gc<'gc, Agent<'gc>>, VmError> {
         match self {
             Value::Agent(agent) => Ok(agent),
@@ -305,7 +314,14 @@ impl<'gc> Value<'gc> {
                     .collect();
                 Value::Object(Gc::new(&ctx, RefLock::new(Object { fields })))
             }
-            _ => Value::Nil,
+            serde_json::Value::Array(array) => {
+                let data = array
+                    .iter()
+                    .map(|value| Value::from_serde_value(ctx, value))
+                    .collect();
+                Value::array(&ctx, data)
+            }
+            serde_json::Value::Null => Value::Nil,
         }
     }
 

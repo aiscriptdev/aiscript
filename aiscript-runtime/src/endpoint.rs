@@ -391,7 +391,7 @@ impl Future for RequestProcessor {
                                                     (
                                                         HeaderName::try_from(name).unwrap(),
                                                         HeaderValue::from_str(
-                                                            &value.as_str().unwrap(),
+                                                            value.as_str().unwrap(),
                                                         )
                                                         .unwrap(),
                                                     )

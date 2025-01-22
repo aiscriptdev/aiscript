@@ -7,7 +7,7 @@ use crate::{
 use gc_arena::{Gc, GcRefLock, RefLock};
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
-    RedirectUrl, TokenUrl,
+    RedirectUrl, Scope, TokenUrl,
 };
 
 pub fn create_sso_provider_class(ctx: Context) -> GcRefLock<'_, Class> {
@@ -49,42 +49,47 @@ fn authority_url<'gc>(
     _args: Vec<Value<'gc>>,
 ) -> Result<Value<'gc>, VmError> {
     if let Value::Instance(receiver) = state.peek(0) {
-        let fieds = &receiver.borrow().fields;
-        let client_id = fieds
+        let fields = &receiver.borrow().fields;
+        let client_id = fields
             .get(&state.intern_static("client_id"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let client_secret = fieds
+        let client_secret = fields
             .get(&state.intern_static("client_secret"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let auth_url = fieds
+        let auth_url = fields
             .get(&state.intern_static("auth_url"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let token_url = fieds
+        let token_url = fields
             .get(&state.intern_static("token_url"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let redirect_url = fieds
+        let redirect_url = fields
             .get(&state.intern_static("redirect_url"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        // let http_client = reqwest::ClientBuilder::new()
-        //     // Following redirects opens the client up to SSRF vulnerabilities.
-        //     .redirect(reqwest::redirect::Policy::none())
-        //     .build()
-        //     .expect("Client should build");
+        let scopes = fields
+            .get(&state.intern_static("scopes"))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .borrow()
+            .data
+            .iter()
+            .map(|scope| Scope::new(scope.as_string().unwrap().to_string()))
+            .collect::<Vec<_>>();
 
         // Generate the authorization URL to which we'll redirect the user.
         let (authorize_url, _csrf_state) = get_client(
@@ -95,9 +100,7 @@ fn authority_url<'gc>(
             &redirect_url,
         )
         .authorize_url(CsrfToken::new_random)
-        // This example is requesting access to the user's public repos and email.
-        // .add_scope(Scope::new("public_repo".to_string()))
-        // .add_scope(Scope::new("user:email".to_string()))
+        .add_scopes(scopes)
         .url();
 
         Ok(Value::String(
