@@ -100,10 +100,9 @@ fn authority_url<'gc>(
         // .add_scope(Scope::new("user:email".to_string()))
         .url();
 
-        Ok(Value::IoString(Gc::new(
-            &state.get_context(),
-            authorize_url.to_string(),
-        )))
+        Ok(Value::String(
+            state.intern(authorize_url.as_str().as_bytes()),
+        ))
     } else {
         Err(VmError::RuntimeError("Invalid receiver".into()))
     }
