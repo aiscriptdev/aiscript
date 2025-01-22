@@ -33,7 +33,7 @@ struct Local<'gc> {
     mutability: Mutability,
 }
 
-impl<'gc> Local<'gc> {
+impl Local<'_> {
     fn is_initialized(&self) -> bool {
         self.depth != UNINITIALIZED_LOCAL_DEPTH
     }

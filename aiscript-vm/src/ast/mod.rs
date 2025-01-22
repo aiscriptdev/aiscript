@@ -41,7 +41,7 @@ pub enum Literal<'gc> {
     Nil,
 }
 
-impl<'gc> Display for Literal<'gc> {
+impl Display for Literal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Literal::Number(n) => write!(f, "{n}"),
@@ -125,7 +125,7 @@ pub struct ParameterDecl<'gc> {
     pub validators: Vec<Box<dyn Validator>>,
 }
 
-impl<'gc> std::fmt::Debug for ParameterDecl<'gc> {
+impl std::fmt::Debug for ParameterDecl<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Parameter")
             .field("name", &self.name)
@@ -219,7 +219,7 @@ pub enum MatchPattern<'gc> {
     Wildcard,
 }
 
-impl<'gc> MatchPattern<'gc> {
+impl MatchPattern<'_> {
     pub fn is_variable_pattern(&self) -> bool {
         matches!(self, Self::Variable { .. })
     }
@@ -361,7 +361,7 @@ pub enum Expr<'gc> {
     },
 }
 
-impl<'gc> Expr<'gc> {
+impl Expr<'_> {
     pub fn line(&self) -> u32 {
         match self {
             Self::EnvLookup { line, .. }
@@ -453,7 +453,7 @@ pub enum Stmt<'gc> {
     Agent(AgentDecl<'gc>),
 }
 
-impl<'gc> Stmt<'gc> {
+impl Stmt<'_> {
     pub fn line(&self) -> u32 {
         match self {
             Self::Use { line, .. }
@@ -477,7 +477,7 @@ impl<'gc> Stmt<'gc> {
 }
 
 // Implement PartialEq manually to handle float comparison
-impl<'gc> PartialEq for Literal<'gc> {
+impl PartialEq for Literal<'_> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Literal::Number(a), Literal::Number(b)) => (a - b).abs() < f64::EPSILON,
@@ -490,10 +490,10 @@ impl<'gc> PartialEq for Literal<'gc> {
 }
 
 // Implement Eq after ensuring PartialEq handles float comparison correctly
-impl<'gc> Eq for Literal<'gc> {}
+impl Eq for Literal<'_> {}
 
 // Implement Hash to match our Eq implementation
-impl<'gc> std::hash::Hash for Literal<'gc> {
+impl std::hash::Hash for Literal<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
             Literal::Number(n) => {
@@ -512,7 +512,7 @@ pub struct Program<'gc> {
     pub statements: Vec<Stmt<'gc>>,
 }
 
-impl<'gc> Program<'gc> {
+impl Program<'_> {
     pub fn new() -> Self {
         Self {
             statements: Vec::new(),

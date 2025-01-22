@@ -32,7 +32,7 @@ mod tests {
                     return a + b;
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse().unwrap();
             let Stmt::Function(FunctionDecl {
                 name,
@@ -110,7 +110,7 @@ mod tests {
                     tool_choice: "auto",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse().unwrap();
             let Stmt::Agent(AgentDecl {
                 name, fields, line, ..
@@ -134,7 +134,7 @@ mod tests {
                     tool_choice: "auto",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse();
             assert!(result.is_err());
             let source = r#"
@@ -142,7 +142,7 @@ mod tests {
                     instructions: "Test instruction.",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse().unwrap();
             let Stmt::Agent(AgentDecl { name, fields, .. }) = &result.statements[0] else {
                 panic!("Expected agent statement");
@@ -158,7 +158,7 @@ mod tests {
                     tool_choice: "auto",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse();
             assert!(result.is_err());
 
@@ -170,7 +170,7 @@ mod tests {
                     tool_choice: "auto",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse();
             assert!(result.is_err());
 
@@ -181,7 +181,7 @@ mod tests {
                     tool_choice: "auto",
                 }
             "#;
-            let mut parser = Parser::new(context, &source);
+            let mut parser = Parser::new(context, source);
             let result = parser.parse();
             assert!(result.is_err());
         });

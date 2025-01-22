@@ -35,13 +35,13 @@ pub enum Value<'gc> {
     Nil,
 }
 
-impl<'gc> PartialEq for Value<'gc> {
+impl PartialEq for Value<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.equals(other)
     }
 }
 
-impl<'gc> Display for Value<'gc> {
+impl Display for Value<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Number(v) => write!(f, "{}", v),
@@ -358,7 +358,7 @@ impl<'gc> Value<'gc> {
 }
 
 // Implementations for Enum and EnumVariant
-impl<'gc> Value<'gc> {
+impl Value<'_> {
     pub fn is_enum(&self) -> bool {
         matches!(self, Value::Enum(_))
     }
@@ -368,19 +368,19 @@ impl<'gc> Value<'gc> {
     }
 }
 
-impl<'gc> From<u64> for Value<'gc> {
+impl From<u64> for Value<'_> {
     fn from(value: u64) -> Self {
         Value::Number(value as f64)
     }
 }
 
-impl<'gc> From<f64> for Value<'gc> {
+impl From<f64> for Value<'_> {
     fn from(value: f64) -> Self {
         Value::Number(value)
     }
 }
 
-impl<'gc> From<bool> for Value<'gc> {
+impl From<bool> for Value<'_> {
     fn from(value: bool) -> Self {
         Value::Boolean(value)
     }

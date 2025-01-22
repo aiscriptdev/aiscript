@@ -168,13 +168,13 @@ fn str_hash(s: &[u8]) -> u64 {
     state.finish()
 }
 
-impl<'gc> fmt::Display for InternedString<'gc> {
+impl fmt::Display for InternedString<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}", self.display_lossy())
     }
 }
 
-impl<'gc> fmt::Debug for InternedString<'gc> {
+impl fmt::Debug for InternedString<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "String({:?})", self.debug_lossy())
     }
@@ -205,7 +205,7 @@ impl<'gc> InternedString<'gc> {
     }
 }
 
-impl<'gc> ops::Deref for InternedString<'gc> {
+impl ops::Deref for InternedString<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &[u8] {
@@ -213,13 +213,13 @@ impl<'gc> ops::Deref for InternedString<'gc> {
     }
 }
 
-impl<'gc> AsRef<[u8]> for InternedString<'gc> {
+impl AsRef<[u8]> for InternedString<'_> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl<'gc, T> PartialEq<T> for InternedString<'gc>
+impl<T> PartialEq<T> for InternedString<'_>
 where
     T: ?Sized + AsRef<[u8]>,
 {
@@ -228,9 +228,9 @@ where
     }
 }
 
-impl<'gc> Eq for InternedString<'gc> {}
+impl Eq for InternedString<'_> {}
 
-impl<'gc> Hash for InternedString<'gc> {
+impl Hash for InternedString<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.stored_hash())
     }
@@ -244,7 +244,7 @@ struct InternedDynStringsInner<'gc>(
 #[collect(no_drop)]
 struct InternedDynStrings<'gc>(Gc<'gc, InternedDynStringsInner<'gc>>);
 
-unsafe impl<'gc> Collect for InternedDynStringsInner<'gc> {
+unsafe impl Collect for InternedDynStringsInner<'_> {
     fn trace(&self, cc: &Collection) {
         // SAFETY: No new Gc pointers are adopted or reparented.
         let mut dyn_strings = unsafe { self.0.unlock_unchecked() }.borrow_mut();

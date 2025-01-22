@@ -17,7 +17,7 @@ impl<'a> Deref for Parser<'a> {
     }
 }
 
-impl<'a> DerefMut for Parser<'a> {
+impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.scanner
     }

@@ -29,7 +29,7 @@ fn write_error_handler(f: &mut String, handler: &ErrorHandler<'_>, level: usize)
     }
 }
 
-impl<'gc> Program<'gc> {
+impl Program<'_> {
     pub fn pretty_print(&self) -> String {
         let mut output = String::from("AST:\n");
         self.fmt_with_indent(&mut output, 0);
@@ -44,7 +44,7 @@ impl<'gc> Program<'gc> {
     }
 }
 
-impl<'gc> Stmt<'gc> {
+impl Stmt<'_> {
     fn fmt_with_indent(&self, f: &mut String, level: usize) {
         let ind = indent(level);
         match self {
@@ -180,7 +180,7 @@ impl<'gc> Stmt<'gc> {
     }
 }
 
-impl<'gc> Expr<'gc> {
+impl Expr<'_> {
     fn fmt_with_indent(&self, f: &mut String, level: usize) {
         let ind = indent(level);
         match self {
@@ -381,7 +381,7 @@ impl<'gc> Expr<'gc> {
 }
 
 // For easier printing in debug scenarios
-impl<'gc> fmt::Display for Program<'gc> {
+impl fmt::Display for Program<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.pretty_print())
     }

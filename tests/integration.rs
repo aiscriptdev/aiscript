@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::{env, fs, process::Command};
 
 use regex::Regex;
-use test_generator;
 
 use test_generator::test_resources;
 

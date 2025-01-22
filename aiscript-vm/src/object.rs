@@ -89,7 +89,7 @@ pub struct UpvalueObj<'gc> {
     pub next: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
 }
 
-impl<'gc> Default for UpvalueObj<'gc> {
+impl Default for UpvalueObj<'_> {
     fn default() -> Self {
         Self::new(0)
     }
@@ -148,7 +148,7 @@ pub struct Upvalue {
     pub is_local: bool,
 }
 
-impl<'gc> Display for Function<'gc> {
+impl Display for Function<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = self.name {
             write!(f, "<fn {}>", name)
@@ -290,7 +290,7 @@ impl<'gc> BoundMethod<'gc> {
     }
 }
 
-impl<'gc> UpvalueObj<'gc> {
+impl UpvalueObj<'_> {
     pub fn new(location: usize) -> Self {
         Self {
             location,
@@ -336,7 +336,7 @@ impl<'gc> Deref for Function<'gc> {
     }
 }
 
-impl<'gc> DerefMut for Function<'gc> {
+impl DerefMut for Function<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.chunk
     }

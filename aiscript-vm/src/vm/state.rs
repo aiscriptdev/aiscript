@@ -112,7 +112,7 @@ pub struct State<'gc> {
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
 }
 
-unsafe impl<'gc> Collect for State<'gc> {
+unsafe impl Collect for State<'_> {
     fn needs_trace() -> bool
     where
         Self: Sized,

@@ -43,7 +43,7 @@ pub(crate) struct TypeResolver<'gc> {
     class_info: HashMap<&'gc str, ClassInfo<'gc>>,
 }
 
-impl<'gc> Default for TypeResolver<'gc> {
+impl Default for TypeResolver<'_> {
     fn default() -> Self {
         Self::new()
     }

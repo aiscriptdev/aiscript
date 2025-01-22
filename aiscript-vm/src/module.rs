@@ -70,7 +70,7 @@ pub struct ModuleManager<'gc> {
     search_paths: Vec<PathBuf>,
 }
 
-impl<'gc> Default for ModuleManager<'gc> {
+impl Default for ModuleManager<'_> {
     fn default() -> Self {
         Self::new()
     }

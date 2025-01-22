@@ -145,13 +145,13 @@ pub struct Chunk<'gc> {
     pub(crate) lines: Vec<u32>,
 }
 
-impl<'gc> Default for Chunk<'gc> {
+impl Default for Chunk<'_> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'gc> Index<usize> for Chunk<'gc> {
+impl Index<usize> for Chunk<'_> {
     type Output = OpCode;
     fn index(&self, index: usize) -> &Self::Output {
         // &self.code[index]
@@ -159,7 +159,7 @@ impl<'gc> Index<usize> for Chunk<'gc> {
     }
 }
 
-impl<'gc> IndexMut<usize> for Chunk<'gc> {
+impl IndexMut<usize> for Chunk<'_> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         // &mut self.code[index]
         unsafe { self.code.get_unchecked_mut(index) }

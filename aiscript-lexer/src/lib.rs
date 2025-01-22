@@ -229,7 +229,7 @@ pub struct Scanner<'a> {
     pub previous: Token<'a>,
 }
 
-impl<'a> Deref for Scanner<'a> {
+impl Deref for Scanner<'_> {
     type Target = ErrorReporter;
 
     fn deref(&self) -> &Self::Target {
@@ -237,7 +237,7 @@ impl<'a> Deref for Scanner<'a> {
     }
 }
 
-impl<'a> DerefMut for Scanner<'a> {
+impl DerefMut for Scanner<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.error_reporter
     }
@@ -664,7 +664,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl<'a> Lexer<'a> {
+impl Lexer<'_> {
     fn read_raw_script(&mut self) -> Result<String, String> {
         let mut script = String::new();
         let mut brace_count = 1;

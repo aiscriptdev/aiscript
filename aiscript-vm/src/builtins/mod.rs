@@ -30,7 +30,7 @@ pub(crate) struct BuiltinMethods<'gc> {
     string: HashMap<InternedString<'gc>, BuiltinMethod<'gc>>,
 }
 
-impl<'gc> Default for BuiltinMethods<'gc> {
+impl Default for BuiltinMethods<'_> {
     fn default() -> Self {
         Self::new()
     }

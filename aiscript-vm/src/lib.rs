@@ -59,7 +59,7 @@ impl<'gc> Deref for BuiltinMethod<'gc> {
     }
 }
 
-unsafe impl<'gc> Collect for NativeFn<'gc> {
+unsafe impl Collect for NativeFn<'_> {
     fn needs_trace() -> bool
     where
         Self: Sized,
@@ -70,7 +70,7 @@ unsafe impl<'gc> Collect for NativeFn<'gc> {
     fn trace(&self, _cc: &gc_arena::Collection) {}
 }
 
-unsafe impl<'gc> Collect for BuiltinMethod<'gc> {
+unsafe impl Collect for BuiltinMethod<'_> {
     fn needs_trace() -> bool
     where
         Self: Sized,
