@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::{
     object::Class,
     value::Value,
@@ -36,27 +38,16 @@ type SsoProviderClient<
     HasTokenUrl = EndpointSet,
 > = BasicClient<HasAuthUrl, HasDeviceAuthUrl, HasIntrospectionUrl, HasRevocationUrl, HasTokenUrl>;
 
-fn get_client(
-    client_id: &str,
-    client_secret: &str,
-    auth_url: &str,
-    token_url: &str,
-    redirect_url: &str,
-) -> SsoProviderClient {
-    let auth_url = AuthUrl::new(auth_url.to_owned()).expect("Invalid authorization endpoint URL");
-    let token_url = TokenUrl::new(token_url.to_owned()).expect("Invalid token endpoint URL");
-
-    BasicClient::new(ClientId::new(client_id.to_owned()))
-        .set_client_secret(ClientSecret::new(client_secret.to_owned()))
-        .set_auth_uri(auth_url)
-        .set_token_uri(token_url)
-        .set_redirect_uri(RedirectUrl::new(redirect_url.to_owned()).expect("Invalid redirect URL"))
+struct AuthFields {
+    client_id: String,
+    client_secret: String,
+    auth_url: String,
+    token_url: String,
+    redirect_url: String,
+    scopes: Vec<Scope>,
 }
 
-fn authority_url<'gc>(
-    state: &mut State<'gc>,
-    _args: Vec<Value<'gc>>,
-) -> Result<Value<'gc>, VmError> {
+fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
     if let Value::Instance(receiver) = state.peek(0) {
         let fields = &receiver.borrow().fields;
         let client_id = fields
@@ -100,24 +91,45 @@ fn authority_url<'gc>(
             .map(|scope| Scope::new(scope.as_string().unwrap().to_string()))
             .collect::<Vec<_>>();
 
-        // Generate the authorization URL to which we'll redirect the user.
-        let (authorize_url, _csrf_state) = get_client(
-            &client_id,
-            &client_secret,
-            &auth_url,
-            &token_url,
-            &redirect_url,
-        )
+        Ok(AuthFields {
+            client_id,
+            client_secret,
+            auth_url,
+            token_url,
+            redirect_url,
+            scopes,
+        })
+    } else {
+        Err(VmError::RuntimeError("Invalid receiver".into()))
+    }
+}
+
+fn get_client(fields: AuthFields) -> SsoProviderClient {
+    let auth_url = AuthUrl::new(fields.auth_url).expect("Invalid authorization endpoint URL");
+    let token_url = TokenUrl::new(fields.token_url).expect("Invalid token endpoint URL");
+
+    BasicClient::new(ClientId::new(fields.client_id))
+        .set_client_secret(ClientSecret::new(fields.client_secret))
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(RedirectUrl::new(fields.redirect_url).expect("Invalid redirect URL"))
+}
+
+fn authority_url<'gc>(
+    state: &mut State<'gc>,
+    _args: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError> {
+    let mut fields = parse_auth_fields(state)?;
+    let scopes = mem::take(&mut fields.scopes);
+    // Generate the authorization URL to which we'll redirect the user.
+    let (authorize_url, _csrf_state) = get_client(fields)
         .authorize_url(CsrfToken::new_random)
         .add_scopes(scopes)
         .url();
 
-        Ok(Value::String(
-            state.intern(authorize_url.as_str().as_bytes()),
-        ))
-    } else {
-        Err(VmError::RuntimeError("Invalid receiver".into()))
-    }
+    Ok(Value::String(
+        state.intern(authorize_url.as_str().as_bytes()),
+    ))
 }
 
 fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc>, VmError> {
@@ -149,66 +161,26 @@ fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
     let code = code
         .ok_or_else(|| VmError::RuntimeError("verify() requires 'code' keyword argument".into()))?;
 
-    if let Value::Instance(receiver) = state.peek(0) {
-        let fields = &receiver.borrow().fields;
-        let client_id = fields
-            .get(&state.intern_static("client_id"))
-            .unwrap()
-            .as_string()
-            .unwrap()
-            .to_string();
-        let client_secret = fields
-            .get(&state.intern_static("client_secret"))
-            .unwrap()
-            .as_string()
-            .unwrap()
-            .to_string();
-        let auth_url = fields
-            .get(&state.intern_static("auth_url"))
-            .unwrap()
-            .as_string()
-            .unwrap()
-            .to_string();
-        let token_url = fields
-            .get(&state.intern_static("token_url"))
-            .unwrap()
-            .as_string()
-            .unwrap()
-            .to_string();
-        let redirect_url = fields
-            .get(&state.intern_static("redirect_url"))
-            .unwrap()
-            .as_string()
-            .unwrap()
-            .to_string();
+    let fields = parse_auth_fields(state)?;
 
-        let http_client = reqwest::ClientBuilder::new()
-            // Following redirects opens the client up to SSRF vulnerabilities.
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .expect("Client should build");
+    let http_client = reqwest::ClientBuilder::new()
+        // Following redirects opens the client up to SSRF vulnerabilities.
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("Client should build");
 
-        let token = match Handle::current().block_on(async {
-            get_client(
-                &client_id,
-                &client_secret,
-                &auth_url,
-                &token_url,
-                &redirect_url,
-            )
+    let token = match Handle::current().block_on(async {
+        get_client(fields)
             .exchange_code(AuthorizationCode::new(code.to_string()))
             .request_async(&http_client)
             .await
-        }) {
-            Ok(token) => token,
-            Err(err) => return Err(VmError::RuntimeError(err.to_string())),
-        };
+    }) {
+        Ok(token) => token,
+        Err(err) => return Err(VmError::RuntimeError(err.to_string())),
+    };
 
-        Ok(Value::IoString(Gc::new(
-            state,
-            token.access_token().secret().to_owned(),
-        )))
-    } else {
-        Err(VmError::RuntimeError("Invalid receiver".into()))
-    }
+    Ok(Value::IoString(Gc::new(
+        state,
+        token.access_token().secret().to_owned(),
+    )))
 }
