@@ -40,7 +40,7 @@ impl FormatSpec {
             // Parse fill and align
             let mut next = chars.peek().copied();
             if let Some(c) = next {
-                if chars.clone().nth(1).map_or(false, |n| "<>^".contains(n)) {
+                if chars.clone().nth(1).is_some_and(|n| "<>^".contains(n)) {
                     result.fill = Some(c);
                     chars.next();
                     next = chars.peek().copied();
