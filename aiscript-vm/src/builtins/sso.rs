@@ -43,6 +43,7 @@ struct AuthFields {
     client_secret: String,
     auth_url: String,
     token_url: String,
+    userinfo_url: String,
     redirect_url: String,
     scopes: Vec<Scope>,
 }
@@ -74,6 +75,12 @@ fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
             .as_string()
             .unwrap()
             .to_string();
+        let userinfo_url = fields
+            .get(&state.intern_static("userinfo_url"))
+            .unwrap()
+            .as_string()
+            .unwrap()
+            .to_string();
         let redirect_url = fields
             .get(&state.intern_static("redirect_url"))
             .unwrap()
@@ -96,6 +103,7 @@ fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
             client_secret,
             auth_url,
             token_url,
+            userinfo_url,
             redirect_url,
             scopes,
         })
@@ -161,7 +169,8 @@ fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
     let code = code
         .ok_or_else(|| VmError::RuntimeError("verify() requires 'code' keyword argument".into()))?;
 
-    let fields = parse_auth_fields(state)?;
+    let mut fields = parse_auth_fields(state)?;
+    let userinfo_url = mem::take(&mut fields.userinfo_url);
 
     let http_client = reqwest::ClientBuilder::new()
         // Following redirects opens the client up to SSRF vulnerabilities.
@@ -169,18 +178,32 @@ fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
         .build()
         .expect("Client should build");
 
-    let token = match Handle::current().block_on(async {
-        get_client(fields)
+    Handle::current().block_on(async {
+        let token = get_client(fields)
             .exchange_code(AuthorizationCode::new(code.to_string()))
             .request_async(&http_client)
             .await
-    }) {
-        Ok(token) => token,
-        Err(err) => return Err(VmError::RuntimeError(err.to_string())),
-    };
+            .map_err(|err| VmError::RuntimeError(err.to_string()))?;
+        let access_token = token.access_token().secret().to_owned();
 
-    Ok(Value::IoString(Gc::new(
-        state,
-        token.access_token().secret().to_owned(),
-    )))
+        let response = http_client
+            .get(userinfo_url)
+            .header("Authorization", format!("Bearer {}", access_token))
+            .send()
+            .await
+            .map_err(|err| VmError::RuntimeError(err.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(VmError::RuntimeError(format!(
+                "Failed to fetch user info: {}",
+                response.status()
+            )));
+        }
+
+        let info = response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|err| VmError::RuntimeError(err.to_string()))?;
+        Ok(Value::from_serde_value(state.get_context(), &info))
+    })
 }

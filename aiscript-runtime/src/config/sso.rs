@@ -33,6 +33,10 @@ fn sso_extra_fields(provider: SsoProvider) -> HashMap<&'static str, serde_json::
                 "token_url",
                 "https://graph.facebook.com/v19.0/oauth/access_token".into(),
             ),
+            (
+                "userinfo_url",
+                "https://graph.facebook.com/v19.0/me?fields=id,name,email,first_name,last_name,picture".into(),
+            ),
         ]
         .into_iter()
         .collect(),
@@ -45,12 +49,17 @@ fn sso_extra_fields(provider: SsoProvider) -> HashMap<&'static str, serde_json::
                 "token_url",
                 "https://www.googleapis.com/oauth2/v3/token".into(),
             ),
+            (
+                "userinfo_url",
+                "https://openidconnect.googleapis.com/v1/userinfo".into(),
+            ),
         ]
         .into_iter()
         .collect(),
         SsoProvider::Discord => [
             ("auth_url", "https://discord.com/oauth2/authorize".into()),
             ("token_url", "https://discord.com/api/oauth2/token".into()),
+            ("userinfo_url", "https://discord.com/api/users/@me".into()),
         ]
         .into_iter()
         .collect(),
@@ -63,6 +72,7 @@ fn sso_extra_fields(provider: SsoProvider) -> HashMap<&'static str, serde_json::
                 "token_url",
                 "https://github.com/login/oauth/access_token".into(),
             ),
+            ("userinfo_url", "https://api.github.com/user".into()),
         ]
         .into_iter()
         .collect(),
