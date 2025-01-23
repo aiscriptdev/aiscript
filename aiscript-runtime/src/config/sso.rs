@@ -26,15 +26,15 @@ fn sso_extra_fields(provider: SsoProvider) -> HashMap<&'static str, serde_json::
     match provider {
         SsoProvider::Facebook => [
             (
-                "auth_url",
+                "auth_endpoint",
                 "https://www.facebook.com/v9.0/dialog/oauth".into(),
             ),
             (
-                "token_url",
+                "token_endpoint",
                 "https://graph.facebook.com/v19.0/oauth/access_token".into(),
             ),
             (
-                "userinfo_url",
+                "userinfo_endpoint",
                 "https://graph.facebook.com/v19.0/me?fields=id,name,email,first_name,last_name,picture".into(),
             ),
         ]
@@ -42,37 +42,37 @@ fn sso_extra_fields(provider: SsoProvider) -> HashMap<&'static str, serde_json::
         .collect(),
         SsoProvider::Google => [
             (
-                "auth_url",
+                "auth_endpoint",
                 "https://accounts.google.com/o/oauth2/v2/auth".into(),
             ),
             (
-                "token_url",
+                "token_endpoint",
                 "https://www.googleapis.com/oauth2/v3/token".into(),
             ),
             (
-                "userinfo_url",
+                "userinfo_endpoint",
                 "https://openidconnect.googleapis.com/v1/userinfo".into(),
             ),
         ]
         .into_iter()
         .collect(),
         SsoProvider::Discord => [
-            ("auth_url", "https://discord.com/oauth2/authorize".into()),
-            ("token_url", "https://discord.com/api/oauth2/token".into()),
-            ("userinfo_url", "https://discord.com/api/users/@me".into()),
+            ("auth_endpoint", "https://discord.com/oauth2/authorize".into()),
+            ("token_endpoint", "https://discord.com/api/oauth2/token".into()),
+            ("userinfo_endpoint", "https://discord.com/api/users/@me".into()),
         ]
         .into_iter()
         .collect(),
         SsoProvider::GitHub => [
             (
-                "auth_url",
+                "auth_endpoint",
                 "https://github.com/login/oauth/authorize".into(),
             ),
             (
-                "token_url",
+                "token_endpoint",
                 "https://github.com/login/oauth/access_token".into(),
             ),
-            ("userinfo_url", "https://api.github.com/user".into()),
+            ("userinfo_endpoint", "https://api.github.com/user".into()),
         ]
         .into_iter()
         .collect(),

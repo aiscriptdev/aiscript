@@ -41,9 +41,9 @@ type SsoProviderClient<
 struct AuthFields {
     client_id: String,
     client_secret: String,
-    auth_url: String,
-    token_url: String,
-    userinfo_url: String,
+    auth_endpoint: String,
+    token_endpoint: String,
+    userinfo_endpoint: String,
     redirect_url: String,
     scopes: Vec<Scope>,
 }
@@ -63,20 +63,20 @@ fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
             .as_string()
             .unwrap()
             .to_string();
-        let auth_url = fields
-            .get(&state.intern_static("auth_url"))
+        let auth_endpoint = fields
+            .get(&state.intern_static("auth_endpoint"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let token_url = fields
-            .get(&state.intern_static("token_url"))
+        let token_endpoint = fields
+            .get(&state.intern_static("token_endpoint"))
             .unwrap()
             .as_string()
             .unwrap()
             .to_string();
-        let userinfo_url = fields
-            .get(&state.intern_static("userinfo_url"))
+        let userinfo_endpoint = fields
+            .get(&state.intern_static("userinfo_endpoint"))
             .unwrap()
             .as_string()
             .unwrap()
@@ -101,9 +101,9 @@ fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
         Ok(AuthFields {
             client_id,
             client_secret,
-            auth_url,
-            token_url,
-            userinfo_url,
+            auth_endpoint,
+            token_endpoint,
+            userinfo_endpoint,
             redirect_url,
             scopes,
         })
@@ -113,13 +113,14 @@ fn parse_auth_fields(state: &mut State<'_>) -> Result<AuthFields, VmError> {
 }
 
 fn get_client(fields: AuthFields) -> SsoProviderClient {
-    let auth_url = AuthUrl::new(fields.auth_url).expect("Invalid authorization endpoint URL");
-    let token_url = TokenUrl::new(fields.token_url).expect("Invalid token endpoint URL");
+    let auth_endpoint =
+        AuthUrl::new(fields.auth_endpoint).expect("Invalid authorization endpoint URL");
+    let token_endpoint = TokenUrl::new(fields.token_endpoint).expect("Invalid token endpoint URL");
 
     BasicClient::new(ClientId::new(fields.client_id))
         .set_client_secret(ClientSecret::new(fields.client_secret))
-        .set_auth_uri(auth_url)
-        .set_token_uri(token_url)
+        .set_auth_uri(auth_endpoint)
+        .set_token_uri(token_endpoint)
         .set_redirect_uri(RedirectUrl::new(fields.redirect_url).expect("Invalid redirect URL"))
 }
 
@@ -170,7 +171,7 @@ fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
         .ok_or_else(|| VmError::RuntimeError("verify() requires 'code' keyword argument".into()))?;
 
     let mut fields = parse_auth_fields(state)?;
-    let userinfo_url = mem::take(&mut fields.userinfo_url);
+    let userinfo_endpoint = mem::take(&mut fields.userinfo_endpoint);
 
     let http_client = reqwest::ClientBuilder::new()
         // Following redirects opens the client up to SSRF vulnerabilities.
@@ -187,7 +188,7 @@ fn verify<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'g
         let access_token = token.access_token().secret().to_owned();
 
         let response = http_client
-            .get(userinfo_url)
+            .get(userinfo_endpoint)
             .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .await
