@@ -26,7 +26,9 @@ jobs:
           fetch-depth: 0 # Not needed if lastUpdated is not enabled
       - uses: pnpm/action-setup@v3 # pnpm is optional but recommended, you can also use npm / yarn
         with:
-          version: 8
+            version: 8
+      - name: Change directory
+        run: cd aiscript-docs
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -34,8 +36,6 @@ jobs:
           cache: pnpm
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Change directory
-        run: cd aiscript-docs
       - name: Install dependencies
         run: pnpm install
       - name: Build with Rspress
