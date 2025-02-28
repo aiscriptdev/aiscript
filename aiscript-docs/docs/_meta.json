@@ -1,0 +1,17 @@
+[
+  {
+    "text": "Guide",
+    "link": "/guide/",
+    "activeMatch": "/guide/"
+  },
+  {
+    "text": "Get Started",
+    "link": "/get-started/",
+    "activeMatch": "/get-started/"
+  },
+  {
+    "text": "Std library",
+    "link": "/std-library/",
+    "activeMatch": "/std-library/"
+  }
+]
