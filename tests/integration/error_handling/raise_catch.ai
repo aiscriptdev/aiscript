@@ -4,7 +4,7 @@ enum ArithError! {
 }
 // Declare error type this function would throw
 // Multiple error types are supported, like this:
-// fn divide(a, b) -> int, ArithError!, AnotherError! {}
+// fn divide(a, b) -> int, ArithError! | AnotherError! {}
 fn divide(a, b) -> int | ArithError! {
     if b == 0 {
         raise ArithError!::DivideZero;

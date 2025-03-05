@@ -24,7 +24,6 @@ print(do_math1(0)); // expect: ArithError!::DivideZero
 fn do_math2(n) -> ArithError! {
     // use raise to re-raise error
     let v = divide(1, n) |err| {
-        print(err);
         raise err;
     };
     print("[value]", v);
@@ -32,7 +31,6 @@ fn do_math2(n) -> ArithError! {
 
 do_math2(1); // expect: [value] 1
 print(do_math2(0));
-// expect: ArithError!::DivideZero
 // expect: ArithError!::DivideZero
 
 fn do_math3(n) -> ArithError! {

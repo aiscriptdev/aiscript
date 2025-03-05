@@ -101,31 +101,91 @@ impl RequestProcessor {
         }
     }
 
-    fn validate_field(field: &Field, value: &Value) -> Result<(), ServerError> {
-        let type_valid = matches!(
-            (field.field_type, value),
+    fn validate_field(field: &Field, value: &Value) -> Result<Value, ServerError> {
+        // Try to convert the value if it doesn't match the expected type
+        let converted_value = match (field.field_type, value) {
+            // Already correct types
             (FieldType::Str, Value::String(_))
-                | (FieldType::Number, Value::Number(_))
-                | (FieldType::Bool, Value::Bool(_))
-                | (FieldType::Array, Value::Array(_))
-        );
+            | (FieldType::Number, Value::Number(_))
+            | (FieldType::Bool, Value::Bool(_))
+            | (FieldType::Array, Value::Array(_)) => value.clone(),
 
-        if !type_valid {
-            return Err(ServerError::TypeMismatch {
-                field: field.name.clone(),
-                expected: field.field_type.as_str(),
-            });
-        }
+            // Convert string to number
+            (FieldType::Number, Value::String(s)) => {
+                // Try parsing as integer first
+                if let Ok(n) = s.parse::<i64>() {
+                    Value::Number(serde_json::Number::from(n))
+                }
+                // Then try as floating point
+                else if let Ok(f) = s.parse::<f64>() {
+                    match serde_json::Number::from_f64(f) {
+                        Some(n) => Value::Number(n),
+                        None => {
+                            return Err(ServerError::TypeMismatch {
+                                field: field.name.clone(),
+                                expected: field.field_type.as_str(),
+                            })
+                        }
+                    }
+                }
+                // Cannot parse as number
+                else {
+                    return Err(ServerError::TypeMismatch {
+                        field: field.name.clone(),
+                        expected: field.field_type.as_str(),
+                    });
+                }
+            }
 
+            // Convert string to boolean
+            (FieldType::Bool, Value::String(s)) => match s.to_lowercase().as_str() {
+                "true" /*| "yes" | "1" | "on"*/ => Value::Bool(true),
+                "false" /*| "no" | "0" | "off"*/ => Value::Bool(false),
+                _ => {
+                    return Err(ServerError::TypeMismatch {
+                        field: field.name.clone(),
+                        expected: field.field_type.as_str(),
+                    })
+                }
+            },
+
+            // Convert number to boolean (0 = false, non-zero = true)
+            (FieldType::Bool, Value::Number(n)) => {
+                if n.as_f64().unwrap_or(0.0) == 0.0 {
+                    Value::Bool(false)
+                } else {
+                    Value::Bool(true)
+                }
+            }
+
+            // Convert number to string
+            (FieldType::Str, Value::Number(n)) => Value::String(n.to_string()),
+
+            // Convert boolean to string
+            (FieldType::Str, Value::Bool(b)) => Value::String(b.to_string()),
+
+            // Other conversions not supported
+            _ => {
+                return Err(ServerError::TypeMismatch {
+                    field: field.name.clone(),
+                    expected: field.field_type.as_str(),
+                })
+            }
+        };
+
+        // Now validate with the converted value
         for validator in &*field.validators {
-            if let Err(e) = validator.validate(value) {
+            if let Err(e) = validator.validate(&converted_value) {
                 return Err(ServerError::ValidationError {
                     field: field.name.clone(),
                     message: e.to_string(),
                 });
             }
         }
-        Ok(())
+
+        // Return success - the caller needs to update the original value
+        // with the converted value if needed
+        Ok(converted_value)
     }
 
     async fn process_json_body(request: Request<Body>) -> Result<Value, ServerError> {
@@ -250,16 +310,20 @@ impl Future for RequestProcessor {
                     self.state = ProcessingState::ValidatingQuery;
                 }
                 ProcessingState::ValidatingQuery => {
-                    let query = extract::Query::<Value>::try_from_uri(self.request.uri())
+                    let mut query = extract::Query::<Value>::try_from_uri(self.request.uri())
                         .map(|extract::Query(q)| q)
                         .unwrap_or_default();
 
+                    dbg!(&query);
                     let mut failed_validation = None;
                     for field in mem::take(&mut self.endpoint.query_params) {
-                        if let Some(value) = query.get(&field.name) {
-                            if let Err(e) = Self::validate_field(&field, value) {
-                                failed_validation = Some(e);
-                                break;
+                        if let Some(value) = query.get_mut(&field.name) {
+                            match Self::validate_field(&field, value) {
+                                Ok(converted_value) => *value = converted_value,
+                                Err(e) => {
+                                    failed_validation = Some(e);
+                                    break;
+                                }
                             }
                             self.query_data.insert(field.name.clone(), value.clone());
                         } else if let Some(default) = &field.default {
