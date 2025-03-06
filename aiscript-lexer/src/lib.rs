@@ -482,7 +482,15 @@ impl<'a> Lexer<'a> {
             '@' => self.make_token(TokenType::At),
             '$' => self.make_token(TokenType::Dollar),
             '?' => self.make_token(TokenType::Question),
-            '_' => self.make_token(TokenType::Underscore),
+            '_' => {
+                // Check if the next character is not alphanumeric or another underscore
+                if !matches!(self.peek(), Some(c) if c.is_alphanumeric() || c == '_') {
+                    self.make_token(TokenType::Underscore)
+                } else {
+                    // Otherwise, scan it as an identifier
+                    self.scan_identifier()
+                }
+            }
             '.' => {
                 let kind = if self.peek() == Some('.') {
                     self.advance();
@@ -630,7 +638,7 @@ impl<'a> Lexer<'a> {
                 }
             }
             c if c.is_ascii_digit() => self.scan_number(),
-            c if c.is_alphabetic() || c == '_' => self.scan_identifier(),
+            c if c.is_alphabetic() => self.scan_identifier(),
             _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
         }
     }
