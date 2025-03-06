@@ -169,6 +169,26 @@ impl<'gc> CodeGen<'gc> {
             Stmt::Loop { body, .. } => {
                 self.declare_functions(body)?;
             }
+            Stmt::Let(VariableDecl {
+                initializer: Some(Expr::Lambda { body, .. }),
+                ..
+            }) => {
+                if let Expr::Block { statements, .. } = &**body {
+                    for stmt in statements {
+                        self.declare_functions(stmt)?;
+                    }
+                }
+            }
+            Stmt::Const {
+                initializer: Expr::Lambda { body, .. },
+                ..
+            } => {
+                if let Expr::Block { statements, .. } = &**body {
+                    for stmt in statements {
+                        self.declare_functions(stmt)?;
+                    }
+                }
+            }
             Stmt::Function(FunctionDecl {
                 name,
                 mangled_name,
