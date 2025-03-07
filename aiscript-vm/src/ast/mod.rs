@@ -356,7 +356,6 @@ pub enum Expr<'gc> {
     },
     Prompt {
         expression: Box<Expr<'gc>>,
-        model: Option<Box<Expr<'gc>>>,
         line: u32,
     },
 }

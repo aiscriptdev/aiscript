@@ -894,15 +894,9 @@ impl<'gc> State<'gc> {
                 };
                 self.push_stack(value);
             }
-            OpCode::Prompt(model_idx) => {
-                let message = self.pop_stack().as_string()?.to_string();
-                let model = if model_idx == u8::MAX {
-                    None // Use default model
-                } else {
-                    let frame = self.current_frame();
-                    Some(frame.read_constant(model_idx).as_string()?)
-                };
-                let result = Value::from(self.intern(ai::prompt(message, model).as_bytes()));
+            OpCode::Prompt => {
+                let message = self.pop_stack().as_string().unwrap().to_string();
+                let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
                 self.push_stack(result);
             }
             OpCode::Agent(name) => {
