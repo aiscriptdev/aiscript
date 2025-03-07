@@ -1,9 +1,14 @@
 [package]
 name = "aiscript-runtime"
-version = "0.1.0"
+description = "The web runtime of AIScript programming language interpreter"
+version.workspace = true
 edition.workspace = true
+homepage.workspace = true
 repository.workspace = true
 license.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 aiscript-lexer = { path = "../aiscript-lexer" }

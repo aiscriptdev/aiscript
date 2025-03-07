@@ -9,13 +9,19 @@ members = [
     "tests",
     "xtask",
 ]
-exclude = []
+exclude = ["assets", "examples", "routes", "tests", "xtask", "project.toml"]
 resolver = "2"
 
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
+homepage = "https://aiscript.dev"
 repository = "https://github.com/aiscriptdev/aiscript"
 license = "Apache-2.0"
+authors = ["Folyd lyshuhow@gmail.com"]
+keywords = ["language", "interpreter", "scripting", "compiler", "vm"]
+categories = ["compilers", "web-programming", "web-programming::http-server"]
+
 
 [workspace.dependencies]
 
