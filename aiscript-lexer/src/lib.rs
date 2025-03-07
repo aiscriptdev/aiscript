@@ -67,6 +67,7 @@ pub enum TokenType {
     Identifier, // Variable/function names
     Error,      // Error type name (ends with qustion mark, e.g. NetworkError! )
     String,     // "string literal"
+    FString,    // f"f-string"
     RawString,  // r"raw string \n\t"
     Number,     // 123, 123.45
     Doc,        // """docstring"""
@@ -625,6 +626,14 @@ impl<'a> Lexer<'a> {
                     self.scan_string()
                 }
             }
+            'f' => {
+                if self.peek() == Some('"') {
+                    self.scan_fstring()
+                } else {
+                    // If 'f' is not followed by a quote, it's just an identifier
+                    self.scan_identifier()
+                }
+            }
             'r' => {
                 // Parse raw string: r"raw string \n\t"
                 if self.peek() == Some('"') {
@@ -641,6 +650,51 @@ impl<'a> Lexer<'a> {
             c if c.is_alphabetic() => self.scan_identifier(),
             _ => Token::new(TokenType::Invalid, "Unexpected character.", self.line),
         }
+    }
+
+    fn scan_fstring(&mut self) -> Token<'a> {
+        // Skip the 'f' and opening quote
+        self.advance(); // Skip the opening quote
+
+        let start_content = self.current; // Where string content starts
+        let mut brace_depth = 0;
+
+        while let Some((end_pos, ch)) = self.iter.peek().copied() {
+            match ch {
+                '{' => {
+                    brace_depth += 1;
+                    self.advance();
+                }
+                '}' => {
+                    if brace_depth > 0 {
+                        brace_depth -= 1;
+                    } else {
+                        // Lone closing brace is treated as literal '}'
+                        // This is similar to Python's f-string behavior
+                        // (Could return an error here instead)
+                        self.advance();
+                    }
+                }
+                '\\' => {
+                    self.advance(); // consume backslash
+                    self.advance(); // consume the following char
+                }
+                '"' => {
+                    let content = &self.source[start_content..end_pos];
+                    self.advance(); // consume closing quote
+                    return Token::new(TokenType::FString, content, self.line);
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        Token::new(TokenType::Invalid, "Unterminated f-string.", self.line)
     }
 
     // Scan a string literal, handling escape sequences

@@ -4,7 +4,7 @@ mod utils;
 use gc_arena::Gc;
 pub use interned::{InternedString, InternedStringSet};
 
-use crate::{vm::Context, Value};
+use crate::{Value, vm::Context};
 
 /// Internal enum to handle string operations
 pub enum StringValue<'gc> {

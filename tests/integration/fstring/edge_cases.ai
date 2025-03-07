@@ -1,0 +1,37 @@
+// Tests edge cases for f-strings
+
+// Escaped braces
+print(f"Escaped opening brace: \\{"); // expect: Escaped opening brace: \{
+print(f"Escaped closing brace: \\}"); // expect: Escaped closing brace: \}
+
+// Empty expressions (should be handled by parser error)
+// print(f"Empty expression: {}"); // This should cause an error
+
+// Adjacent expressions
+let a = "first";
+let b = "second";
+print(f"{a}{b}"); // expect: firstsecond
+
+// Nested quotes
+print(f"She said, \"Hello, {a}!\""); // expect: She said, "Hello, first!"
+print(f"Single quotes: \'{b}\'"); // expect: Single quotes: 'second'
+
+// Special characters inside string
+print(f"Tab: \t Newline: \n with {a}"); // expect: Tab: 	 Newline: 
+// expect:  with first
+
+// Unicode characters
+let emoji = "😊";
+print(f"Unicode: {emoji}"); // expect: Unicode: 😊
+
+// Nested expressions (might be tricky for the parser)
+let c = 10;
+print(f"Nested: {c + (c * 2)}"); // expect: Nested: 30
+
+// Conditional expressions
+// TODO: support quote escape in fstring
+// let isAdmin = true;
+// print(f"User is {"admin" if isAdmin else "regular user"}");
+
+// Multiple expressions with no spaces
+print(f"{a}{b}{c}"); // expect: firstsecond10

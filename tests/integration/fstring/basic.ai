@@ -1,0 +1,28 @@
+// Basic string interpolation
+let name = "Alice";
+let greeting = f"Hello, {name}!";
+print(greeting); // expect: Hello, Alice!
+
+// Multiple variables
+let first = "Bob";
+let last = "Smith";
+print(f"{first} {last}"); // expect: Bob Smith
+
+// Empty f-string
+let empty = f"";
+print(empty); // expect: ""
+
+// F-string with no interpolation
+let no_interp = f"Just a regular string";
+print(no_interp); // expect: Just a regular string
+
+// Multiple interpolations
+let a = "one";
+let b = "two";
+let c = "three";
+print(f"{a}, {b}, {c}"); // expect: one, two, three
+
+// Interpolations at the beginning, middle, and end
+print(f"{a} is first"); // expect: one is first
+print(f"The middle is {b}"); // expect: The middle is two
+print(f"Last is {c}"); // expect: Last is three

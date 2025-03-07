@@ -1,0 +1,48 @@
+// Tests f-strings with different data types
+
+// Numbers
+let integer = 42;
+let float = 3.14;
+print(f"Integer: {integer}"); // expect: Integer: 42
+print(f"Float: {float}"); // expect: Float: 3.14
+
+// Boolean
+let truth = true;
+let falsehood = false;
+print(f"Truth: {truth}"); // expect: Truth: true
+print(f"Falsehood: {falsehood}"); // expect: Falsehood: false
+
+// Nil
+let nothing = nil;
+print(f"Nothing: {nothing}"); // expect: Nothing: nil
+
+// Arrays
+let array = [1, 2, 3];
+print(f"Array: {array}"); // expect: Array: [1, 2, 3]
+
+// Objects
+let obj = {"name": "Dave", "age": 30};
+print(f"{obj.name}"); // expect: Dave
+print(f"{obj.age}"); // expect: 30
+
+// Nested objects and arrays
+let nested = {"items": [1, 2, {"key": "value"}]};
+print(f"Nested: {nested}"); // expect: Nested: {items: [1, 2, {key: value}]}
+
+// Enum
+enum Status {
+    Active,
+    Inactive,
+    Pending
+}
+print(f"Enum value: {Status::Active}"); // expect: Enum value: Status::Active
+
+// Class instance
+class Person {
+    fn new(name, age) {
+        self.name = name;
+        self.age = age;
+    }
+}
+let person = Person("Emma", 25);
+print(f"Person: {person}"); // expect: Person: <instance of Person>

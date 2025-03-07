@@ -14,16 +14,9 @@ use gc_arena::{
 use sqlx::{PgPool, SqlitePool};
 
 use crate::{
-    NativeFn, OpCode, ReturnValue, Value,
-    ai::{self, PromptConfig},
-    ast::{ChunkId, Visibility},
-    builtins::BuiltinMethods,
-    module::{ModuleKind, ModuleManager, ModuleSource},
-    object::{
-        BoundMethod, Class, Closure, EnumVariant, Function, Instance, List, Object, Upvalue,
-        UpvalueObj,
-    },
-    string::{InternedString, InternedStringSet},
+    ai::{self, PromptConfig}, ast::{ChunkId, Visibility}, builtins::BuiltinMethods, module::{ModuleKind, ModuleManager, ModuleSource}, object::{
+        BoundMethod, Class, Closure, EnumVariant, Function, Instance, List, ListKind, Object, Upvalue, UpvalueObj
+    }, string::{InternedString, InternedStringSet}, NativeFn, OpCode, ReturnValue, Value
 };
 
 use super::{Context, VmError, fuel::Fuel};
@@ -429,6 +422,118 @@ impl<'gc> State<'gc> {
             }
             OpCode::LessEqual => {
                 binary_op!(self, <=);
+            }
+            OpCode::BuildString(count) => {
+                let count = count as usize;
+                if count == 0 {
+                    // Empty string case
+                    let empty = self.intern(b"");
+                    self.push_stack(Value::String(empty));
+                } else {
+                    // We have 'count' values on the stack to combine
+                    let mut total_len = 0;
+                    let mut string_parts = Vec::with_capacity(count);
+
+                    // First, convert all values to strings and estimate total length
+                    for i in 0..count {
+                        let value = *self.peek(count - i - 1);
+                        let string_repr = match value {
+                            Value::String(s) => {
+                                let s_str = s.to_str().unwrap_or("");
+                                total_len += s_str.len();
+                                s_str.to_string()
+                            }
+                            Value::IoString(s) => {
+                                total_len += s.len();
+                                s.to_string()
+                            }
+                            Value::Number(n) => {
+                                let s = format!("{}", n);
+                                total_len += s.len();
+                                s
+                            }
+                            Value::Boolean(b) => {
+                                let s = format!("{}", b);
+                                total_len += s.len();
+                                s
+                            }
+                            Value::Nil => {
+                                let s = "nil".to_string();
+                                total_len += s.len();
+                                s
+                            }
+                            Value::List(list) => {
+                                // Format arrays and tuples nicely
+                                let arr = list.borrow();
+                                let s = match arr.kind {
+                                    ListKind::Array => {
+                                        let elements: Vec<String> =
+                                            arr.data.iter().map(|v| format!("{}", v)).collect();
+                                        format!("[{}]", elements.join(", "))
+                                    }
+                                    ListKind::Tuple => {
+                                        let elements: Vec<String> =
+                                            arr.data.iter().map(|v| format!("{}", v)).collect();
+                                        format!("({})", elements.join(", "))
+                                    }
+                                };
+                                total_len += s.len();
+                                s
+                            }
+                            Value::Object(obj) => {
+                                let mut result = String::from("{");
+                                let mut first = true;
+                                for (key, value) in &obj.borrow().fields {
+                                    if !first {
+                                        result.push_str(", ");
+                                    }
+                                    result.push_str(&format!("{}: {}", key, value));
+                                    first = false;
+                                }
+                                result.push('}');
+                                total_len += result.len();
+                                result
+                            }
+                            Value::Instance(instance) => {
+                                let name = instance.borrow().class.borrow().name.to_string();
+                                let s = format!("<instance of {}>", name);
+                                total_len += s.len();
+                                s
+                            }
+                            Value::EnumVariant(variant) => {
+                                let enum_name = variant.enum_.borrow().name.to_string();
+                                let variant_name = variant.name.to_string();
+                                let s = if variant.value.is_nil() {
+                                    format!("{}::{}", enum_name, variant_name)
+                                } else {
+                                    format!("{}::{}({})", enum_name, variant_name, variant.value)
+                                };
+                                total_len += s.len();
+                                s
+                            }
+                            // Handle other value types with their string representation
+                            _ => {
+                                let s = format!("{}", value);
+                                total_len += s.len();
+                                s
+                            }
+                        };
+                        string_parts.push(string_repr);
+                    }
+
+                    // Build the final string
+                    let mut result = String::with_capacity(total_len);
+                    for part in string_parts {
+                        result.push_str(&part);
+                    }
+
+                    // Pop the string parts from the stack
+                    self.stack_top -= count;
+
+                    // Push the combined string
+                    let interned = self.intern(result.as_bytes());
+                    self.push_stack(Value::String(interned));
+                }
             }
             OpCode::Dup => {
                 let value = *self.peek(0);

@@ -147,6 +147,15 @@ impl<'gc> ParameterDecl<'gc> {
     }
 }
 
+// Define a new enum to represent parts of an f-string
+#[derive(Debug)]
+pub enum FStringPart<'gc> {
+    // A literal string part (the text outside of curly braces)
+    StringLiteral(InternedString<'gc>),
+    // An expression to be evaluated and converted to a string (the code inside curly braces)
+    Expression(Box<Expr<'gc>>),
+}
+
 #[derive(Debug)]
 pub struct ErrorHandler<'gc> {
     pub error_var: Token<'gc>,
@@ -264,6 +273,11 @@ pub enum Expr<'gc> {
         value: Literal<'gc>,
         line: u32,
     },
+    FString {
+        // A vector of either literal string parts or expressions to be interpolated
+        parts: Vec<FStringPart<'gc>>,
+        line: u32,
+    },
     Unary {
         operator: Token<'gc>,
         right: Box<Expr<'gc>>,
@@ -371,6 +385,7 @@ impl Expr<'_> {
             | Self::Grouping { line, .. }
             | Self::List { line, .. }
             | Self::Literal { line, .. }
+            | Self::FString { line, .. }
             | Self::Unary { line, .. }
             | Self::Variable { line, .. }
             | Self::Index { line, .. }

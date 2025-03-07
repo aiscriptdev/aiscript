@@ -13,16 +13,16 @@ use super::{
     lexer::{Scanner, Token, TokenType},
 };
 use crate::{
+    VmError,
     ast::{
-        AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FunctionDecl,
-        MatchArm, MatchPattern, ObjectProperty, VariableDecl, Visibility,
+        AgentDecl, ClassDecl, ClassFieldDecl, EnumDecl, EnumVariant, ErrorHandler, FStringPart,
+        FunctionDecl, MatchArm, MatchPattern, ObjectProperty, VariableDecl, Visibility,
     },
     object::{FunctionType, ListKind},
     ty::{
         ClassField, EnumVariantChecker, FunctionErrorResolver, Type, TypeResolver, ValidationError,
     },
     vm::Context,
-    VmError,
 };
 use aiscript_directive::DirectiveParser;
 
@@ -1314,6 +1314,112 @@ impl<'gc> Parser<'gc> {
         })
     }
 
+    fn fstring(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
+        let line = self.previous.line;
+        let content = self.previous.lexeme;
+
+        // Parse the f-string content to extract string literals and expressions
+        let parts = self.parse_fstring_content(content)?;
+        Some(Expr::FString { parts, line })
+    }
+
+    fn parse_fstring_content(&mut self, content: &'gc str) -> Option<Vec<FStringPart<'gc>>> {
+        let mut parts = Vec::new();
+        let mut in_expression = false;
+        let mut brace_depth = 0;
+        let mut start = 0;
+
+        // Iterate through the string content character by character
+        let chars: Vec<(usize, char)> = content.char_indices().collect();
+
+        for (i, c) in chars.iter() {
+            match c {
+                '{' => {
+                    if *i > 0 && chars[i - 1].1 == '\\' {
+                        // Escaped brace, skip
+                        continue;
+                    }
+
+                    if brace_depth == 0 {
+                        // Start of an expression
+                        if start < *i {
+                            // Add the preceding string literal part
+                            let str_part = &content[start..*i];
+                            let escaped_str = self.escape_string(str_part)?;
+                            parts.push(FStringPart::StringLiteral(
+                                self.ctx.intern(escaped_str.as_bytes()),
+                            ));
+                        }
+                        in_expression = true;
+                        start = *i + 1; // Start after the opening brace
+                    }
+                    brace_depth += 1;
+                }
+                '}' => {
+                    if *i > 0 && chars[i - 1].1 == '\\' {
+                        // Escaped brace, skip
+                        continue;
+                    }
+
+                    if in_expression && brace_depth == 1 {
+                        // End of an expression
+                        let expr_str = &content[start..*i];
+                        if !expr_str.is_empty() {
+                            // Parse the expression using a temporary parser
+                            let mut temp_parser = Parser::new(self.ctx, expr_str);
+                            temp_parser.advance(); // Initialize the first token
+
+                            match temp_parser.expression() {
+                                Some(expr) => {
+                                    parts.push(FStringPart::Expression(Box::new(expr)));
+                                }
+                                None => {
+                                    self.error(&format!(
+                                        "Invalid expression in f-string: '{}'",
+                                        expr_str
+                                    ));
+                                    return None;
+                                }
+                            }
+                        } else {
+                            self.error("Empty expression in f-string");
+                            return None;
+                        }
+
+                        in_expression = false;
+                        start = *i + 1; // Start after the closing brace
+                    }
+
+                    if brace_depth > 0 {
+                        brace_depth -= 1;
+                    } else {
+                        self.error("Unmatched closing brace in f-string");
+                        return None;
+                    }
+                }
+                _ => {
+                    // Just continue for all other characters
+                }
+            }
+        }
+
+        // Add the final string part if there is one
+        if !in_expression && start < content.len() {
+            let str_part = &content[start..];
+            let escaped_str = self.escape_string(str_part)?;
+            parts.push(FStringPart::StringLiteral(
+                self.ctx.intern(escaped_str.as_bytes()),
+            ));
+        }
+
+        if in_expression {
+            self.error("Unterminated expression in f-string");
+            return None;
+        }
+
+        Some(parts)
+    }
+
     fn raw_string(&mut self, _can_assign: bool) -> Option<Expr<'gc>> {
         Some(Expr::Literal {
             value: Literal::String(self.ctx.intern(self.previous.lexeme.as_bytes())),
@@ -2325,6 +2431,7 @@ fn get_rule<'gc>(kind: TokenType) -> ParseRule<'gc> {
         TokenType::Error => ParseRule::new(Some(Parser::error_type), None, Precedence::None),
         TokenType::Identifier => ParseRule::new(Some(Parser::variable), None, Precedence::None),
         TokenType::String => ParseRule::new(Some(Parser::string), None, Precedence::None),
+        TokenType::FString => ParseRule::new(Some(Parser::fstring), None, Precedence::None),
         TokenType::RawString => ParseRule::new(Some(Parser::raw_string), None, Precedence::None),
         TokenType::Number => ParseRule::new(Some(Parser::number), None, Precedence::None),
         TokenType::And => ParseRule::new(None, Some(Parser::and), Precedence::And),
