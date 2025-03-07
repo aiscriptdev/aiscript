@@ -3,9 +3,9 @@ mod prompt;
 
 use std::env;
 
-pub use agent::{run_agent, Agent};
+pub use agent::{Agent, run_agent};
 use openai_api_rs::v1::api::OpenAIClient;
-pub use prompt::prompt;
+pub use prompt::{PromptConfig, prompt_with_config};
 
 pub(crate) fn openai_client() -> OpenAIClient {
     OpenAIClient::builder()

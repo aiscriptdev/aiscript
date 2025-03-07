@@ -314,7 +314,6 @@ impl Future for RequestProcessor {
                         .map(|extract::Query(q)| q)
                         .unwrap_or_default();
 
-                    dbg!(&query);
                     let mut failed_validation = None;
                     for field in mem::take(&mut self.endpoint.query_params) {
                         if let Some(value) = query.get_mut(&field.name) {

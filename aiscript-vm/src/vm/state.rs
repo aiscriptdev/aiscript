@@ -8,13 +8,14 @@ use std::{
 
 use ahash::AHasher;
 use gc_arena::{
-    lock::{GcRefLock, RefLock},
     Collect, Collection, Gc, Mutation,
+    lock::{GcRefLock, RefLock},
 };
 use sqlx::{PgPool, SqlitePool};
 
 use crate::{
-    ai,
+    NativeFn, OpCode, ReturnValue, Value,
+    ai::{self, PromptConfig},
     ast::{ChunkId, Visibility},
     builtins::BuiltinMethods,
     module::{ModuleKind, ModuleManager, ModuleSource},
@@ -23,10 +24,9 @@ use crate::{
         UpvalueObj,
     },
     string::{InternedString, InternedStringSet},
-    NativeFn, OpCode, ReturnValue, Value,
 };
 
-use super::{fuel::Fuel, Context, VmError};
+use super::{Context, VmError, fuel::Fuel};
 
 type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>;
 
@@ -208,9 +208,8 @@ impl<'gc> State<'gc> {
                 let function = self.get_chunk(imported_script_chunk_id)?;
                 self.eval_function(function, &[])?;
 
-                if let Some(ModuleKind::Script {
-                    globals, ..
-                }) = self.module_manager.modules.get_mut(&path)
+                if let Some(ModuleKind::Script { globals, .. }) =
+                    self.module_manager.modules.get_mut(&path)
                 {
                     *globals = mem::replace(&mut self.globals, prev_globals);
                 }
@@ -895,9 +894,72 @@ impl<'gc> State<'gc> {
                 self.push_stack(value);
             }
             OpCode::Prompt => {
-                let message = self.pop_stack().as_string().unwrap().to_string();
-                let result = Value::from(self.intern(ai::prompt(message).as_bytes()));
-                self.push_stack(result);
+                let value = self.pop_stack();
+
+                let result = match value {
+                    // Simple string case
+                    Value::String(s) => {
+                        let input = s.to_str().unwrap().to_string();
+                        ai::prompt_with_config(PromptConfig {
+                            input,
+                            ..Default::default()
+                        })
+                    }
+                    // Object config case
+                    Value::Object(obj) => {
+                        let mut config = PromptConfig::default();
+                        let obj_ref = obj.borrow();
+
+                        // Extract input (required)
+                        if let Some(Value::String(input)) =
+                            obj_ref.fields.get(&self.intern(b"input"))
+                        {
+                            config.input = input.to_str().unwrap().to_string();
+                        } else {
+                            return Err(self.runtime_error(
+                                "Prompt requires 'input' field to be a string.".into(),
+                            ));
+                        }
+
+                        // Extract model (optional)
+                        if let Some(Value::String(model)) =
+                            obj_ref.fields.get(&self.intern(b"model"))
+                        {
+                            config.model = Some(model.to_str().unwrap().to_string());
+                        }
+
+                        // Extract max_tokens (optional)
+                        if let Some(Value::Number(tokens)) =
+                            obj_ref.fields.get(&self.intern(b"max_tokens"))
+                        {
+                            config.max_tokens = Some(*tokens as i64);
+                        }
+
+                        // Extract temperature (optional)
+                        if let Some(Value::Number(temp)) =
+                            obj_ref.fields.get(&self.intern(b"temperature"))
+                        {
+                            config.temperature = Some(*temp);
+                        }
+
+                        // Extract system_prompt (optional)
+                        // if let Some(Value::String(sys_prompt) | Value::IoString(sys_prompt)) =
+                        //     obj_ref.fields.get(&self.intern(b"system_prompt"))
+                        // {
+                        //     config.system_prompt = Some(sys_prompt.to_str().unwrap().to_string());
+                        // }
+
+                        ai::prompt_with_config(config)
+                    }
+                    _ => {
+                        return Err(self.runtime_error(
+                            "Prompt expects a string or configuration object.".into(),
+                        ));
+                    }
+                };
+
+                let result = self.intern(result.as_bytes());
+                self.push_stack(Value::from(result));
             }
             OpCode::Agent(name) => {
                 let agent = frame.read_constant(name);
