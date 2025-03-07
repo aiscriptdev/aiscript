@@ -13,8 +13,8 @@
   <!-- <a href="https://github.com/aiscript-dev/aiscript/actions">
     <img src="https://github.com/aiscript-dev/aiscript/actions/workflows/ci.yml/badge.svg" alt="Build Status">
   </a> -->
-  <a href="https://discord.gg/aiscript">
-    <img src="https://img.shields.io/discord/123456789?color=5865F2&label=discord" alt="Discord">
+  <a href="https://discord.gg/bXRqsweNPb">
+    <img src="https://img.shields.io/discord/711895914494558250?label=chat&logo=discord" alt="Discord">
   </a>
 </p>
 
@@ -116,12 +116,6 @@ Check out the [examples](./examples) directory for more sample code.
 ## Roadmap
 
 See our [roadmap](https://aiscript.dev/guide/contribution/roadmap) for upcoming features and improvements.
-
-## Community
-
-- [Discord](https://discord.gg/aiscript)
-- [Twitter](https://twitter.com/aiscriptlang)
-- [GitHub Discussions](https://github.com/aiscript-dev/aiscript/discussions)
 
 ## Contributing
 
