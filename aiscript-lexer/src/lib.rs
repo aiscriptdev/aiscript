@@ -9,6 +9,7 @@ pub use error_reporter::ErrorReporter;
 
 mod character_tests;
 mod error_reporter;
+mod fstring_tests;
 mod peakable;
 mod tests;
 
