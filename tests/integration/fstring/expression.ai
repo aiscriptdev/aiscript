@@ -1,0 +1,30 @@
+// Numeric expressions
+let x = 10;
+let y = 5;
+print(f"{x} + {y} = {x + y}"); // expect: 10 + 5 = 15
+print(f"{x} - {y} = {x - y}"); // expect: 10 - 5 = 5
+print(f"{x} * {y} = {x * y}"); // expect: 10 * 5 = 50
+print(f"{x} / {y} = {x / y}"); // expect: 10 / 5 = 2
+
+// Complex expressions
+print(f"Complex: {(x + y) * 2 - (x / y)}"); // expect: Complex: 28
+
+// Boolean expressions
+let isTrue = true;
+let isFalse = false;
+print(f"Is it true? {isTrue}"); // expect: Is it true? true
+print(f"Is it false? {isFalse}"); // expect: Is it false? false
+print(f"Logical AND: {isTrue and isFalse}"); // expect: Logical AND: false
+print(f"Logical OR: {isTrue or isFalse}"); // expect: Logical OR: true
+
+// String operations
+// let str1 = "hello";
+// let str2 = "world";
+// print(f"Concatenated: {str1 + \" \" + str2}");
+
+// Function calls in interpolation
+fn get_message() {
+    return "function result";
+}
+
+print(f"From function: {get_message()}"); // expect: From function: function result
