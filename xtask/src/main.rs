@@ -41,7 +41,7 @@ fn run_tests() -> Result<()> {
             "--features",
             "ai_test",
             "--bin",
-            "aiscript-cli-test",
+            "aiscript-test",
         ])
         .status()
         .context("Failed to build with ai_test feature")?;

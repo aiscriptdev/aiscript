@@ -4,14 +4,14 @@ version = "0.1.0"
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
-default-run = "aiscript-cli"
+default-run = "aiscript"
 
 [[bin]]
-name = "aiscript-cli"
+name = "aiscript"
 path = "src/main.rs"
 
 [[bin]]
-name = "aiscript-cli-test"
+name = "aiscript-test"
 path = "src/main.rs"
 required-features = ["ai_test"]
 
