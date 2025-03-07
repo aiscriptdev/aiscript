@@ -11,8 +11,8 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-aiscript-lexer = { path = "../aiscript-lexer" }
-aiscript-directive = { path = "../aiscript-directive" }
+aiscript-lexer = { path = "../aiscript-lexer", version = "0.1.0" }
+aiscript-directive = { path = "../aiscript-directive", version = "0.1.0" }
 ahash = "0.8"
 gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "3dbc6c4263700312ef63ceee3f02943b38828130", features = [
     "allocator-api2",

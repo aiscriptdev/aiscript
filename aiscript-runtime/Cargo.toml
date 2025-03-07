@@ -11,9 +11,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-aiscript-lexer = { path = "../aiscript-lexer" }
-aiscript-directive = { path = "../aiscript-directive" }
-aiscript-vm = { path = "../aiscript-vm" }
+aiscript-lexer = { path = "../aiscript-lexer", version = "0.1.0" }
+aiscript-directive = { path = "../aiscript-directive", version = "0.1.0" }
+aiscript-vm = { path = "../aiscript-vm", version = "0.1.0" }
 hyper = "1.4.1"
 hyper-util = "0.1.7"
 tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
