@@ -1,4 +1,0 @@
-schema BasicUserInfo {
-    handle: str
-    nickname: str
-}

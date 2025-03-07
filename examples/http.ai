@@ -1,0 +1,48 @@
+// First import the http module
+use std.http;
+
+// Simple GET request
+let response = http.get("https://ipinfo.io/");
+
+// GET with headers
+let headers = {
+    "Authorization": "Bearer token123",
+    "Accept": "application/json"
+};
+let response = http.get("https://api.example.com/users", headers);
+
+// // POST with JSON body
+let json_body = {
+    name: "John Doe",
+    email: "john@example.com"
+};
+let response = http.post("https://api.example.com/users", headers, json_body);
+
+// PUT request
+let update = {
+    name: "John Smith"
+};
+let response = http.put("https://api.example.com/users/123", headers, update);
+
+// // DELETE request
+// let response = http.delete("https://api.example.com/users/123", headers);
+
+// // PATCH request
+// let patch = {
+//     status: "inactive"
+// };
+// let response = http.patch("https://api.example.com/users/123", headers, patch);
+
+// // HEAD request (like GET but returns only headers)
+// let response = http.head("https://api.example.com/users");
+
+// // OPTIONS request
+// let response = http.options("https://api.example.com/users");
+
+// // Response handling is the same for all methods
+if response.ok {
+    print("Status:", response.status);
+    print("Body:", response.json);  // If response is JSON
+} else {
+    print("Error:", response.statusText);
+}

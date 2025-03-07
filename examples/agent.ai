@@ -1,0 +1,59 @@
+use std.random;
+let player1_move = nil;
+let player2_move = nil;
+fn make_move() -> str {
+    """Make a move in the game. Returns rock, paper, or scissors."""
+    return random.choice(["rock", "paper", "scissors"]);
+}
+agent Judge {
+    instructions: "You are the judge of the Rock Paper Scissors game.
+    1. Let Player1 move first then Player2
+    2. Use record_move to store each player's move after it finished
+    3. After both players finished, use announce_result to display the result
+    4. End the game after announcing results",
+    fn record_move(player: str, move: str) {
+        """Record a player's move."""
+        print(player, "choose", move);
+        if player == "Player1" {
+            player1_move = move;
+        } else {
+            player2_move = move;
+        }
+    }
+    fn announce_result() {
+        """Check the recorded moves and announce the winner."""
+        let winning_moves = {"rock": "scissors", "scissors": "paper", "paper": "rock"};
+        if player1_move == player2_move {
+            print("It's a tie!");
+        } else if winning_moves[player1_move] == player2_move {
+            print("Player 1 wins!");
+        } else {
+            print("Player 2 wins!");
+        }
+    }
+    fn transfer_to_player1() {
+        """Transfer control to Player 1 Agent"""
+        return Player1;
+    }
+    fn transfer_to_player2() {
+        """Transfer control to Player 2 Agent"""
+        return Player2;
+    }
+}
+fn transfer_to_judge() {
+    """Transfer control to Judge Agent"""
+    return Judge;
+}
+agent Player1 {
+    instructions: "You are Player 1 in the Rock Paper Scissors game.
+    1. Make your move using the make_move function
+    2. Transfer control to the judge after your move",
+    tools: [make_move, transfer_to_judge],
+}
+agent Player2 {
+    instructions: "You are Player 2 in the Rock Paper Scissors game.
+    1. Make your move using the make_move function
+    2. Transfer control to the judge after your move",
+    tools: [make_move, transfer_to_judge],
+}
+Judge.run(input="Let's start play the game!", debug=true);

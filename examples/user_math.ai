@@ -1,0 +1,36 @@
+print("loaded math.ai");
+pub const PI = 3.14;
+pub fn add(x: int, y: int) -> int {  // Available as math.add
+    return x + y;
+}
+
+pub fn sub(x: int, y: int) -> int {  // Available as math.add
+    return x - y;
+}
+
+print(add(1,2));
+print(PI);
+
+pub class A {
+    fn test() {
+        print("test from A");
+    }
+}
+print("end of math.ai");
+
+
+let global_variable = "abc";
+
+if len(global_variable) > 1 {
+   let local_variable = "xyz";
+   print("I can access global variable:", global_variable);
+}
+
+// local variable is inaccessible outer of local scope,
+// this print statement would 
+// print(local_variable);
+
+const PI = 3.14;
+
+print(PI); // print 3.14
+PI = 3.1415; // 

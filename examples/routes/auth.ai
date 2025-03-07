@@ -1,0 +1,59 @@
+route / {
+    @auth // JWT auth
+    get /ask {
+        query {
+            @string(min_len=5, max_len=50)
+            question: str
+        }
+
+        ai fn ask_llm(question: str) -> str {
+            return prompt question;
+        }
+        // http.get("https://api.openai.com/v1/engines/davinci/completions");
+        let answer = ask_llm(query.question);
+        return answer;
+    }
+
+    @basic_auth // Username/Password auth
+    post /guess {
+        body {
+            @number(min=1, max=100)
+            magic: int = 1
+        }
+        
+        header.path = "/guess";
+        let msg = "Try again!";
+        if body.magic == 42 {
+            msg = "You guessed it!";
+        }
+        return {
+            body: msg,
+            headers: {
+                path: "/guess",
+            }
+        };
+    }
+
+    @sso(provider="google")
+    get /auth/google {
+        let url = sso.authority_url();
+        print(url);
+        return temporary_redirect(target=url);
+    }
+
+    get /header {
+        return response(
+            status_code=404,
+            body={
+                "message": "Hello, world!",
+            },
+            headers= {
+            "X-Header": "Hello, world!",
+        });
+    }
+}
+
+
+
+
+

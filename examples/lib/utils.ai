@@ -1,3 +1,0 @@
-pub fn sanitize_tweet(content: str) -> str {
-    return content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-}

@@ -1,0 +1,38 @@
+class User {
+    @string(min_len=3, max=20)
+    name: str,
+    @number(min=18, strict_int=true, strict_float=true)
+    age: int,
+    @in(["male", "female"])
+    gender: str = "male",
+}
+let u1 = User("Le", 20.0, "male") |err| {
+    print("Validate error:", err);
+};
+// Validate error: { 
+//      loc: [name], input: Le, type: validation_error,
+//      msg: String length is less than the minimum length of 3 
+// }
+let u2 = User("Lee", 17, "male") |err| {
+    print("Validate error:", err);
+};
+// Validate error: {
+//      loc: [age], input: 17, type: validation_error,
+//      msg: Number is less than the minimum value of 18
+// }
+let u3 = User("Lee", 20, "boy") |err| {
+    print("Validate error:", err);
+};
+// Validate error: {
+//      loc: [gender], input: boy, type: validation_error,
+//      msg: Value is not in the list of allowed values
+// }
+let u4 = User("Lee") |err| {
+    print("Validate error:", err);
+};
+// Validate error: {
+//      loc: [age], input: nil, type: missing,
+//      msg: Field required
+// }
+
+

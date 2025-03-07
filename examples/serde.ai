@@ -1,0 +1,12 @@
+use std.serde;
+let s = "{\"name\": \"Alice\", \"age\": 30}";
+let obj = serde.from_str(s);
+// Basic usage without pretty-printing
+let str1 = serde.to_str(obj);
+print(str1);
+// With pretty-printing
+let str2 = serde.to_str(obj, pretty=true);
+print(str2);
+
+// File operations with pretty-printing
+serde.to_file("output.json", obj, pretty=true);

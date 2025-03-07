@@ -1,0 +1,48 @@
+// class FileNotFound! {
+//     name: str,
+// }
+// print(FileNotFound!);
+
+enum IOError! {
+    DiskFull = "the disk is fulled",
+    Interrupted = "io is interrupted",
+}
+// print(IOError!);
+
+// fn check_error(e: IOError!) {
+//     print(e);
+// }
+
+// check_error(IOError!::DiskFull);
+
+enum ArithError! {
+    DivideZero,
+}
+
+fn divide(a, b) -> int | ArithError! {
+    if b == 0 {
+        raise ArithError!::DivideZero;
+    }
+
+    return a / b;
+}
+
+fn do_math() {
+    let x = 0;
+    let v = divide(1, 0) |err| {
+        let a = 1;
+        print("error:", err);
+        999
+    };
+    print(v);
+    // let y = divide(1, 1)?;
+    // print(y);
+}
+
+let x = do_math();
+print(x);
+// {
+//     print(1);
+//     let a = IOError!::DiskFull;
+//     let x = a;
+// }

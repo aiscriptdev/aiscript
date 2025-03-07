@@ -1,0 +1,23 @@
+use std.db.pg;
+
+pg.query("INSERT INTO language (name) VALUES($1) RETURNING id, name;", "Rust");
+let languages = pg.query("select id, name from language;");
+print(languages); // expect: [1, "Rust"]
+let languages = pg.query_as(Language, "select id, name from language where id > 3 limit 10;");
+class Language {
+    id: int,
+    name: str,
+}
+print(languages);
+
+let tx = pg.begin_transaction();
+print(tx);
+let r1 = tx.query("INSERT INTO language (name) VALUES($1) RETURNING id, name;", "JavaScript");
+print(r1);
+let r2 = tx.query("INSERT INTO language (name) VALUES($1) RETURNING id, name;", "AIScript");
+print(r2);
+let languages = pg.query_as(Language, "select id, name from language where id > 10 limit 10;");
+print(languages);
+tx.commit();
+
+// print(pg.query(r"update language set "name"='aiscript22' where id=38 returning id, name;"));

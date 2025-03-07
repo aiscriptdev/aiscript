@@ -1,0 +1,27 @@
+use std.math;
+use std.io;
+use std.time;
+use std.str;
+use user_math;
+
+print(str.len("abcd"));
+print(str.to_uppercase("abcd"));
+print(time.now());
+print(math.add(1, 2)); // expect: 3
+print(math.sub(1, 1)); // expect: 0
+
+print(math.PI); // expect: 3.14
+
+print(math.sqrt(16));         // 4
+
+print(user_math.add(1,2));
+print(user_math.PI);
+
+let content = io.read_file("main.ai");
+print(content);
+let lines = io.read_lines("test.ai");
+print(lines);
+
+print(io.is_file("a"));
+let arr = [1,2,3];
+print(sum(arr));

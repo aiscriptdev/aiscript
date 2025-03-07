@@ -1,0 +1,10 @@
+get /guess {
+
+    query {
+        @number(min=0, max=100)
+        value: int
+    }
+
+    let message = "You got it!" if query.value == 42 else "Try again";
+    return { message };
+}

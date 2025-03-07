@@ -1,0 +1,559 @@
+[
+    {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are the judge of the Rock Paper Scissors game.\n    1. Collect moves from both players, first Player1 then Player2\n    2. Use process_round to determine the winner\n    3. Announce the results using announce_result\n    4. End the game after announcing results"
+            },
+            {
+                "role": "user",
+                "content": "Start!"
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player1",
+                    "description": "Transfer control to Player 1 Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player2",
+                    "description": "Transfer control to Player 2 Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "process_round",
+                    "description": "Process a round of the game and determine the winner.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "move1": {
+                                "type": "string"
+                            },
+                            "move2": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "move1",
+                            "move2"
+                        ]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "announce_result",
+                    "description": "Announce the result of the round.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "winner": {
+                                "type": "string"
+                            },
+                            "move1": {
+                                "type": "string"
+                            },
+                            "move2": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "winner",
+                            "move1",
+                            "move2"
+                        ]
+                    }
+                }
+            }
+        ],
+        "parallel_tool_calls": true,
+        "tool_choice": "auto"
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_ngfUWkdvNgYmjcKsanxPgk2b",
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player1",
+                    "arguments": "{}"
+                }
+            }
+        ]
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Player 1 in the Rock Paper Scissors game.\n    1. Make your move using the make_move function\n    2. Transfer control to the judge after your move"
+            },
+            {
+                "role": "user",
+                "content": "Start!"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_ngfUWkdvNgYmjcKsanxPgk2b",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_player1",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Player1}",
+                "name": "transfer_to_player1",
+                "tool_call_id": "call_ngfUWkdvNgYmjcKsanxPgk2b"
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_judge",
+                    "description": "Transfer control to Judge Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "make_move",
+                    "description": "Make a move in the game. Returns rock, paper, or scissors.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+        ],
+        "parallel_tool_calls": true,
+        "tool_choice": "auto"
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_zXcsKcoWwakDWvtvOepXTkzH",
+                "type": "function",
+                "function": {
+                    "name": "make_move",
+                    "arguments": "{}"
+                }
+            }
+        ]
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Player 1 in the Rock Paper Scissors game.\n    1. Make your move using the make_move function\n    2. Transfer control to the judge after your move"
+            },
+            {
+                "role": "user",
+                "content": "Start!"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_ngfUWkdvNgYmjcKsanxPgk2b",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_player1",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Player1}",
+                "name": "transfer_to_player1",
+                "tool_call_id": "call_ngfUWkdvNgYmjcKsanxPgk2b"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_zXcsKcoWwakDWvtvOepXTkzH",
+                        "type": "function",
+                        "function": {
+                            "name": "make_move",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "paper",
+                "name": "make_move",
+                "tool_call_id": "call_zXcsKcoWwakDWvtvOepXTkzH"
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_judge",
+                    "description": "Transfer control to Judge Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "make_move",
+                    "description": "Make a move in the game. Returns rock, paper, or scissors.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+        ],
+        "parallel_tool_calls": true,
+        "tool_choice": "auto"
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_fDYbRdTsTZ8vJUn9XyVjLmTH",
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_judge",
+                    "arguments": "{}"
+                }
+            }
+        ]
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are the judge of the Rock Paper Scissors game.\n    1. Collect moves from both players, first Player1 then Player2\n    2. Use process_round to determine the winner\n    3. Announce the results using announce_result\n    4. End the game after announcing results"
+            },
+            {
+                "role": "user",
+                "content": "Start!"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_ngfUWkdvNgYmjcKsanxPgk2b",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_player1",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Player1}",
+                "name": "transfer_to_player1",
+                "tool_call_id": "call_ngfUWkdvNgYmjcKsanxPgk2b"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_zXcsKcoWwakDWvtvOepXTkzH",
+                        "type": "function",
+                        "function": {
+                            "name": "make_move",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "paper",
+                "name": "make_move",
+                "tool_call_id": "call_zXcsKcoWwakDWvtvOepXTkzH"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_fDYbRdTsTZ8vJUn9XyVjLmTH",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_judge",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Judge}",
+                "name": "transfer_to_judge",
+                "tool_call_id": "call_fDYbRdTsTZ8vJUn9XyVjLmTH"
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player1",
+                    "description": "Transfer control to Player 1 Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player2",
+                    "description": "Transfer control to Player 2 Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "process_round",
+                    "description": "Process a round of the game and determine the winner.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "move1": {
+                                "type": "string"
+                            },
+                            "move2": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "move1",
+                            "move2"
+                        ]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "announce_result",
+                    "description": "Announce the result of the round.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "move2": {
+                                "type": "string"
+                            },
+                            "winner": {
+                                "type": "string"
+                            },
+                            "move1": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "winner",
+                            "move1",
+                            "move2"
+                        ]
+                    }
+                }
+            }
+        ],
+        "parallel_tool_calls": true,
+        "tool_choice": "auto"
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_si2z1zWVjxvqT2xn46ioe5rB",
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_player2",
+                    "arguments": "{}"
+                }
+            }
+        ]
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Player 2 in the Rock Paper Scissors game.\n    1. Make your move using the make_move function\n    2. Transfer control to the judge after your move"
+            },
+            {
+                "role": "user",
+                "content": "Start!"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_ngfUWkdvNgYmjcKsanxPgk2b",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_player1",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Player1}",
+                "name": "transfer_to_player1",
+                "tool_call_id": "call_ngfUWkdvNgYmjcKsanxPgk2b"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_zXcsKcoWwakDWvtvOepXTkzH",
+                        "type": "function",
+                        "function": {
+                            "name": "make_move",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "paper",
+                "name": "make_move",
+                "tool_call_id": "call_zXcsKcoWwakDWvtvOepXTkzH"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_fDYbRdTsTZ8vJUn9XyVjLmTH",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_judge",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Judge}",
+                "name": "transfer_to_judge",
+                "tool_call_id": "call_fDYbRdTsTZ8vJUn9XyVjLmTH"
+            },
+            {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                    {
+                        "id": "call_si2z1zWVjxvqT2xn46ioe5rB",
+                        "type": "function",
+                        "function": {
+                            "name": "transfer_to_player2",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            },
+            {
+                "role": "tool",
+                "content": "{\"assistant\": Player2}",
+                "name": "transfer_to_player2",
+                "tool_call_id": "call_si2z1zWVjxvqT2xn46ioe5rB"
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "transfer_to_judge",
+                    "description": "Transfer control to Judge Agent",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "make_move",
+                    "description": "Make a move in the game. Returns rock, paper, or scissors.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+        ],
+        "parallel_tool_calls": true,
+        "tool_choice": "auto"
+    },
+    {
+        "role": "assistant",
+        "content": "I have chosen paper. It's your turn!"
+    }
+]

@@ -1,0 +1,68 @@
+enum Status {
+    Pending,    // Gets implicit value 0.0
+    Active,     // Gets implicit value 1.0
+    Suspended,  // Gets implicit value 2.0
+}
+print([Status::Active]);
+print([1]);
+print([1,2]);
+let x = "aaa";
+print([x,]);
+print(["bbb"]);
+print(["bbb", "ccc"]);
+class A {}
+
+// let a = A::Pending;
+// print(a);
+// print(Status::Active);
+
+enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    ServerError = 500,
+
+    pub ai fn as_str(self) {
+        print("as str");
+    }
+    pub  fn as_str() {
+        print("as str");
+    }
+    // pub  as_str3() {
+    //     print("as str");
+    // }
+    ai fn  as_str4() {
+        print("as str");
+    }
+     fn  as_str5() {
+        print("as str");
+    }
+}
+
+print([HttpStatus::Ok]);
+// let s = HttpStatus.Ok;
+// print(s); // 200
+// let ss = HttpStatus::Ok;
+// print(ss); // HttpStatus::Ok(200)
+
+// // Integer enum with auto-increment
+// enum Status {
+//     Pending,     // 0
+//     Active,      // 1
+//     Failed = 10, // 10
+//     Success,     // 11
+// }
+
+// // String enum (must provide all values)
+// enum FileType {
+//     Text = "text/plain",
+//     Html = "text/html",
+//     Json = "application/json"
+// }
+
+// // Boolean enum (must provide all values)
+// enum Flag {
+//     True = true,
+//     False = false,
+// }
+
+// These would cause errors:

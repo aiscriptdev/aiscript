@@ -1,0 +1,19 @@
+use std.db.redis;
+
+// Simple commands
+redis.cmd("SET mykey somevalue");
+let value = redis.cmd("GET mykey");
+print(value);
+let lists = redis.cmd("LRANGE mylist 0 -1");
+print(lists);
+
+
+// Pipeline usage
+let p = redis.pipeline();
+p.cmd("SET k1 v1");
+p.cmd("SET k2 v2");
+p.cmd("GET k1");
+let results = p.exec();  // Execute pipeline
+print(results);  // ["OK", "OK", "v1"]
+// or
+// p.discard();  // Discard pipeline

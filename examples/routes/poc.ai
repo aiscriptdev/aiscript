@@ -1,0 +1,45 @@
+/// Test POC API
+route /poc {
+    /// Get hello API
+    @auth // JWT auth
+    get /hello {
+        query {
+            /// hello content
+            @string(min_len=3, max_len=30)
+            content: str
+            /// hello age
+            age: int = 18
+        }
+
+        let name = "aiscript";
+        print name;
+        print request;
+        return "get: hello" + name + request.path;
+    }
+
+    /// Post and put hello API
+    @basic_auth // Basic auth (username, password)
+    post /hello, put /hello2 {
+        query {
+            @string(min_len=3, max_len=30)
+            content: str
+            /// age
+            age: int = 18
+            @in(["ios", "android"])
+            platform: str = "ios" 
+        }
+
+        @json
+        body {
+            /// test flag
+            test: bool = true
+        }
+
+        ai fn ask(question) {
+            return prompt content;
+        }
+
+        let answer = ask(content);
+        return "AI answer: " + answer;
+    }
+}
