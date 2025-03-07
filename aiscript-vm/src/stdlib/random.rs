@@ -3,10 +3,9 @@ use rand::prelude::*;
 use std::time::SystemTime;
 
 use crate::{
-    float_arg,
+    NativeFn, Value, VmError, float_arg,
     module::ModuleKind,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 pub fn create_random_module(ctx: Context) -> ModuleKind {
@@ -70,7 +69,7 @@ fn random_float<'gc>(
     }
 
     RNG.with(|rng| {
-        let val: f64 = rng.borrow_mut().gen();
+        let val: f64 = rng.borrow_mut().r#gen();
         Ok(Value::Number(val))
     })
 }
@@ -203,14 +202,14 @@ fn random_normal<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "normal() takes either 0 or 2 arguments".into(),
-            ))
+            ));
         }
     };
 
     RNG.with(|rng| {
         // Box-Muller transform
-        let u1: f64 = rng.borrow_mut().gen();
-        let u2: f64 = rng.borrow_mut().gen();
+        let u1: f64 = rng.borrow_mut().r#gen();
+        let u2: f64 = rng.borrow_mut().r#gen();
 
         let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
         let val = mu + sigma * z;
@@ -240,7 +239,7 @@ fn random_exponential<'gc>(
     };
 
     RNG.with(|rng| {
-        let u: f64 = rng.borrow_mut().gen();
+        let u: f64 = rng.borrow_mut().r#gen();
         let val = -u.ln() / lambda;
         Ok(Value::Number(val))
     })
@@ -264,7 +263,7 @@ fn random_bool<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Va
     };
 
     RNG.with(|rng| {
-        let val: f64 = rng.borrow_mut().gen();
+        let val: f64 = rng.borrow_mut().r#gen();
         Ok(Value::Boolean(val < p))
     })
 }

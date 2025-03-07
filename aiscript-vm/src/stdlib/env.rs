@@ -1,10 +1,10 @@
 use gc_arena::{Gc, RefLock};
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     object::Object,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 pub fn create_env_module(ctx: Context) -> ModuleKind {
@@ -75,6 +75,6 @@ fn env_set<'gc>(_state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<
     let var_name = args[0].as_string()?.to_str().unwrap();
     let value = args[1].as_string()?.to_str().unwrap();
 
-    std::env::set_var(var_name, value);
+    unsafe { std::env::set_var(var_name, value) };
     Ok(Value::Nil)
 }

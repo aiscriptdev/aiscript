@@ -209,7 +209,7 @@ impl<'gc> State<'gc> {
                 self.eval_function(function, &[])?;
 
                 if let Some(ModuleKind::Script {
-                    ref mut globals, ..
+                    globals, ..
                 }) = self.module_manager.modules.get_mut(&path)
                 {
                     *globals = mem::replace(&mut self.globals, prev_globals);
