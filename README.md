@@ -10,9 +10,9 @@
   <a href="https://github.com/aiscript-dev/aiscript/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
   </a>
-  <a href="https://github.com/aiscript-dev/aiscript/actions">
+  <!-- <a href="https://github.com/aiscript-dev/aiscript/actions">
     <img src="https://github.com/aiscript-dev/aiscript/actions/workflows/ci.yml/badge.svg" alt="Build Status">
-  </a>
+  </a> -->
   <a href="https://discord.gg/aiscript">
     <img src="https://img.shields.io/discord/123456789?color=5865F2&label=discord" alt="Discord">
   </a>
@@ -109,20 +109,6 @@ AIScript excels in these scenarios:
 - **Data validation**: When request/response validation is critical to your application
 - **Internal tools**: Build tools quickly with integrated documentation
 
-## Contributing
-
-We welcome contributions to AIScript! Please see our [Contribution Guide](https://aiscript.dev/guide/contribution/interpreter-architecture) for more information.
-
-## License
-
-AIScript is released under the MIT License. See [LICENSE](LICENSE) for details.
-
-## Community
-
-- [Discord](https://discord.gg/aiscript)
-- [Twitter](https://twitter.com/aiscriptlang)
-- [GitHub Discussions](https://github.com/aiscript-dev/aiscript/discussions)
-
 ## Examples
 
 Check out the [examples](./examples) directory for more sample code.
@@ -130,3 +116,17 @@ Check out the [examples](./examples) directory for more sample code.
 ## Roadmap
 
 See our [roadmap](https://aiscript.dev/guide/contribution/roadmap) for upcoming features and improvements.
+
+## Community
+
+- [Discord](https://discord.gg/aiscript)
+- [Twitter](https://twitter.com/aiscriptlang)
+- [GitHub Discussions](https://github.com/aiscript-dev/aiscript/discussions)
+
+## Contributing
+
+We welcome contributions to AIScript! Please see our [Contribution Guide](https://aiscript.dev/guide/contribution/interpreter-architecture) for more information.
+
+## License
+
+AIScript is released under the MIT License. See [LICENSE](LICENSE) for details.
