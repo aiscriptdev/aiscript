@@ -5,17 +5,17 @@ use std::{
 };
 
 use crate::{
+    OpCode, Value,
     ai::Agent,
     ast::{
-        AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, Expr, FnDef, FunctionDecl, Literal,
-        MatchArm, MatchPattern, Mutability, ObjectProperty, ParameterDecl, Program, Stmt,
-        VariableDecl,
+        AgentDecl, ChunkId, ClassDecl, EnumDecl, ErrorHandler, Expr, FStringPart, FnDef,
+        FunctionDecl, Literal, MatchArm, MatchPattern, Mutability, ObjectProperty, ParameterDecl,
+        Program, Stmt, VariableDecl,
     },
     lexer::{Token, TokenType},
     object::{Enum, EnumVariant, Function, FunctionType, Parameter, Upvalue},
     ty::PrimitiveType,
     vm::{Context, VmError},
-    OpCode, Value,
 };
 use aiscript_lexer::ErrorReporter;
 use gc_arena::{Gc, GcRefLock, RefLock};
@@ -688,6 +688,37 @@ impl<'gc> CodeGen<'gc> {
                 Literal::Boolean(b) => self.emit(OpCode::Bool(b)),
                 Literal::Nil => self.emit(OpCode::Nil),
             },
+            Expr::FString { parts, line: _ } => {
+                // Generate code for each part of the f-string and
+                // count how many parts we'll need to combine
+                let mut part_count = 0;
+
+                for part in parts {
+                    match part {
+                        FStringPart::StringLiteral(s) => {
+                            // Push the string literal
+                            self.emit_constant(Value::from(s));
+                            part_count += 1;
+                        }
+                        FStringPart::Expression(expr) => {
+                            // Generate code for the expression
+                            self.generate_expr(*expr)?;
+
+                            // The BuildString opcode will handle conversion implicitly
+                            part_count += 1;
+                        }
+                    }
+                }
+
+                // Now combine all the strings with a BuildString operation
+                if part_count > 0 {
+                    self.emit_build_string(part_count);
+                } else {
+                    // Empty f-string case
+                    let empty_string = self.ctx.intern(b"");
+                    self.emit_constant(Value::from(empty_string));
+                }
+            }
             Expr::Unary {
                 operator, right, ..
             } => {
@@ -891,6 +922,22 @@ impl<'gc> CodeGen<'gc> {
         Ok(())
     }
 
+    fn emit_build_string(&mut self, count: usize) {
+        // Enforce the limit of 255 parts in an f-string
+        if count > u8::MAX as usize {
+            self.error(&format!(
+                "F-string with too many parts: {}. Maximum supported is {}.",
+                count,
+                u8::MAX
+            ));
+            // Emit a BuildString with max parts to avoid further errors
+            self.emit(OpCode::BuildString(u8::MAX));
+        } else {
+            // Simple case - just emit one BuildString opcode
+            self.emit(OpCode::BuildString(count as u8));
+        }
+    }
+
     fn generate_keyword_args(
         &mut self,
         keyword_args: HashMap<String, Expr<'gc>>,
@@ -972,7 +1019,7 @@ impl<'gc> CodeGen<'gc> {
                             self.emit(OpCode::Dup);
                             declared_arm_variable = true;
                         }
-                        // Always match for variable, let 
+                        // Always match for variable, let
                         // the guard (if exists) to check the condition later
                         self.emit(OpCode::Bool(true));
                     }

@@ -7,9 +7,9 @@ use std::{
 use gc_arena::Collect;
 
 use crate::{
+    Value,
     ast::{ChunkId, Visibility},
     object::ListKind,
-    Value,
 };
 
 #[derive(Copy, Clone, Collect, PartialEq)]
@@ -36,6 +36,8 @@ pub enum OpCode {
     GreaterEqual,
     Less,
     LessEqual,
+    // New opcode to build a string from multiple parts on the stack
+    BuildString(u8), // Number of string parts to combine
     Dup,
     Pop(u8), // Pop count
     DefineGlobal {
@@ -253,6 +255,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::GreaterEqual => simple_instruction("GREATER_EQUAL"),
                 OpCode::Less => simple_instruction("LESS"),
                 OpCode::LessEqual => simple_instruction("LESS_EQUAL"),
+                OpCode::BuildString(c) => self.constant_instruction("BUILD_STRING", c),
                 OpCode::Dup => simple_instruction("DUP"),
                 OpCode::Pop(count) => println!("{:-16} {:4}", "OP_POP", count),
                 OpCode::DefineGlobal { name_constant, .. } => {
