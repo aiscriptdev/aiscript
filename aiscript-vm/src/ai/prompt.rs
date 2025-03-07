@@ -27,7 +27,7 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
 }
 
 #[cfg(not(feature = "ai_test"))]
-async fn _prompt_with_config(config: PromptConfig) -> String {
+async fn _prompt_with_config(mut config: PromptConfig) -> String {
     use openai_api_rs::v1::{
         chat_completion::{self, ChatCompletionRequest},
         common::GPT3_5_TURBO,
@@ -37,10 +37,10 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
 
     // Create system message if provided
     let mut messages = Vec::new();
-    if let Some(system_prompt) = &config.system_prompt {
+    if let Some(system_prompt) = config.system_prompt.take() {
         messages.push(chat_completion::ChatCompletionMessage {
             role: chat_completion::MessageRole::system,
-            content: chat_completion::Content::Text(system_prompt.clone()),
+            content: chat_completion::Content::Text(system_prompt),
             name: None,
             tool_calls: None,
             tool_call_id: None,
@@ -50,7 +50,7 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
     // Add user message
     messages.push(chat_completion::ChatCompletionMessage {
         role: chat_completion::MessageRole::user,
-        content: chat_completion::Content::Text(config.input.clone()),
+        content: chat_completion::Content::Text(config.input),
         name: None,
         tool_calls: None,
         tool_call_id: None,
@@ -60,7 +60,7 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
     let mut req = ChatCompletionRequest::new(
         config
             .model
-            .clone()
+            .take()
             .unwrap_or_else(|| GPT3_5_TURBO.to_string()),
         messages,
     );

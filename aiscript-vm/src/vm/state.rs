@@ -943,11 +943,11 @@ impl<'gc> State<'gc> {
                         }
 
                         // Extract system_prompt (optional)
-                        // if let Some(Value::String(sys_prompt) | Value::IoString(sys_prompt)) =
-                        //     obj_ref.fields.get(&self.intern(b"system_prompt"))
-                        // {
-                        //     config.system_prompt = Some(sys_prompt.to_str().unwrap().to_string());
-                        // }
+                        if let Some(Value::String(sys_prompt)) =
+                            obj_ref.fields.get(&self.intern(b"system_prompt"))
+                        {
+                            config.system_prompt = Some(sys_prompt.to_str().unwrap().to_string());
+                        }
 
                         ai::prompt_with_config(config)
                     }
