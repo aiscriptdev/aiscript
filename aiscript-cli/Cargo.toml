@@ -1,5 +1,6 @@
 [package]
 name = "aiscript-cli"
+description = "The AIScript programming language"
 version.workspace = true
 edition.workspace = true
 homepage.workspace = true
