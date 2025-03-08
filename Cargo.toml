@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "aiscript",
-    "aiscript-cli",
+    "aiscript-api",
     "aiscript-lexer",
     "aiscript-arena",
     "aiscript-derived",

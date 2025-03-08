@@ -5,7 +5,7 @@ use regex::Regex;
 
 use test_generator::test_resources;
 
-const CLI_PKG_NAME: &str = "aiscript-test";
+const CLI_PKG_NAME: &str = "aiscript";
 
 fn test_command() -> Command {
     // Create full path to binary

@@ -42,6 +42,20 @@ dependencies = [
 [[package]]
 name = "aiscript"
 version = "0.1.0"
+dependencies = [
+ "aiscript-runtime",
+ "aiscript-vm",
+ "clap",
+ "dirs",
+ "dotenv",
+ "rustyline",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "aiscript-api"
+version = "0.1.0"
 
 [[package]]
 name = "aiscript-arena"
@@ -54,20 +68,6 @@ dependencies = [
  "sptr",
  "tracing",
  "trybuild",
-]
-
-[[package]]
-name = "aiscript-cli"
-version = "0.1.0"
-dependencies = [
- "aiscript-runtime",
- "aiscript-vm",
- "clap",
- "dirs",
- "dotenv",
- "rustyline",
- "serde",
- "tokio",
 ]
 
 [[package]]

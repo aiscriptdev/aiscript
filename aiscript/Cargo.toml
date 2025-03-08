@@ -1,5 +1,6 @@
 [package]
 name = "aiscript"
+description = "The AIScript programming language"
 version.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -7,5 +8,21 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 categories.workspace = true
+default-run = "aiscript"
+
+[[bin]]
+name = "aiscript"
+path = "src/main.rs"
 
 [dependencies]
+aiscript-vm = { path = "../aiscript-vm", version = "0.1.0" }
+aiscript-runtime = { path = "../aiscript-runtime", version = "0.1.0" }
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1.44", features = ["rt-multi-thread", "macros"] }
+dotenv = "0.15.0"
+rustyline = "15.0"
+dirs = "6.0"
+serde.workspace = true
+
+[features]
+ai_test = ["aiscript-vm/ai_test"]
