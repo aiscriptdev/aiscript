@@ -84,17 +84,11 @@ jobs:
         with:
           path: dist
 
-      # Add the install.sh script to the release
-      - name: Prepare install script
-        run: |
-          cp install.sh dist/
-          chmod +x dist/install.sh
-
       # Generate checksums for all artifacts
       - name: Generate checksums
         run: |
           cd dist
-          find . -type f -not -path "*/\.*" | grep -v "checksums.txt" | xargs -I{} shasum -a 256 {} > checksums.txt
+          find aiscript-* -type f | xargs -I{} shasum -a 256 {} > checksums.txt
           cat checksums.txt
 
       - name: Prepare release files
@@ -104,7 +98,6 @@ jobs:
           cp dist/aiscript-macos-x86_64/aiscript-macos-x86_64 release_files/
           cp dist/aiscript-macos-arm64/aiscript-macos-arm64 release_files/
           cp dist/aiscript-windows-x86_64.exe/aiscript-windows-x86_64.exe release_files/
-          cp dist/install.sh release_files/
           cp dist/checksums.txt release_files/
 
       - name: Create release
