@@ -1833,8 +1833,9 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "openai-api-rs"
-version = "5.2.4"
-source = "git+https://github.com/aiscriptdev/openai-api-rs.git?branch=main#449a68229c494cbaf387410e5978f11fc6e1bf03"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a29728a6769e3b6c71f8bd2cf79153d41c1d199f3e574c7566b7b84819e2d5c5"
 dependencies = [
  "bytes",
  "futures-util",

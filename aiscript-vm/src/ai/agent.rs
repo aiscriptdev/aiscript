@@ -280,7 +280,6 @@ pub async fn _run_agent<'gc>(
 ) -> Value<'gc> {
     let message = args[0];
     let debug = args[1].as_boolean();
-    println!("debug: {debug}");
     let mut history = Vec::new();
     history.push(ChatCompletionMessage {
         role: MessageRole::user,
@@ -289,7 +288,7 @@ pub async fn _run_agent<'gc>(
         tool_calls: None,
         tool_call_id: None,
     });
-    let client = super::openai_client();
+    let mut client = super::openai_client();
     loop {
         let mut messages = vec![agent.get_instruction_message()];
         messages.extend(history.clone());
@@ -309,7 +308,7 @@ pub async fn _run_agent<'gc>(
         if debug {
             println!("Response: {}", serde_json::to_string(&response).unwrap());
         }
-        history.push(convert_chat_response_message(response.clone()));
+        history.push(convert_chat_response_message(response));
         if response.tool_calls.is_none() {
             return make_response_object(
                 state,
@@ -359,12 +358,12 @@ impl From<PrimitiveType> for JSONSchemaType {
 }
 
 #[cfg(not(feature = "ai_test"))]
-fn convert_chat_response_message(m: ChatCompletionMessageForResponse) -> ChatCompletionMessage {
+fn convert_chat_response_message(m: &ChatCompletionMessageForResponse) -> ChatCompletionMessage {
     ChatCompletionMessage {
-        role: m.role,
-        content: Content::Text(m.content.unwrap_or_default()),
-        name: m.name,
-        tool_calls: m.tool_calls,
+        role: m.role.clone(),
+        content: Content::Text(m.content.clone().unwrap_or_default()),
+        name: m.name.clone(),
+        tool_calls: m.tool_calls.clone(),
         tool_call_id: None,
     }
 }

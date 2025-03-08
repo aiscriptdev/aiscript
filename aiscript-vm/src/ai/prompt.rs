@@ -33,7 +33,7 @@ async fn _prompt_with_config(mut config: PromptConfig) -> String {
         common::GPT3_5_TURBO,
     };
 
-    let client = super::openai_client();
+    let mut client = super::openai_client();
 
     // Create system message if provided
     let mut messages = Vec::new();
