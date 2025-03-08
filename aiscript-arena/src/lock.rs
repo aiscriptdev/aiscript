@@ -151,7 +151,7 @@ impl<'gc, T: Copy + 'gc> Gc<'gc, Lock<T>> {
     }
 }
 
-unsafe impl<'gc, T: Collect + Copy + 'gc> Collect for Lock<T> {
+unsafe impl<T: Collect + Copy> Collect for Lock<T> {
     #[inline]
     fn needs_trace() -> bool {
         T::needs_trace()
@@ -291,7 +291,7 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, RefLock<T>> {
 // required by `needs_trace`).
 // Fortunately this doesn't matter much as there's no way to allocate
 // unsized GC'd values directly.
-unsafe impl<'gc, T: Collect + 'gc> Collect for RefLock<T> {
+unsafe impl<T: Collect> Collect for RefLock<T> {
     #[inline]
     fn needs_trace() -> bool {
         T::needs_trace()

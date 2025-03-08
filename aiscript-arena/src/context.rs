@@ -588,7 +588,7 @@ impl Context {
 }
 
 // SAFETY: the gc_box must never be accessed after calling this function.
-unsafe fn free_gc_box<'gc>(mut gc_box: GcBox) {
+unsafe fn free_gc_box(mut gc_box: GcBox) {
     unsafe {
         if gc_box.header().is_live() {
             // If the alive flag is set, that means we haven't dropped the inner value of this object,

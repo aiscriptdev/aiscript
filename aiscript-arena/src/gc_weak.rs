@@ -109,7 +109,7 @@ impl<'gc, T: ?Sized + 'gc> GcWeak<'gc, T> {
 impl<'gc, T: 'gc> GcWeak<'gc, T> {
     /// Cast the internal pointer to a different type.
     ///
-    /// SAFETY:
+    /// # SAFETY
     /// It must be valid to dereference a `*mut U` that has come from casting a `*mut T`.
     #[inline]
     pub unsafe fn cast<U: 'gc>(this: GcWeak<'gc, T>) -> GcWeak<'gc, U> {
@@ -122,7 +122,7 @@ impl<'gc, T: 'gc> GcWeak<'gc, T> {
 
     /// Retrieve a `GcWeak` from a raw pointer obtained from `GcWeak::as_ptr`
     ///
-    /// SAFETY:
+    /// # SAFETY
     /// The provided pointer must have been obtained from `GcWeak::as_ptr` or `Gc::as_ptr`, and
     /// the pointer must not have been *fully* collected yet (it may be a dropped but valid weak
     /// pointer).
