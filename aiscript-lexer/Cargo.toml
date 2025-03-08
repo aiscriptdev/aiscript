@@ -9,5 +9,6 @@ license.workspace = true
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
+readme.workspace = true
 
 [dependencies]

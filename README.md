@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="500" src="./assets/logo.svg" alt="AIScript Logo">
+  <img width="500" src="https://aiscript.dev/aiscript-logo.svg" alt="AIScript Logo">
 </p>
 
 <h1 align="center">AIScript</h1>
