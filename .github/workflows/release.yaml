@@ -3,7 +3,7 @@ name: Release AIScript
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   build:
@@ -62,6 +62,7 @@ jobs:
         with:
           name: ${{ matrix.asset_name }}
           path: dist/${{ matrix.asset_name }}
+          retention-days: 1
           if-no-files-found: error
 
   release:
@@ -90,17 +91,21 @@ jobs:
           find . -type f -not -path "*/\.*" | grep -v "checksums.txt" | xargs -I{} shasum -a 256 {} > checksums.txt
           cat checksums.txt
 
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          cp dist/aiscript-linux-x86_64/aiscript-linux-x86_64 release_files/
+          cp dist/aiscript-macos-x86_64/aiscript-macos-x86_64 release_files/
+          cp dist/aiscript-macos-arm64/aiscript-macos-arm64 release_files/
+          cp dist/aiscript-windows-x86_64.exe/aiscript-windows-x86_64.exe release_files/
+          cp dist/install.sh release_files/
+          cp dist/checksums.txt release_files/
+
       - name: Create release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            dist/aiscript-linux-x86_64/aiscript-linux-x86_64
-            dist/aiscript-macos-x86_64/aiscript-macos-x86_64
-            dist/aiscript-macos-arm64/aiscript-macos-arm64
-            dist/aiscript-windows-x86_64.exe/aiscript-windows-x86_64.exe
-            dist/install.sh
-            dist/checksums.txt
+          files: release_files/*
           draft: false
           prerelease: false
           generate_release_notes: true

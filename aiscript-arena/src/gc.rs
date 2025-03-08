@@ -181,6 +181,7 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, T> {
     ///
     /// Unlike `AsRef` or `Deref`, the returned reference isn't bound to the `Gc` itself, and
     /// will stay valid for the entirety of the current arena callback.
+    #[allow(clippy::should_implement_trait)]
     #[inline]
     pub fn as_ref(self: Gc<'gc, T>) -> &'gc T {
         // SAFETY: The returned reference cannot escape the current arena callback, as `&'gc T`
@@ -257,10 +258,6 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, T> {
 impl<'gc, T: PartialEq + ?Sized + 'gc> PartialEq for Gc<'gc, T> {
     fn eq(&self, other: &Self) -> bool {
         (**self).eq(other)
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        (**self).ne(other)
     }
 }
 

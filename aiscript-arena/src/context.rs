@@ -1,3 +1,4 @@
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     cell::{Cell, RefCell},

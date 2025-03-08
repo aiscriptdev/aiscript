@@ -19,6 +19,7 @@ use crate::context::Collection;
 /// deriving `Collect`. A safe way of providing internal mutability in this case is to use
 /// [`crate::lock::Lock<T>`] and [`crate::lock::RefLock<T>`], which provides internal mutability
 /// while ensuring that the write barrier is always executed.
+/// # Safety
 pub unsafe trait Collect {
     /// As an optimization, if this type can never hold a `Gc` pointer and `trace` is unnecessary
     /// to call, you may implement this method and return false. The default implementation returns
