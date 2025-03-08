@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Gc, RefLock};
+use aiscript_arena::{Gc, RefLock};
 
 use crate::{
     builtins::response,

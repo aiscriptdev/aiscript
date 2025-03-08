@@ -18,8 +18,8 @@ use std::ops::Deref;
 
 pub(crate) use aiscript_lexer as lexer;
 pub(crate) use chunk::{Chunk, OpCode};
-use gc_arena::Collect;
-use gc_arena::Mutation;
+use aiscript_arena::Collect;
+use aiscript_arena::Mutation;
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
@@ -67,7 +67,7 @@ unsafe impl Collect for NativeFn<'_> {
         false
     }
 
-    fn trace(&self, _cc: &gc_arena::Collection) {}
+    fn trace(&self, _cc: &aiscript_arena::Collection) {}
 }
 
 unsafe impl Collect for BuiltinMethod<'_> {
@@ -78,7 +78,7 @@ unsafe impl Collect for BuiltinMethod<'_> {
         false
     }
 
-    fn trace(&self, _cc: &gc_arena::Collection) {}
+    fn trace(&self, _cc: &aiscript_arena::Collection) {}
 }
 
 #[derive(Debug, PartialEq)]

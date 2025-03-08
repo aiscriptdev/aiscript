@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use aiscript_directive::Validator;
-use gc_arena::Collect;
+use aiscript_arena::Collect;
 use indexmap::IndexMap;
 
 use crate::object::{FunctionType, ListKind};

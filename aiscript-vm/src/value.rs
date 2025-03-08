@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use gc_arena::{lock::GcRefLock, Collect, Gc, Mutation, RefLock};
+use aiscript_arena::{lock::GcRefLock, Collect, Gc, Mutation, RefLock};
 
 use crate::{
     ai::Agent,

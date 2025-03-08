@@ -1,4 +1,4 @@
-use gc_arena::{Gc, RefLock};
+use aiscript_arena::{Gc, RefLock};
 
 use crate::{
     NativeFn, Value, VmError,

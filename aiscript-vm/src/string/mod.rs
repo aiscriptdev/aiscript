@@ -1,7 +1,7 @@
 mod interned;
 mod utils;
 
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 pub use interned::{InternedString, InternedStringSet};
 
 use crate::{Value, vm::Context};

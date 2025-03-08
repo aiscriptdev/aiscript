@@ -13,12 +13,15 @@ categories.workspace = true
 [dependencies]
 aiscript-lexer = { path = "../aiscript-lexer", version = "0.1.0" }
 aiscript-directive = { path = "../aiscript-directive", version = "0.1.0" }
-ahash = "0.8"
-gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "3dbc6c4263700312ef63ceee3f02943b38828130", features = [
+aiscript-arena = { path = "../aiscript-arena", features = [
     "allocator-api2",
     "hashbrown",
 ] }
-# gc-arena = { path = "../../gc-arena", features = ["allocator-api2", "hashbrown"] }
+# gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "3dbc6c4263700312ef63ceee3f02943b38828130", features = [
+#     "allocator-api2",
+#     "hashbrown",
+# ] }
+ahash = "0.8"
 hashbrown = { version = "0.14", features = ["raw"] }
 openai-api-rs = { git = "https://github.com/aiscriptdev/openai-api-rs.git", branch = "main" }
 num_enum = "0.7.3"

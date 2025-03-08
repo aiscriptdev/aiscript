@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Collect, Gc};
+use aiscript_arena::{Collect, Gc};
 use openai_api_rs::v1::types::JSONSchemaType;
 #[cfg(not(feature = "ai_test"))]
 use openai_api_rs::v1::{

@@ -1,6 +1,6 @@
 use std::{fmt::Display, fs, ops, path::PathBuf};
 
-use gc_arena::{arena::CollectionPhase, Arena, Mutation, Rootable};
+use aiscript_arena::{arena::CollectionPhase, Arena, Mutation, Rootable};
 use sqlx::{PgPool, SqlitePool};
 pub use state::State;
 

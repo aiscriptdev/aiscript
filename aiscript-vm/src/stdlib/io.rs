@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 
 use crate::{
     module::ModuleKind,

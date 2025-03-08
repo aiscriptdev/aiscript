@@ -1,5 +1,5 @@
 use crate::{vm::State, Value, VmError};
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 
 pub(super) fn bool<'gc>(
     _state: &mut State<'gc>,

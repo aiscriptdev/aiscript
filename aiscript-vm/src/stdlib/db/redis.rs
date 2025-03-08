@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use gc_arena::{Gc, RefLock};
+use aiscript_arena::{Gc, RefLock};
 use redis::{RedisResult, Value as RedisValue};
 use tokio::runtime::Handle;
 

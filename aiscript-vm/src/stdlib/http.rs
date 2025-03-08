@@ -1,7 +1,7 @@
 use ahash::AHasher;
 use std::{collections::HashMap, hash::BuildHasherDefault};
 
-use gc_arena::{Gc, RefLock};
+use aiscript_arena::{Gc, RefLock};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use tokio::runtime::Handle;
 
