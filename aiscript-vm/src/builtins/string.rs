@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Gc, Mutation};
+use aiscript_arena::{Gc, Mutation};
 use regex::Regex;
 
 use crate::BuiltinMethod;

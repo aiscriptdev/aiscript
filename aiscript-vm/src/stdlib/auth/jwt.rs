@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{Duration, Utc};
-use gc_arena::{Gc, GcRefLock, RefLock};
+use aiscript_arena::{Gc, GcRefLock, RefLock};
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };

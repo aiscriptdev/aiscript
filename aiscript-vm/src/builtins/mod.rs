@@ -3,7 +3,7 @@ use crate::{
     vm::{Context, State},
     BuiltinMethod, NativeFn, Value, VmError,
 };
-use gc_arena::{Collect, Gc, Mutation};
+use aiscript_arena::{Collect, Gc, Mutation};
 use std::{
     collections::HashMap,
     io::{self, Write},

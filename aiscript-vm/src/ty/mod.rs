@@ -1,4 +1,4 @@
-use gc_arena::Collect;
+use aiscript_arena::Collect;
 
 mod r#enum;
 mod error;

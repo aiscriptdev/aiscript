@@ -1,4 +1,4 @@
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 use std::fs;
 
 use crate::{

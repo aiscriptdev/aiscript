@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},

@@ -4,7 +4,7 @@ use std::{
     sync::Once,
 };
 
-use gc_arena::Collect;
+use aiscript_arena::Collect;
 
 use crate::{
     Value,

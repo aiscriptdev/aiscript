@@ -1,6 +1,6 @@
 use crate::{string::InternedString, Value, VmError};
 use ahash::AHasher;
-use gc_arena::Collect;
+use aiscript_arena::Collect;
 use std::hash::BuildHasherDefault;
 use std::{collections::HashMap, path::PathBuf};
 

@@ -6,7 +6,7 @@ use crate::{
     vm::{Context, State},
     VmError,
 };
-use gc_arena::{Gc, GcRefLock, RefLock};
+use aiscript_arena::{Gc, GcRefLock, RefLock};
 use oauth2::{
     basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
     EndpointNotSet, EndpointSet, RedirectUrl, Scope, TokenResponse, TokenUrl,

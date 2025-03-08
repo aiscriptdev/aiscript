@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use gc_arena::arena::rootless_mutate;
+    use aiscript_arena::arena::rootless_mutate;
 
     use crate::{
         ast::{AgentDecl, FunctionDecl, Stmt},

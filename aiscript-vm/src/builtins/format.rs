@@ -1,5 +1,5 @@
 use crate::{vm::State, Value, VmError};
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 use std::fmt::Write;
 
 /// Format function that implements Python-like string formatting

@@ -7,7 +7,7 @@ use std::{
 };
 
 use ahash::AHasher;
-use gc_arena::{
+use aiscript_arena::{
     Collect, Collection, Gc, Mutation,
     lock::{GcRefLock, RefLock},
 };

@@ -8,7 +8,7 @@ use std::{
 
 use ahash::AHasher;
 use aiscript_directive::Validator;
-use gc_arena::{
+use aiscript_arena::{
     lock::{GcRefLock, RefLock},
     Collect, Gc, Mutation,
 };

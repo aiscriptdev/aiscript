@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use codegen::CodeGen;
-use gc_arena::Gc;
+use aiscript_arena::Gc;
 
 use crate::{ast::ChunkId, object::Function, parser::Parser, vm::Context, VmError};
 

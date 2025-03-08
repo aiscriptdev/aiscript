@@ -3,6 +3,8 @@ members = [
     "aiscript",
     "aiscript-cli",
     "aiscript-lexer",
+    "aiscript-arena",
+    "aiscript-derived",
     "aiscript-directive",
     "aiscript-runtime",
     "aiscript-vm",

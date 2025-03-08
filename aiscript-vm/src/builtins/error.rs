@@ -4,7 +4,7 @@ use crate::{
     value::Value,
     vm::Context,
 };
-use gc_arena::{Gc, GcRefLock, RefLock};
+use aiscript_arena::{Gc, GcRefLock, RefLock};
 use std::collections::HashMap;
 
 pub fn create_validation_error(ctx: Context) -> GcRefLock<'_, Class> {

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use gc_arena::{Gc, GcRefLock, RefLock};
+use aiscript_arena::{Gc, GcRefLock, RefLock};
 use sqlx::{Column, Postgres, Row, TypeInfo, ValueRef};
 
 use tokio::runtime::Handle;
