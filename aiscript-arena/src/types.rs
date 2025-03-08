@@ -272,8 +272,8 @@ pub(crate) type Invariant<'a> = PhantomData<Cell<&'a ()>>;
 mod tagged_ptr {
     #![cfg_attr(not(miri), allow(unstable_name_collisions))]
 
-    #[cfg(not(miri))]
-    use sptr::Strict as _;
+    // #[cfg(not(miri))]
+    // use sptr::Strict as _;
 
     use core::cell::Cell;
 
