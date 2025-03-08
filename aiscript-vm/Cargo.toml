@@ -26,8 +26,8 @@ openai-api-rs = "6.0"
 ahash = "0.8"
 hashbrown = { version = "0.14", features = ["raw"] }
 num_enum = "0.7.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde.workspace = true
+serde_json.workspace = true
 tokio = { version = "1.44" }
 indexmap = "2.7"
 chrono = "0.4"
@@ -40,9 +40,9 @@ sqlx = { version = "0.8", features = [
     "chrono",
     "uuid",
 ] }
-redis = { version = "0.29", features = ["aio", "tokio-comp"] }
+redis.workspace = true
 jsonwebtoken = "9.3"
-reqwest = "0.12"
+reqwest.workspace = true
 oauth2 = "5.0"
 
 [features]

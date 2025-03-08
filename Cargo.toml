@@ -26,6 +26,10 @@ categories = ["compilers", "web-programming", "web-programming::http-server"]
 
 
 [workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+redis = { version = "0.29", features = ["aio", "tokio-comp"] }
+reqwest = "0.12"
 
 # RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.ai
 [profile.release]
