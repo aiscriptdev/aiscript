@@ -25,7 +25,7 @@ use crate::{arena::Root, metrics::Metrics, Collect, Gc, Mutation, Rootable};
 #[derive(Copy, Clone)]
 pub struct DynamicRootSet<'gc>(Gc<'gc, Inner<'gc>>);
 
-unsafe impl<'gc> Collect for DynamicRootSet<'gc> {
+unsafe impl Collect for DynamicRootSet<'_> {
     fn trace(&self, cc: &crate::Collection) {
         self.0.trace(cc);
     }
@@ -189,7 +189,7 @@ struct Inner<'gc> {
     slots: Rc<RefCell<Slots<'gc>>>,
 }
 
-unsafe impl<'gc> Collect for Inner<'gc> {
+unsafe impl Collect for Inner<'_> {
     fn trace(&self, cc: &crate::Collection) {
         let slots = self.slots.borrow();
         slots.trace(cc);
@@ -209,7 +209,7 @@ enum Slot<'gc> {
     Occupied { root: Gc<'gc, ()>, ref_count: usize },
 }
 
-unsafe impl<'gc> Collect for Slot<'gc> {
+unsafe impl Collect for Slot<'_> {
     fn trace(&self, cc: &crate::Collection) {
         match self {
             Slot::Vacant { .. } => {}
@@ -224,14 +224,14 @@ struct Slots<'gc> {
     next_free: Index,
 }
 
-impl<'gc> Drop for Slots<'gc> {
+impl Drop for Slots<'_> {
     fn drop(&mut self) {
         self.metrics
             .mark_external_deallocation(self.slots.capacity() * mem::size_of::<Slot>());
     }
 }
 
-unsafe impl<'gc> Collect for Slots<'gc> {
+unsafe impl Collect for Slots<'_> {
     fn trace(&self, cc: &crate::Collection) {
         self.slots.trace(cc);
     }

@@ -19,11 +19,11 @@ impl GcBox {
     /// **SAFETY:** The pointer must point to a valid `GcBoxInner` allocated
     /// in a `Box`.
     #[inline(always)]
-    pub(crate) unsafe fn erase<T: ?Sized>(ptr: NonNull<GcBoxInner<T>>) -> Self {
+    pub(crate) unsafe fn erase<T: ?Sized>(ptr: NonNull<GcBoxInner<T>>) -> Self { unsafe {
         // This cast is sound because `GcBoxInner` is `repr(C)`.
         let erased = ptr.as_ptr() as *mut GcBoxInner<()>;
         Self(NonNull::new_unchecked(erased))
-    }
+    }}
 
     /// Gets a pointer to the value stored inside this box.
     /// `T` must be the same type that was used with `erase`, so that
@@ -47,18 +47,18 @@ impl GcBox {
     ///
     /// **SAFETY**: `Self::drop_in_place` must not have been called.
     #[inline(always)]
-    pub(crate) unsafe fn trace_value(&self, cc: &crate::Collection) {
+    pub(crate) unsafe fn trace_value(&self, cc: &crate::Collection) { unsafe {
         (self.header().vtable().trace_value)(*self, cc)
-    }
+    }}
 
     /// Drops the stored value.
     ///
     /// **SAFETY**: once called, no GC pointers should access the stored value
     /// (but accessing the `GcBox` itself is still safe).
     #[inline(always)]
-    pub(crate) unsafe fn drop_in_place(&mut self) {
+    pub(crate) unsafe fn drop_in_place(&mut self) { unsafe {
         (self.header().vtable().drop_value)(*self)
-    }
+    }}
 
     /// Deallocates the box. Failing to call `Self::drop_in_place` beforehand
     /// will cause the stored value to be leaked.
@@ -66,12 +66,12 @@ impl GcBox {
     /// **SAFETY**: once called, this `GcBox` should never be accessed by any GC
     /// pointers again.
     #[inline(always)]
-    pub(crate) unsafe fn dealloc(self) {
+    pub(crate) unsafe fn dealloc(self) { unsafe {
         let layout = self.header().vtable().box_layout;
         let ptr = self.0.as_ptr() as *mut u8;
         // SAFETY: the pointer was `Box`-allocated with this layout.
         alloc::alloc::dealloc(ptr, layout);
-    }
+    }}
 }
 
 pub(crate) struct GcBoxHeader {

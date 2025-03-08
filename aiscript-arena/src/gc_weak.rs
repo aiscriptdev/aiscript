@@ -38,7 +38,7 @@ impl<'gc, T: ?Sized + 'gc> GcWeak<'gc, T> {
     #[inline]
     pub fn upgrade(self, mc: &Mutation<'gc>) -> Option<Gc<'gc, T>> {
         let ptr = unsafe { GcBox::erase(self.inner.ptr) };
-        mc.upgrade(ptr).then(|| self.inner)
+        mc.upgrade(ptr).then_some(self.inner)
     }
 
     /// During collection, return whether the value referenced by this `GcWeak` has already been
@@ -97,7 +97,7 @@ impl<'gc, T: ?Sized + 'gc> GcWeak<'gc, T> {
     pub fn ptr_eq(this: GcWeak<'gc, T>, other: GcWeak<'gc, T>) -> bool {
         // TODO: Equivalent to `core::ptr::addr_eq`:
         // https://github.com/rust-lang/rust/issues/116324
-        this.as_ptr() as *const () == other.as_ptr() as *const ()
+        core::ptr::eq(this.as_ptr(), other.as_ptr())
     }
 
     #[inline]
@@ -112,11 +112,11 @@ impl<'gc, T: 'gc> GcWeak<'gc, T> {
     /// SAFETY:
     /// It must be valid to dereference a `*mut U` that has come from casting a `*mut T`.
     #[inline]
-    pub unsafe fn cast<U: 'gc>(this: GcWeak<'gc, T>) -> GcWeak<'gc, U> {
+    pub unsafe fn cast<U: 'gc>(this: GcWeak<'gc, T>) -> GcWeak<'gc, U> { unsafe {
         GcWeak {
             inner: Gc::cast::<U>(this.inner),
         }
-    }
+    }}
 
     /// Retrieve a `GcWeak` from a raw pointer obtained from `GcWeak::as_ptr`
     ///
@@ -125,9 +125,9 @@ impl<'gc, T: 'gc> GcWeak<'gc, T> {
     /// the pointer must not have been *fully* collected yet (it may be a dropped but valid weak
     /// pointer).
     #[inline]
-    pub unsafe fn from_ptr(ptr: *const T) -> GcWeak<'gc, T> {
+    pub unsafe fn from_ptr(ptr: *const T) -> GcWeak<'gc, T> { unsafe {
         GcWeak {
             inner: Gc::from_ptr(ptr),
         }
-    }
+    }}
 }

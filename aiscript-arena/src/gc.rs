@@ -152,7 +152,7 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, T> {
     /// The provided pointer must have been obtained from `Gc::as_ptr`, and the pointer must not
     /// have been collected yet.
     #[inline]
-    pub unsafe fn from_ptr(ptr: *const T) -> Gc<'gc, T> {
+    pub unsafe fn from_ptr(ptr: *const T) -> Gc<'gc, T> { unsafe {
         let layout = Layout::new::<GcBoxHeader>();
         let (_, header_offset) = layout.extend(Layout::for_value(&*ptr)).unwrap();
         let header_offset = -(header_offset as isize);
@@ -161,7 +161,7 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, T> {
             ptr: NonNull::new_unchecked(ptr),
             _invariant: PhantomData,
         }
-    }
+    }}
 }
 
 impl<'gc, T: Unlock + ?Sized + 'gc> Gc<'gc, T> {
@@ -217,7 +217,7 @@ impl<'gc, T: ?Sized + 'gc> Gc<'gc, T> {
     pub fn ptr_eq(this: Gc<'gc, T>, other: Gc<'gc, T>) -> bool {
         // TODO: Equivalent to `core::ptr::addr_eq`:
         // https://github.com/rust-lang/rust/issues/116324
-        Gc::as_ptr(this) as *const () == Gc::as_ptr(other) as *const ()
+        core::ptr::eq(Gc::as_ptr(this), Gc::as_ptr(other))
     }
 
     #[inline]

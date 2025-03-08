@@ -228,12 +228,12 @@ make_lock_wrapper!(
     impl ?Sized {
         #[track_caller]
         #[inline]
-        pub fn borrow<'a>(&'a self) -> Ref<'a, T> {
+        pub fn borrow(&self) -> Ref<'_, T> {
             self.cell.borrow()
         }
 
         #[inline]
-        pub fn try_borrow<'a>(&'a self) -> Result<Ref<'a, T>, BorrowError> {
+        pub fn try_borrow(&self) -> Result<Ref<'_, T>, BorrowError> {
             self.cell.try_borrow()
         }
     }

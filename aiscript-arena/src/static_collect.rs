@@ -11,7 +11,7 @@ use core::ops::{Deref, DerefMut};
 #[repr(transparent)]
 pub struct Static<T: ?Sized>(pub T);
 
-impl<'a, T: ?Sized + 'static> Rootable<'a> for Static<T> {
+impl<T: ?Sized + 'static> Rootable<'_> for Static<T> {
     type Root = Static<T>;
 }
 

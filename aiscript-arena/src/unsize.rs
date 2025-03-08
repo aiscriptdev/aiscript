@@ -82,14 +82,14 @@ unsafe impl<'gc, T, U: ?Sized> __CoercePtrInternal<Gc<'gc, U>> for Gc<'gc, T> {
     unsafe fn __coerce_unchecked<F>(self, coerce: F) -> Gc<'gc, U>
     where
         F: FnOnce(*mut T) -> *mut U,
-    {
+    { unsafe {
         let ptr = self.ptr.as_ptr() as *mut T;
         let ptr = NonNull::new_unchecked(coerce(ptr) as *mut GcBoxInner<U>);
         Gc {
             ptr,
             _invariant: PhantomData,
         }
-    }
+    }}
 }
 
 unsafe impl<'gc, T, U: ?Sized> __CoercePtrInternal<GcWeak<'gc, U>> for GcWeak<'gc, T> {
@@ -100,8 +100,8 @@ unsafe impl<'gc, T, U: ?Sized> __CoercePtrInternal<GcWeak<'gc, U>> for GcWeak<'g
     unsafe fn __coerce_unchecked<F>(self, coerce: F) -> GcWeak<'gc, U>
     where
         F: FnOnce(*mut T) -> *mut U,
-    {
+    { unsafe {
         let inner = self.inner.__coerce_unchecked(coerce);
         GcWeak { inner }
-    }
+    }}
 }

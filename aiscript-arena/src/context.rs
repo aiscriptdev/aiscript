@@ -92,11 +92,11 @@ impl<'gc> Deref for Finalization<'gc> {
 
     fn deref(&self) -> &Self::Target {
         // SAFETY: Finalization and Mutation are #[repr(transparent)]
-        unsafe { mem::transmute::<&Self, &Mutation>(&self) }
+        unsafe { mem::transmute::<&Self, &Mutation>(self) }
     }
 }
 
-impl<'gc> Finalization<'gc> {
+impl Finalization<'_> {
     #[inline]
     pub(crate) fn resurrect(&self, gc_box: GcBox) {
         self.context.resurrect(gc_box)
@@ -178,7 +178,7 @@ impl Drop for Context {
     fn drop(&mut self) {
         struct DropAll<'a>(&'a Metrics, Option<GcBox>);
 
-        impl<'a> Drop for DropAll<'a> {
+        impl Drop for DropAll<'_> {
             fn drop(&mut self) {
                 if let Some(gc_box) = self.1.take() {
                     let mut drop_resume = DropAll(self.0, Some(gc_box));
@@ -193,7 +193,7 @@ impl Drop for Context {
             }
         }
 
-        let _guard = PhaseGuard::enter(&self, Some(Phase::Drop));
+        let _guard = PhaseGuard::enter(self, Some(Phase::Drop));
         DropAll(&self.metrics, self.all.get());
     }
 }
@@ -216,9 +216,9 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn mutation_context<'gc>(&self) -> &Mutation<'gc> {
-        mem::transmute::<&Self, &Mutation>(&self)
-    }
+    pub(crate) unsafe fn mutation_context<'gc>(&self) -> &Mutation<'gc> { unsafe {
+        mem::transmute::<&Self, &Mutation>(self)
+    }}
 
     #[inline]
     fn collection_context(&self) -> &Collection {
@@ -227,9 +227,9 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn finalization_context<'gc>(&self) -> &Finalization<'gc> {
-        mem::transmute::<&Self, &Finalization>(&self)
-    }
+    pub(crate) unsafe fn finalization_context<'gc>(&self) -> &Finalization<'gc> { unsafe {
+        mem::transmute::<&Self, &Finalization>(self)
+    }}
 
     #[inline]
     pub(crate) fn metrics(&self) -> &Metrics {
@@ -302,11 +302,7 @@ impl Context {
                     let next_gray = if let Some(gc_box) = self.gray.borrow_mut().pop() {
                         self.metrics.mark_gc_traced(gc_box.header().size_of_box());
                         Some(gc_box)
-                    } else if let Some(gc_box) = self.gray_again.borrow_mut().pop() {
-                        Some(gc_box)
-                    } else {
-                        None
-                    };
+                    } else { self.gray_again.borrow_mut().pop() };
 
                     if let Some(gc_box) = next_gray {
                         // If we have an object in the gray queue, take one, trace it, and turn it
@@ -325,7 +321,7 @@ impl Context {
                             gc_box: GcBox,
                         }
 
-                        impl<'a> Drop for DropGuard<'a> {
+                        impl Drop for DropGuard<'_> {
                             fn drop(&mut self) {
                                 self.cx.gray_again.borrow_mut().push(self.gc_box);
                             }
@@ -342,21 +338,19 @@ impl Context {
                         // again" objects.
                         root.trace(self.collection_context());
                         self.root_needs_trace.set(false);
+                    } else if early_stop == Some(EarlyStop::BeforeSweep) {
+                        target_debt = f64::INFINITY;
                     } else {
-                        if early_stop == Some(EarlyStop::BeforeSweep) {
-                            target_debt = f64::INFINITY;
-                        } else {
-                            // If we have no gray objects left, we enter the sweep phase.
-                            entered.switch(Phase::Sweep);
+                        // If we have no gray objects left, we enter the sweep phase.
+                        entered.switch(Phase::Sweep);
 
-                            // Set `sweep to the current head of our `all` linked list. Any new
-                            // allocations during the newly-entered `Phase:Sweep` will update `all`,
-                            // but will *not* be reachable from `this.sweep`.
-                            self.sweep.set(self.all.get());
+                        // Set `sweep to the current head of our `all` linked list. Any new
+                        // allocations during the newly-entered `Phase:Sweep` will update `all`,
+                        // but will *not* be reachable from `this.sweep`.
+                        self.sweep.set(self.all.get());
 
-                            // No need to update metrics here.
-                            continue;
-                        }
+                        // No need to update metrics here.
+                        continue;
                     }
                 }
                 Phase::Sweep => {
@@ -484,7 +478,7 @@ impl Context {
                 parent.header().set_color(GcColor::Gray);
                 this.gray_again.borrow_mut().push(parent);
             }
-            barrier(&self, parent);
+            barrier(self, parent);
         }
     }
 
@@ -592,13 +586,13 @@ impl Context {
 }
 
 // SAFETY: the gc_box must never be accessed after calling this function.
-unsafe fn free_gc_box<'gc>(mut gc_box: GcBox) {
+unsafe fn free_gc_box<'gc>(mut gc_box: GcBox) { unsafe {
     if gc_box.header().is_live() {
         // If the alive flag is set, that means we haven't dropped the inner value of this object,
         gc_box.drop_in_place();
     }
     gc_box.dealloc();
-}
+}}
 
 /// Helper type for managing phase transitions.
 struct PhaseGuard<'a> {
@@ -607,7 +601,7 @@ struct PhaseGuard<'a> {
     span: tracing::span::EnteredSpan,
 }
 
-impl<'a> Drop for PhaseGuard<'a> {
+impl Drop for PhaseGuard<'_> {
     fn drop(&mut self) {
         #[cfg(feature = "tracing")]
         {

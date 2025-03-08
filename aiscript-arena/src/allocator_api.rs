@@ -59,7 +59,7 @@ impl<'gc, A> MetricsAlloc<'gc, A> {
     }
 }
 
-unsafe impl<'gc, A: Allocator> Allocator for MetricsAlloc<'gc, A> {
+unsafe impl<A: Allocator> Allocator for MetricsAlloc<'_, A> {
     #[inline]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         let ptr = self.allocator.allocate(layout)?;
@@ -68,10 +68,10 @@ unsafe impl<'gc, A: Allocator> Allocator for MetricsAlloc<'gc, A> {
     }
 
     #[inline]
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         self.metrics.mark_external_deallocation(layout.size());
         self.allocator.deallocate(ptr, layout);
-    }
+    }}
 
     #[inline]
     fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
@@ -86,12 +86,12 @@ unsafe impl<'gc, A: Allocator> Allocator for MetricsAlloc<'gc, A> {
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         let ptr = self.allocator.grow(ptr, old_layout, new_layout)?;
         self.metrics
             .mark_external_allocation(new_layout.size() - old_layout.size());
         Ok(ptr)
-    }
+    }}
 
     #[inline]
     unsafe fn grow_zeroed(
@@ -99,12 +99,12 @@ unsafe impl<'gc, A: Allocator> Allocator for MetricsAlloc<'gc, A> {
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         let ptr = self.allocator.grow_zeroed(ptr, old_layout, new_layout)?;
         self.metrics
             .mark_external_allocation(new_layout.size() - old_layout.size());
         Ok(ptr)
-    }
+    }}
 
     #[inline]
     unsafe fn shrink(
@@ -112,15 +112,15 @@ unsafe impl<'gc, A: Allocator> Allocator for MetricsAlloc<'gc, A> {
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         let ptr = self.allocator.shrink(ptr, old_layout, new_layout)?;
         self.metrics
             .mark_external_deallocation(old_layout.size() - new_layout.size());
         Ok(ptr)
-    }
+    }}
 }
 
-unsafe impl<'gc, A: 'static> Collect for MetricsAlloc<'gc, A> {
+unsafe impl<A: 'static> Collect for MetricsAlloc<'_, A> {
     #[inline]
     fn needs_trace() -> bool {
         false

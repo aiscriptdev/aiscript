@@ -339,7 +339,7 @@ where
 
 pub struct MarkedArena<'a, R: for<'b> Rootable<'b>>(&'a mut Arena<R>);
 
-impl<'a, R> MarkedArena<'a, R>
+impl<R> MarkedArena<'_, R>
 where
     R: for<'b> Rootable<'b>,
     for<'b> Root<'b, R>: Collect,
