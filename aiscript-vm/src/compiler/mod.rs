@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
-use codegen::CodeGen;
 use aiscript_arena::Gc;
+use codegen::CodeGen;
 
-use crate::{ast::ChunkId, object::Function, parser::Parser, vm::Context, VmError};
+use crate::{VmError, ast::ChunkId, object::Function, parser::Parser, vm::Context};
 
 mod codegen;
 #[cfg(feature = "optimizer")]

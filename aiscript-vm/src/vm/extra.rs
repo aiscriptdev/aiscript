@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use aiscript_arena::{Gc, RefLock};
 
 use crate::{
+    NativeFn, ReturnValue, Value,
     builtins::response,
     object::{Instance, Object},
-    NativeFn, ReturnValue, Value,
 };
 
 use super::Vm;

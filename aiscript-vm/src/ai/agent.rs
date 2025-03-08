@@ -14,13 +14,13 @@ use openai_api_rs::v1::{
 use tokio::runtime::Handle;
 
 use crate::{
+    Chunk, Value,
     ast::{Expr, FnDef, Literal},
     lexer::Token,
     object::{Function, Object, Parameter},
     string::InternedString,
     ty::PrimitiveType,
     vm::{Context, State},
-    Chunk, Value,
 };
 
 #[derive(Collect)]

@@ -5,10 +5,10 @@ use redis::{RedisResult, Value as RedisValue};
 use tokio::runtime::Handle;
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     object::Object,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 thread_local! {

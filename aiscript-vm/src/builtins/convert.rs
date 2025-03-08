@@ -1,4 +1,4 @@
-use crate::{vm::State, Value, VmError};
+use crate::{Value, VmError, vm::State};
 use aiscript_arena::Gc;
 
 pub(super) fn bool<'gc>(
@@ -128,7 +128,7 @@ pub(super) fn chr<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "chr() argument must be an integer.".into(),
-            ))
+            ));
         }
     };
 
@@ -206,7 +206,7 @@ pub(super) fn bin<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "bin() argument must be an integer.".into(),
-            ))
+            ));
         }
     };
 
@@ -236,7 +236,7 @@ pub(super) fn hex<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "hex() argument must be an integer.".into(),
-            ))
+            ));
         }
     };
 
@@ -266,7 +266,7 @@ pub(super) fn oct<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "oct() argument must be an integer.".into(),
-            ))
+            ));
         }
     };
 

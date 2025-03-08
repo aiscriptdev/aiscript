@@ -39,7 +39,10 @@ mod tests {
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::FString);
-        assert_eq!(token.lexeme, r#"Nested: {{not interpolated}} but {interpolated}"#);
+        assert_eq!(
+            token.lexeme,
+            r#"Nested: {{not interpolated}} but {interpolated}"#
+        );
     }
 
     #[test]
@@ -49,7 +52,10 @@ mod tests {
 
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::FString);
-        assert_eq!(token.lexeme, r#"This has \"escaped quotes\" and {variable}"#);
+        assert_eq!(
+            token.lexeme,
+            r#"This has \"escaped quotes\" and {variable}"#
+        );
     }
 
     #[test]
@@ -142,7 +148,10 @@ mod tests {
         let token = scanner.next().unwrap();
         assert_eq!(token.kind, TokenType::FString);
         // The lexer will include the escaped quotes in the lexeme
-        assert_eq!(token.lexeme, r#"Complex: {fn_call(arg1, {nested: \"object\"})[index].property}"#);
+        assert_eq!(
+            token.lexeme,
+            r#"Complex: {fn_call(arg1, {nested: \"object\"})[index].property}"#
+        );
     }
 
     #[test]

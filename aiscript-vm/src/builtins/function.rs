@@ -1,4 +1,4 @@
-use crate::{vm::State, Value, VmError};
+use crate::{Value, VmError, vm::State};
 
 pub(super) fn map<'gc>(
     state: &mut State<'gc>,
@@ -16,7 +16,7 @@ pub(super) fn map<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "map() first argument must be an array.".into(),
-            ))
+            ));
         }
     };
 
@@ -26,12 +26,12 @@ pub(super) fn map<'gc>(
         Value::NativeFunction(_) => {
             return Err(VmError::RuntimeError(
                 "map() doesn't support native functions yet.".into(),
-            ))
+            ));
         }
         _ => {
             return Err(VmError::RuntimeError(
                 "map() second argument must be a function.".into(),
-            ))
+            ));
         }
     };
 
@@ -66,7 +66,7 @@ pub(super) fn filter<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "filter() first argument must be an array.".into(),
-            ))
+            ));
         }
     };
 
@@ -76,12 +76,12 @@ pub(super) fn filter<'gc>(
         Value::NativeFunction(_) => {
             return Err(VmError::RuntimeError(
                 "filter() doesn't support native functions yet.".into(),
-            ))
+            ));
         }
         _ => {
             return Err(VmError::RuntimeError(
                 "filter() second argument must be a function.".into(),
-            ))
+            ));
         }
     };
 
@@ -120,7 +120,7 @@ pub(super) fn zip<'gc>(
             _ => {
                 return Err(VmError::RuntimeError(
                     "zip() arguments must be arrays.".into(),
-                ))
+                ));
             }
         }
     }

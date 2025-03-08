@@ -5,10 +5,10 @@ use sqlx::{Column, Row, Sqlite, TypeInfo, ValueRef};
 use tokio::runtime::Handle;
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     object::{Class, Instance, Object},
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 thread_local! {
@@ -217,7 +217,7 @@ fn sqlite_query_as<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "First argument to query_as() must be a class.".into(),
-            ))
+            ));
         }
     };
 
@@ -336,7 +336,7 @@ mod transaction {
             _ => {
                 return Err(VmError::RuntimeError(
                     "First argument to query_as() must be a class.".into(),
-                ))
+                ));
             }
         };
 

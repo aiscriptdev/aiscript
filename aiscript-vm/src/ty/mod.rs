@@ -5,8 +5,8 @@ mod error;
 mod resolver;
 
 use crate::lexer::Token;
-pub(crate) use error::FunctionErrorResolver;
 pub(crate) use r#enum::EnumVariantChecker;
+pub(crate) use error::FunctionErrorResolver;
 pub(crate) use resolver::{ClassField, TypeResolver, ValidationError};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]

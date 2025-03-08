@@ -1,14 +1,14 @@
 use std::{fmt::Display, fs, ops, path::PathBuf};
 
-use aiscript_arena::{arena::CollectionPhase, Arena, Mutation, Rootable};
+use aiscript_arena::{Arena, Mutation, Rootable, arena::CollectionPhase};
 use sqlx::{PgPool, SqlitePool};
 pub use state::State;
 
 use crate::{
+    ReturnValue, Value,
     ast::ChunkId,
     builtins, stdlib,
     string::{InternedString, InternedStringSet},
-    ReturnValue, Value,
 };
 use fuel::Fuel;
 

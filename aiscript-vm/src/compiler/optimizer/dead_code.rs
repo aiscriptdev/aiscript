@@ -1,5 +1,5 @@
 use super::OptimizationStrategy;
-use crate::{chunk::Chunk, OpCode};
+use crate::{OpCode, chunk::Chunk};
 use std::collections::HashMap;
 
 // Removes unreachable code after unconditional control flow

@@ -7,11 +7,11 @@ use std::{
 use aiscript_arena::Gc;
 
 use crate::{
+    NativeFn,
     module::ModuleKind,
     string_arg,
     value::Value,
     vm::{Context, State, VmError},
-    NativeFn,
 };
 
 pub fn create_io_module(ctx: Context) -> ModuleKind {

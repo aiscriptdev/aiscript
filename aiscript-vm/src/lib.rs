@@ -16,13 +16,13 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 
-pub(crate) use aiscript_lexer as lexer;
-pub(crate) use chunk::{Chunk, OpCode};
 use aiscript_arena::Collect;
 use aiscript_arena::Mutation;
+pub(crate) use aiscript_lexer as lexer;
+pub(crate) use chunk::{Chunk, OpCode};
+use serde::Serialize;
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
-use serde::Serialize;
 pub use value::Value;
 use vm::State;
 pub use vm::Vm;

@@ -1,15 +1,15 @@
 use std::mem;
 
 use crate::{
+    VmError,
     object::Class,
     value::Value,
     vm::{Context, State},
-    VmError,
 };
 use aiscript_arena::{Gc, GcRefLock, RefLock};
 use oauth2::{
-    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    EndpointNotSet, EndpointSet, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    RedirectUrl, Scope, TokenResponse, TokenUrl, basic::BasicClient,
 };
 use tokio::runtime::Handle;
 

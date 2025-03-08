@@ -1,13 +1,13 @@
+use aiscript_directive::Validator;
 use aiscript_directive::route::{Auth, RouteAnnotation};
 use aiscript_directive::validator::{InValidator, StringValidator};
-use aiscript_directive::Validator;
 use oas3::{
+    Spec,
     spec::{
         Components, Info, MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter,
         ParameterIn, ParameterStyle, PathItem, RequestBody, Response, SchemaType as Type,
         SchemaTypeSet, SecurityScheme, Server, Tag,
     },
-    Spec,
 };
 use std::collections::BTreeMap;
 

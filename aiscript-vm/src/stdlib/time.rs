@@ -1,16 +1,15 @@
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use aiscript_arena::Gc;
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
-    float_arg,
+    NativeFn, Value, VmError, float_arg,
     module::ModuleKind,
     string_arg,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 pub fn create_time_module(ctx: Context) -> ModuleKind {

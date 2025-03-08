@@ -6,11 +6,11 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use tokio::runtime::Handle;
 
 use crate::{
+    NativeFn, Value,
     module::ModuleKind,
     object::Object,
     string::InternedString,
     vm::{Context, VmError},
-    NativeFn, Value,
 };
 
 pub fn create_http_module(ctx: Context) -> ModuleKind {

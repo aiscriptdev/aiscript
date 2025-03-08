@@ -1,9 +1,9 @@
 use aiscript_arena::{Gc, RefLock};
 
 use crate::{
+    Value, VmError,
     object::{Class, Instance, Object},
     vm::State,
-    Value, VmError,
 };
 
 /// Creates a new Response instance with the given status code, body, headers, and cookies.

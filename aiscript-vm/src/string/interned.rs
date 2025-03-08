@@ -9,10 +9,10 @@ use std::{
 
 use ahash::AHasher;
 use aiscript_arena::{
-    allocator_api::MetricsAlloc, barrier::Unlock, lock::RefLock, metrics::Metrics, Collect,
-    Collection, Gc, GcWeak, Mutation, Static,
+    Collect, Collection, Gc, GcWeak, Mutation, Static, allocator_api::MetricsAlloc,
+    barrier::Unlock, lock::RefLock, metrics::Metrics,
 };
-use hashbrown::{hash_map, raw::RawTable, HashMap};
+use hashbrown::{HashMap, hash_map, raw::RawTable};
 
 use super::utils::{debug_utf8_lossy, display_utf8_lossy};
 
@@ -272,7 +272,7 @@ impl<'gc> InternedDynStrings<'gc> {
 
     fn intern(self, mc: &Mutation<'gc>, s: &[u8]) -> InternedString<'gc> {
         // SAFETY: If a new string is added, we call the write barrier.
-        let mut dyn_strings = unsafe { self.0 .0.unlock_unchecked() }.borrow_mut();
+        let mut dyn_strings = unsafe { self.0.0.unlock_unchecked() }.borrow_mut();
 
         // SAFETY: The RawTable outlives the iterator
         unsafe {

@@ -45,10 +45,12 @@ impl<T: ?Sized> Write<T> {
     /// by this wrapper, unless [`Gc::write`] is invoked manually on the parent [`Gc`]
     /// pointer during the current arena callback.
     #[inline(always)]
-    pub unsafe fn assume(v: &T) -> &Self { unsafe {
-        // SAFETY: `Self` is `repr(transparent)`.
-        mem::transmute(v)
-    }}
+    pub unsafe fn assume(v: &T) -> &Self {
+        unsafe {
+            // SAFETY: `Self` is `repr(transparent)`.
+            mem::transmute(v)
+        }
+    }
 
     /// Gets a writable reference to non-GC'd data.
     ///
@@ -74,10 +76,12 @@ impl<T: ?Sized> Write<T> {
     /// Implementation detail of `write_field!`; same safety requirements as `assume`.
     #[inline(always)]
     #[doc(hidden)]
-    pub unsafe fn __from_ref_and_ptr(v: &T, _: *const T) -> &Self { unsafe {
-        // SAFETY: `Self` is `repr(transparent)`.
-        mem::transmute(v)
-    }}
+    pub unsafe fn __from_ref_and_ptr(v: &T, _: *const T) -> &Self {
+        unsafe {
+            // SAFETY: `Self` is `repr(transparent)`.
+            mem::transmute(v)
+        }
+    }
 
     /// Unlocks the referenced value, providing full interior mutability.
     #[inline]

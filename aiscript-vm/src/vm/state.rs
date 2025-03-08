@@ -14,9 +14,16 @@ use aiscript_arena::{
 use sqlx::{PgPool, SqlitePool};
 
 use crate::{
-    ai::{self, PromptConfig}, ast::{ChunkId, Visibility}, builtins::BuiltinMethods, module::{ModuleKind, ModuleManager, ModuleSource}, object::{
-        BoundMethod, Class, Closure, EnumVariant, Function, Instance, List, ListKind, Object, Upvalue, UpvalueObj
-    }, string::{InternedString, InternedStringSet}, NativeFn, OpCode, ReturnValue, Value
+    NativeFn, OpCode, ReturnValue, Value,
+    ai::{self, PromptConfig},
+    ast::{ChunkId, Visibility},
+    builtins::BuiltinMethods,
+    module::{ModuleKind, ModuleManager, ModuleSource},
+    object::{
+        BoundMethod, Class, Closure, EnumVariant, Function, Instance, List, ListKind, Object,
+        Upvalue, UpvalueObj,
+    },
+    string::{InternedString, InternedStringSet},
 };
 
 use super::{Context, VmError, fuel::Fuel};

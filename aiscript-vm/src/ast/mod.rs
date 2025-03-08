@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use aiscript_directive::Validator;
 use aiscript_arena::Collect;
+use aiscript_directive::Validator;
 use indexmap::IndexMap;
 
 use crate::object::{FunctionType, ListKind};
+use crate::{Value, string::InternedString};
 use crate::{lexer::Token, ty::PrimitiveType};
-use crate::{string::InternedString, Value};
 
 mod pretty;
 

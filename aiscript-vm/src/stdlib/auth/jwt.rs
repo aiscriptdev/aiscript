@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use chrono::{Duration, Utc};
 use aiscript_arena::{Gc, GcRefLock, RefLock};
+use chrono::{Duration, Utc};
 use jsonwebtoken::{
-    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
+    Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation, decode, encode,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     object::Object,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -100,7 +100,7 @@ fn build_claims<'gc>(claims_obj: &GcRefLock<'gc, Object<'gc>>) -> Result<Claims,
                         return Err(VmError::RuntimeError(format!(
                             "Unsupported claim value type for key: {}",
                             key_str
-                        )))
+                        )));
                     }
                 };
                 claims.extra.insert(key_str.to_string(), json_value);
@@ -180,7 +180,7 @@ fn jwt_encode<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Valu
         _ => {
             return Err(VmError::RuntimeError(
                 "First argument must be claims object".into(),
-            ))
+            ));
         }
     };
 
@@ -259,7 +259,7 @@ fn create_access_token<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "First argument must be payload object".into(),
-            ))
+            ));
         }
     };
 
@@ -325,7 +325,7 @@ fn create_access_token<'gc>(
                         return Err(VmError::RuntimeError(format!(
                             "Unsupported claim value type for key: {}",
                             key_str
-                        )))
+                        )));
                     }
                 };
                 claims.extra.insert(key_str.to_string(), json_value);

@@ -2,10 +2,10 @@ use aiscript_arena::Gc;
 use std::fs;
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     string_arg,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 pub fn create_serde_module(ctx: Context) -> ModuleKind {
@@ -62,7 +62,7 @@ fn serde_to_str<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Va
             _ => {
                 return Err(VmError::RuntimeError(
                     "pretty argument must be a boolean".into(),
-                ))
+                ));
             }
         }
     } else {
@@ -128,7 +128,7 @@ fn serde_to_file<'gc>(
             _ => {
                 return Err(VmError::RuntimeError(
                     "pretty argument must be a boolean".into(),
-                ))
+                ));
             }
         }
     } else {

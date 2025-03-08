@@ -17,8 +17,8 @@ use crate::{
     ty::PrimitiveType,
     vm::{Context, VmError},
 };
-use aiscript_lexer::ErrorReporter;
 use aiscript_arena::{Gc, GcRefLock, RefLock};
+use aiscript_lexer::ErrorReporter;
 use indexmap::IndexMap;
 
 const MAX_LOCALS: usize = u8::MAX as usize + 1;

@@ -1,4 +1,4 @@
-use crate::{string::InternedString, Value, VmError};
+use crate::{Value, VmError, string::InternedString};
 use ahash::AHasher;
 use aiscript_arena::Collect;
 use std::hash::BuildHasherDefault;

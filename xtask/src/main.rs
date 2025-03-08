@@ -36,13 +36,7 @@ fn run_interpreter(features: &[&str], file: &str) -> Result<()> {
 
 fn run_tests() -> Result<()> {
     let status = Command::new("cargo")
-        .args([
-            "build",
-            "--features",
-            "ai_test",
-            "--bin",
-            "aiscript-test",
-        ])
+        .args(["build", "--features", "ai_test", "--bin", "aiscript-test"])
         .status()
         .context("Failed to build with ai_test feature")?;
 

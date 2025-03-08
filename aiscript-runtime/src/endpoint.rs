@@ -1,21 +1,21 @@
-use aiscript_directive::{route::RouteAnnotation, Validator};
+use aiscript_directive::{Validator, route::RouteAnnotation};
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
+    Form, Json, RequestExt,
     body::Body,
     extract::{self, FromRequest, Request},
     http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
-    Form, Json, RequestExt,
 };
 use axum_extra::{
-    headers::{
-        authorization::{Basic, Bearer},
-        Authorization,
-    },
     TypedHeader,
+    headers::{
+        Authorization,
+        authorization::{Basic, Bearer},
+    },
 };
 use hyper::StatusCode;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode};
 use serde_json::Value;
 use sqlx::{PgPool, SqlitePool};
 use std::{
@@ -31,8 +31,8 @@ use tokio::task::{self, JoinHandle};
 use tower::Service;
 
 use crate::{
-    ast::{self, *},
     Config,
+    ast::{self, *},
 };
 
 use crate::error::ServerError;
@@ -124,7 +124,7 @@ impl RequestProcessor {
                             return Err(ServerError::TypeMismatch {
                                 field: field.name.clone(),
                                 expected: field.field_type.as_str(),
-                            })
+                            });
                         }
                     }
                 }
@@ -169,7 +169,7 @@ impl RequestProcessor {
                 return Err(ServerError::TypeMismatch {
                     field: field.name.clone(),
                     expected: field.field_type.as_str(),
-                })
+                });
             }
         };
 
@@ -269,7 +269,7 @@ impl Future for RequestProcessor {
                                     return Poll::Ready(Ok(ServerError::AuthenticationError {
                                         message: e.to_string(),
                                     }
-                                    .into_response()))
+                                    .into_response()));
                                 }
                             }
                         };
@@ -303,7 +303,7 @@ impl Future for RequestProcessor {
                                 return Poll::Ready(Ok(ServerError::AuthenticationError {
                                     message: e.to_string(),
                                 }
-                                .into_response()))
+                                .into_response()));
                             }
                         }
                     }
@@ -358,7 +358,7 @@ impl Future for RequestProcessor {
                             Poll::Ready(Err(e)) => {
                                 return Poll::Ready(Ok(
                                     format!("Body parsing error: {:?}", e).into_response()
-                                ))
+                                ));
                             }
                         };
 
@@ -394,7 +394,7 @@ impl Future for RequestProcessor {
                                     "Missing `[sso.{}]` config",
                                     provider.as_str()
                                 )
-                                .into_response()))
+                                .into_response()));
                             }
                         }
                     } else {

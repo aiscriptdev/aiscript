@@ -1,4 +1,4 @@
-use crate::{chunk::Chunk, OpCode};
+use crate::{OpCode, chunk::Chunk};
 use std::collections::HashMap;
 
 use super::OptimizationStrategy;

@@ -1,8 +1,7 @@
 use crate::{
-    float_arg,
+    NativeFn, Value, VmError, float_arg,
     module::ModuleKind,
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 pub fn create_math_module(ctx: Context) -> ModuleKind {

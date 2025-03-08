@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
-use aiscript_arena::{lock::GcRefLock, Collect, Gc, Mutation, RefLock};
+use aiscript_arena::{Collect, Gc, Mutation, RefLock, lock::GcRefLock};
 
 use crate::{
+    NativeFn,
     ai::Agent,
     object::{BoundMethod, Class, Closure, Enum, EnumVariant, Instance, List, ListKind, Object},
     string::{InternedString, StringValue},
     vm::{Context, VmError},
-    NativeFn,
 };
 
 #[derive(Copy, Clone, Default, Collect)]

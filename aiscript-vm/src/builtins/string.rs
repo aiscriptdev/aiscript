@@ -4,7 +4,7 @@ use aiscript_arena::{Gc, Mutation};
 use regex::Regex;
 
 use crate::BuiltinMethod;
-use crate::{float_arg, string_arg, vm::Context, Value, VmError};
+use crate::{Value, VmError, float_arg, string_arg, vm::Context};
 
 use crate::string::InternedString;
 
@@ -296,7 +296,7 @@ fn join<'gc>(
         _ => {
             return Err(VmError::RuntimeError(
                 "join: argument must be an array".into(),
-            ))
+            ));
         }
     };
 
@@ -312,7 +312,7 @@ fn join<'gc>(
                 return Err(VmError::RuntimeError(format!(
                     "join: array element {} must be a string",
                     i
-                )))
+                )));
             }
         }
     }

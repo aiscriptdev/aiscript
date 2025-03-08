@@ -6,10 +6,10 @@ use sqlx::{Column, Postgres, Row, TypeInfo, ValueRef};
 use tokio::runtime::Handle;
 
 use crate::{
+    NativeFn, Value, VmError,
     module::ModuleKind,
     object::{Class, Instance, Object},
     vm::{Context, State},
-    NativeFn, Value, VmError,
 };
 
 thread_local! {
@@ -274,7 +274,7 @@ where
                                 _ => {
                                     return Err(sqlx::Error::Protocol(
                                         "Unsupported array element type".into(),
-                                    ))
+                                    ));
                                 }
                             }
                         } else {
@@ -367,7 +367,7 @@ fn pg_query_as<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Val
         _ => {
             return Err(VmError::RuntimeError(
                 "First argument to query_as() must be a class.".into(),
-            ))
+            ));
         }
     };
 
@@ -492,7 +492,7 @@ mod transaction {
             _ => {
                 return Err(VmError::RuntimeError(
                     "First argument to query_as() must be a class.".into(),
-                ))
+                ));
             }
         };
 

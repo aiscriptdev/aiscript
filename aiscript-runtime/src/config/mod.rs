@@ -4,11 +4,12 @@ use auth::AuthConfig;
 use serde::Deserialize;
 
 use db::DatabaseConfig;
-pub use sso::{get_sso_fields, SsoConfig};
+pub use sso::{SsoConfig, get_sso_fields};
 
 mod auth;
 mod db;
 mod sso;
+#[cfg(test)]
 mod tests;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();

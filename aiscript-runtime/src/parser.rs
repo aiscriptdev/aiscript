@@ -1,5 +1,5 @@
-use aiscript_directive::route::RouteAnnotation;
 use aiscript_directive::DirectiveParser;
+use aiscript_directive::route::RouteAnnotation;
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
@@ -102,14 +102,14 @@ impl<'a> Parser<'a> {
                 let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
                 for directive in directives {
                     match directive.name.as_str() {
-                            "form" => body.kind = BodyKind::Form,
-                            "json" => body.kind = BodyKind::Json,
-                            name => {
-                                return Err(format!(
-                                    "Invalid directive, only @form or @json are allowed on body block, current: @{name}"
-                                ))
-                            }
+                        "form" => body.kind = BodyKind::Form,
+                        "json" => body.kind = BodyKind::Json,
+                        name => {
+                            return Err(format!(
+                                "Invalid directive, only @form or @json are allowed on body block, current: @{name}"
+                            ));
                         }
+                    }
 
                     if !self.check_identifier("body") {
                         return Err("Only body block supports @form or @json directive".into());
@@ -347,8 +347,8 @@ pub fn parse_route(input: &str) -> Result<Route, String> {
 #[cfg(test)]
 mod tests {
     use aiscript_directive::{
-        validator::{AnyValidator, InValidator, NotValidator, StringValidator},
         Validator,
+        validator::{AnyValidator, InValidator, NotValidator, StringValidator},
     };
 
     use super::*;

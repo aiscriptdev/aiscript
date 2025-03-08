@@ -112,11 +112,13 @@ impl<'gc, T: 'gc> GcWeak<'gc, T> {
     /// SAFETY:
     /// It must be valid to dereference a `*mut U` that has come from casting a `*mut T`.
     #[inline]
-    pub unsafe fn cast<U: 'gc>(this: GcWeak<'gc, T>) -> GcWeak<'gc, U> { unsafe {
-        GcWeak {
-            inner: Gc::cast::<U>(this.inner),
+    pub unsafe fn cast<U: 'gc>(this: GcWeak<'gc, T>) -> GcWeak<'gc, U> {
+        unsafe {
+            GcWeak {
+                inner: Gc::cast::<U>(this.inner),
+            }
         }
-    }}
+    }
 
     /// Retrieve a `GcWeak` from a raw pointer obtained from `GcWeak::as_ptr`
     ///
@@ -125,9 +127,11 @@ impl<'gc, T: 'gc> GcWeak<'gc, T> {
     /// the pointer must not have been *fully* collected yet (it may be a dropped but valid weak
     /// pointer).
     #[inline]
-    pub unsafe fn from_ptr(ptr: *const T) -> GcWeak<'gc, T> { unsafe {
-        GcWeak {
-            inner: Gc::from_ptr(ptr),
+    pub unsafe fn from_ptr(ptr: *const T) -> GcWeak<'gc, T> {
+        unsafe {
+            GcWeak {
+                inner: Gc::from_ptr(ptr),
+            }
         }
-    }}
+    }
 }

@@ -7,10 +7,10 @@ use core::{
 };
 
 use crate::{
+    Gc,
     collect::Collect,
     metrics::Metrics,
     types::{GcBox, GcBoxHeader, GcBoxInner, GcColor, Invariant},
-    Gc,
 };
 
 /// Handle value given by arena callbacks during construction and mutation. Allows allocating new
@@ -216,9 +216,9 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn mutation_context<'gc>(&self) -> &Mutation<'gc> { unsafe {
-        mem::transmute::<&Self, &Mutation>(self)
-    }}
+    pub(crate) unsafe fn mutation_context<'gc>(&self) -> &Mutation<'gc> {
+        unsafe { mem::transmute::<&Self, &Mutation>(self) }
+    }
 
     #[inline]
     fn collection_context(&self) -> &Collection {
@@ -227,9 +227,9 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn finalization_context<'gc>(&self) -> &Finalization<'gc> { unsafe {
-        mem::transmute::<&Self, &Finalization>(self)
-    }}
+    pub(crate) unsafe fn finalization_context<'gc>(&self) -> &Finalization<'gc> {
+        unsafe { mem::transmute::<&Self, &Finalization>(self) }
+    }
 
     #[inline]
     pub(crate) fn metrics(&self) -> &Metrics {
@@ -302,7 +302,9 @@ impl Context {
                     let next_gray = if let Some(gc_box) = self.gray.borrow_mut().pop() {
                         self.metrics.mark_gc_traced(gc_box.header().size_of_box());
                         Some(gc_box)
-                    } else { self.gray_again.borrow_mut().pop() };
+                    } else {
+                        self.gray_again.borrow_mut().pop()
+                    };
 
                     if let Some(gc_box) = next_gray {
                         // If we have an object in the gray queue, take one, trace it, and turn it
@@ -586,13 +588,15 @@ impl Context {
 }
 
 // SAFETY: the gc_box must never be accessed after calling this function.
-unsafe fn free_gc_box<'gc>(mut gc_box: GcBox) { unsafe {
-    if gc_box.header().is_live() {
-        // If the alive flag is set, that means we haven't dropped the inner value of this object,
-        gc_box.drop_in_place();
+unsafe fn free_gc_box<'gc>(mut gc_box: GcBox) {
+    unsafe {
+        if gc_box.header().is_live() {
+            // If the alive flag is set, that means we haven't dropped the inner value of this object,
+            gc_box.drop_in_place();
+        }
+        gc_box.dealloc();
     }
-    gc_box.dealloc();
-}}
+}
 
 /// Helper type for managing phase transitions.
 struct PhaseGuard<'a> {

@@ -1,11 +1,11 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
     visit_mut::VisitMut,
 };
-use synstructure::{decl_derive, AddBounds};
+use synstructure::{AddBounds, decl_derive};
 
 fn find_collect_meta(attrs: &[syn::Attribute]) -> syn::Result<Option<&syn::Attribute>> {
     let mut found = None;

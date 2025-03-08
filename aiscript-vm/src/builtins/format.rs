@@ -1,4 +1,4 @@
-use crate::{vm::State, Value, VmError};
+use crate::{Value, VmError, vm::State};
 use aiscript_arena::Gc;
 use std::fmt::Write;
 

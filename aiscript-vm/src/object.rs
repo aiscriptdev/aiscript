@@ -7,13 +7,13 @@ use std::{
 };
 
 use ahash::AHasher;
-use aiscript_directive::Validator;
 use aiscript_arena::{
-    lock::{GcRefLock, RefLock},
     Collect, Gc, Mutation,
+    lock::{GcRefLock, RefLock},
 };
+use aiscript_directive::Validator;
 
-use crate::{string::InternedString, Chunk, Value};
+use crate::{Chunk, Value, string::InternedString};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Collect)]
 #[collect(require_static)]

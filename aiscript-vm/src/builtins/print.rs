@@ -1,4 +1,4 @@
-use crate::{vm::State, Value, VmError};
+use crate::{Value, VmError, vm::State};
 use std::fmt::Write;
 
 /// Print objects to the text stream file, separated by sep and followed by end.

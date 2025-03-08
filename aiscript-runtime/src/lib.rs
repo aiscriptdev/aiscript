@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use walkdir::WalkDir;
 
-use crate::endpoint::{convert_field, Endpoint};
+use crate::endpoint::{Endpoint, convert_field};
 pub use config::Config;
 mod ast;
 mod config;

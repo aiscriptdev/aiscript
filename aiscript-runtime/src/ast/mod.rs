@@ -1,5 +1,5 @@
 #![allow(unused)]
-use aiscript_directive::{route::RouteAnnotation, Validator};
+use aiscript_directive::{Validator, route::RouteAnnotation};
 use serde_json::Value;
 
 #[derive(Clone, Debug, Eq, PartialEq)]

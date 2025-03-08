@@ -6,7 +6,7 @@ use core::{
     fmt,
 };
 
-use crate::{barrier::Unlock, Collect, Collection, Gc, Mutation};
+use crate::{Collect, Collection, Gc, Mutation, barrier::Unlock};
 
 // Helper macro to factor out the common parts of locks types.
 macro_rules! make_lock_wrapper {

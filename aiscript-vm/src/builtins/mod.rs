@@ -1,7 +1,7 @@
 use crate::{
+    BuiltinMethod, NativeFn, Value, VmError,
     string::InternedString,
     vm::{Context, State},
-    BuiltinMethod, NativeFn, Value, VmError,
 };
 use aiscript_arena::{Collect, Gc, Mutation};
 use std::{
@@ -308,7 +308,7 @@ fn input<'gc>(state: &mut State<'gc>, args: Vec<Value<'gc>>) -> Result<Value<'gc
             _ => {
                 return Err(VmError::RuntimeError(
                     "input() prompt must be a string.".into(),
-                ))
+                ));
             }
         }
         io::stdout().flush().unwrap();
