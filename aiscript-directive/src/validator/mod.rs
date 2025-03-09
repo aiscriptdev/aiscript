@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::{Directive, DirectiveParams, FromDirective};
 
+mod array;
 mod date;
 
 pub trait Validator: Send + Sync + Any {
@@ -262,6 +263,7 @@ impl FromDirective for Box<dyn Validator> {
             "any" => Ok(Box::new(AnyValidator::from_directive(directive)?)),
             "not" => Ok(Box::new(NotValidator::from_directive(directive)?)),
             "date" => Ok(Box::new(DateValidator::from_directive(directive)?)),
+            "array" => Ok(Box::new(AnyValidator::from_directive(directive)?)), // Add this line
             v => Err(format!("Invalid validators: @{}", v)),
         }
     }
