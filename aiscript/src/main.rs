@@ -8,6 +8,9 @@ use repr::Repl;
 use tokio::task;
 
 mod repr;
+mod project;
+
+use project::ProjectGenerator;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -34,6 +37,12 @@ enum Commands {
         #[arg(short, long, default_value_t = false)]
         reload: bool,
     },
+    /// Create a new AIScript project with a standard directory structure.
+    New {
+        /// The name of the new project
+        #[arg(value_name = "PROJECT_NAME")]
+        name: String,
+    },
 }
 
 #[tokio::main]
@@ -46,6 +55,13 @@ async fn main() {
         Some(Commands::Serve { file, port, reload }) => {
             println!("Server listening on port http://localhost:{}", port);
             aiscript_runtime::run(file, port, reload).await;
+        }
+        Some(Commands::New { name }) => {
+            let generator = ProjectGenerator::new(&name);
+            if let Err(e) = generator.generate() {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
         }
         None => {
             if let Some(path) = cli.file {

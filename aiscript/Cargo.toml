@@ -24,6 +24,10 @@ dotenv = "0.15.0"
 rustyline = "15.0"
 dirs = "6.0"
 serde.workspace = true
+whoami = "1.4.1"
+
+[dev-dependencies]
+tempfile = "3.8.1"
 
 [features]
 ai_test = ["aiscript-vm/ai_test"]

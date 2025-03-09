@@ -50,7 +50,9 @@ dependencies = [
  "dotenv",
  "rustyline",
  "serde",
+ "tempfile",
  "tokio",
+ "whoami",
 ]
 
 [[package]]
@@ -3596,6 +3598,7 @@ checksum = "372d5b87f58ec45c384ba03563b03544dc5fadc3983e434b286913f5b4a9bb6d"
 dependencies = [
  "redox_syscall",
  "wasite",
+ "web-sys",
 ]
 
 [[package]]
