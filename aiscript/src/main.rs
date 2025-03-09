@@ -7,8 +7,8 @@ use clap::{Parser, Subcommand};
 use repr::Repl;
 use tokio::task;
 
-mod repr;
 mod project;
+mod repr;
 
 use project::ProjectGenerator;
 
