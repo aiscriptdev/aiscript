@@ -7,6 +7,7 @@ use crate::{Directive, DirectiveParams, FromDirective};
 
 mod array;
 mod date;
+mod format;
 
 pub trait Validator: Send + Sync + Any {
     fn name(&self) -> &'static str;
