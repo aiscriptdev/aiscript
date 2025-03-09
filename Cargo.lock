@@ -85,6 +85,8 @@ name = "aiscript-directive"
 version = "0.1.0"
 dependencies = [
  "aiscript-lexer",
+ "chrono",
+ "regex",
  "serde_json",
 ]
 
