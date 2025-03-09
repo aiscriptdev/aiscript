@@ -9,3 +9,11 @@ get /guess {
     let message = "You got it!" if query.value == 42 else "Try again";
     return { message };
 }
+
+get /hello {
+    query {
+        name: str
+    }
+
+    return { message: f"Hello, {query.name}!" };
+}
