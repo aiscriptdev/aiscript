@@ -63,14 +63,21 @@ impl Vm {
     }
 
     pub fn run_file(&mut self, path: PathBuf) {
-        let source = fs::read_to_string(path).unwrap();
-        let source: &'static str = Box::leak(source.into_boxed_str());
-        if let Err(VmError::CompileError) = self.compile(source) {
-            std::process::exit(65);
-        }
-        if let Err(VmError::RuntimeError(err)) = self.interpret() {
-            eprintln!("{err}");
-            std::process::exit(70);
+        match fs::read_to_string(&path) {
+            Ok(source) => {
+                let source: &'static str = Box::leak(source.into_boxed_str());
+                if let Err(VmError::CompileError) = self.compile(source) {
+                    std::process::exit(65);
+                }
+                if let Err(VmError::RuntimeError(err)) = self.interpret() {
+                    eprintln!("{err}");
+                    std::process::exit(70);
+                }
+            }
+            Err(err) => {
+                eprintln!("Failed to read file '{}': {}", path.display(), err);
+                std::process::exit(1);
+            }
         }
     }
 
