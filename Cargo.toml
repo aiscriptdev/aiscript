@@ -34,3 +34,8 @@ reqwest = "0.12"
 # RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.ai
 [profile.release]
 debug = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
