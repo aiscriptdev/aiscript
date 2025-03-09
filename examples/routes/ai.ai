@@ -1,3 +1,4 @@
+@docs(tag="Guess", deprecated=true)
 get /guess {
 
     query {

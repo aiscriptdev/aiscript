@@ -46,6 +46,10 @@ impl OpenAPIGenerator {
                     } else {
                         format!("{}/{}", path, path_spec.path)
                     };
+                    // Skip hidden routes if applicable
+                    if route.annotation.docs.as_ref().is_some_and(|d| d.hidden) {
+                        continue;
+                    }
                     paths.insert(full_path.replace("//", "/"), path_item);
                 }
             }
@@ -153,11 +157,18 @@ impl OpenAPIGenerator {
 
     fn create_operation(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> Operation {
         let route_name = route.prefix.trim_matches('/').to_string();
-        let tags = if route_name.is_empty() {
+        let mut tags = if route_name.is_empty() {
             vec!["default".to_string()]
         } else {
             vec![route_name]
         };
+
+        // Add custom tag from docs directive if present
+        if let Some(docs) = &route.annotation.docs {
+            if let Some(tag) = &docs.tag {
+                tags = vec![tag.clone()];
+            }
+        }
 
         let mut parameters = Self::create_path_parameters(&path_spec.params);
         for query_field in &endpoint.query {
@@ -185,6 +196,7 @@ impl OpenAPIGenerator {
             parameters,
             request_body,
             responses: Some(Self::create_default_responses()),
+            deprecated: route.annotation.docs.as_ref().map(|d| d.deprecated),
             // security: Self::get_security_requirement(endpoint.annotation),
             ..Default::default()
         }

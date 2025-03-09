@@ -1,11 +1,13 @@
+use docs::Docs;
 use serde_json::Value;
 
+mod docs;
 use crate::{Directive, FromDirective};
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RouteAnnotation {
     pub auth: Auth,
-    pub deprecated: bool,
+    pub docs: Option<Docs>,
     pub sso_provider: Option<SsoProvider>,
 }
 
@@ -62,12 +64,12 @@ impl RouteAnnotation {
         matches!(self.auth, Auth::Jwt)
     }
 
-    pub fn or(mut self, other: RouteAnnotation) -> Self {
+    pub fn or(mut self, other: &RouteAnnotation) -> Self {
         if matches!(self.auth, Auth::None) {
             self.auth = other.auth;
         }
-        if !self.deprecated {
-            self.deprecated = other.deprecated
+        if self.docs.is_none() {
+            self.docs = other.docs.clone()
         }
         self
     }
@@ -93,11 +95,11 @@ impl RouteAnnotation {
                     return Err("Duplicate auth directive".into());
                 }
             }
-            "deprecated" => {
-                if self.deprecated {
-                    return Err("Duplicate deprecated directive".into());
+            "docs" => {
+                if self.docs.is_some() {
+                    return Err("Duplicate @docs directive".into());
                 } else {
-                    self.deprecated = true;
+                    self.docs = Some(Docs::from_directive(directive)?);
                 }
             }
             "sso" => {
