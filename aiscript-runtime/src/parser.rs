@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn test_basic_route() {
         let input = r#"
-            route /test/<id:int> {
+            route /test/:id {
                 """
                 Test route line1
                 Test route line2
@@ -412,10 +412,10 @@ mod tests {
 
         let route = result.unwrap();
         assert_eq!(route.docs, "Test route line1\nTest route line2");
-        assert_eq!(route.prefix, "/test/:id");
+        assert_eq!(route.prefix, "/test/{id}");
         assert_eq!(route.params.len(), 1);
         assert_eq!(route.params[0].name, "id");
-        assert_eq!(route.params[0].param_type, "int");
+        assert_eq!(route.params[0].param_type, "str");
 
         let endpoint = &route.endpoints[0];
         assert_eq!(endpoint.docs, "Test endpoint");
@@ -607,7 +607,7 @@ mod tests {
     fn test_multiple_paths_with_params() {
         let input = r#"
             route /api {
-                get /users/<id:int>, post /users {
+                get /users/:id, post /users {
                     return "ok";
                 }
             }
@@ -620,7 +620,7 @@ mod tests {
         assert_eq!(endpoint.path_specs.len(), 2);
 
         assert_eq!(endpoint.path_specs[0].method, HttpMethod::Get);
-        assert_eq!(endpoint.path_specs[0].path, "/users/:id");
+        assert_eq!(endpoint.path_specs[0].path, "/users/{id}");
         assert_eq!(endpoint.path_specs[0].params.len(), 1);
         assert_eq!(endpoint.path_specs[0].params[0].name, "id");
 
