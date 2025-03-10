@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
 };
 
+mod array;
 mod convert;
 mod error;
 mod format;
@@ -28,6 +29,7 @@ use print::print;
 #[collect(no_drop)]
 pub(crate) struct BuiltinMethods<'gc> {
     string: HashMap<InternedString<'gc>, BuiltinMethod<'gc>>,
+    array: HashMap<InternedString<'gc>, BuiltinMethod<'gc>>,
 }
 
 impl Default for BuiltinMethods<'_> {
@@ -40,11 +42,13 @@ impl<'gc> BuiltinMethods<'gc> {
     pub fn new() -> Self {
         BuiltinMethods {
             string: HashMap::default(),
+            array: HashMap::default(),
         }
     }
 
     pub fn init(&mut self, ctx: Context<'gc>) {
         self.string = string::define_string_methods(ctx);
+        self.array = array::define_array_methods(ctx);
     }
 
     pub fn invoke_string_method(
@@ -59,6 +63,23 @@ impl<'gc> BuiltinMethods<'gc> {
         } else {
             Err(VmError::RuntimeError(format!(
                 "Unknown string method: {}",
+                name
+            )))
+        }
+    }
+
+    pub fn invoke_array_method(
+        &self,
+        mc: &'gc Mutation<'gc>,
+        name: InternedString<'gc>,
+        receiver: Value<'gc>,
+        args: Vec<Value<'gc>>,
+    ) -> Result<Value<'gc>, VmError> {
+        if let Some(f) = self.array.get(&name) {
+            f(mc, receiver, args)
+        } else {
+            Err(VmError::RuntimeError(format!(
+                "Unknown array method: {}",
                 name
             )))
         }

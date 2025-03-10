@@ -151,9 +151,6 @@ mod tests {
         // Create an absolute path for the project
         let project_path = temp_path.join(project_name);
 
-        // Create a generator with the project name
-        let generator = ProjectGenerator::new(project_name);
-
         // Override the project path for testing
         let generator = ProjectGenerator {
             project_name: project_name.to_string(),

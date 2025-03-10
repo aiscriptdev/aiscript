@@ -1413,6 +1413,26 @@ impl<'gc> State<'gc> {
                 self.push_stack(result);
                 Ok(())
             }
+            Value::List(_) => {
+                // Array method handling
+                let mut args = Vec::new();
+
+                // Collect arguments
+                for _ in 0..args_count {
+                    args.push(self.pop_stack());
+                }
+                args.reverse(); // Restore argument order
+
+                // Pop the receiver and keyword args
+                self.stack_top -= keyword_args_count as usize * 2 + 1;
+
+                // Dispatch to array method
+                let result = self
+                    .builtin_methods
+                    .invoke_array_method(self.mc, name, receiver, args)?;
+                self.push_stack(result);
+                Ok(())
+            }
             Value::Class(class) => {
                 if let Some(value) = class.borrow().static_methods.get(&name) {
                     self.call_value(*value, args_count, keyword_args_count)
