@@ -34,7 +34,7 @@ pub struct PathSpec {
     pub params: Vec<PathParameter>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RequestBody {
     pub kind: BodyKind,
     pub fields: Vec<Field>,
@@ -47,7 +47,7 @@ pub enum BodyKind {
     Json,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldType {
     Str,
     Number,
@@ -76,6 +76,19 @@ pub struct Field {
     pub docs: String,
 }
 
+impl std::fmt::Debug for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Field")
+            .field("name", &self.name)
+            .field("_type", &self._type)
+            .field("required", &self.required)
+            .field("default", &self.default)
+            .field("docs", &self.docs)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub struct Endpoint {
     pub annotation: RouteAnnotation,
     pub path_specs: Vec<PathSpec>,
@@ -88,6 +101,7 @@ pub struct Endpoint {
     pub docs: String,
 }
 
+#[derive(Debug)]
 pub struct Route {
     pub annotation: RouteAnnotation,
     pub prefix: String,
