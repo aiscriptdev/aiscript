@@ -39,12 +39,6 @@ use crate::error::ServerError;
 
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
-impl IntoResponse for ServerError {
-    fn into_response(self) -> Response {
-        (axum::http::StatusCode::BAD_REQUEST, self.to_string()).into_response()
-    }
-}
-
 #[derive(Clone)]
 pub struct Field {
     name: String,
