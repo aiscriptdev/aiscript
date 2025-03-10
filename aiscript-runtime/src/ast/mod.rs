@@ -22,16 +22,10 @@ impl HttpMethod {
 }
 
 #[derive(Debug, Clone)]
-pub struct PathParameter {
-    pub name: String,       // Parameter name (e.g., "id")
-    pub param_type: String, // Parameter type (e.g., "int")
-}
-
-#[derive(Debug, Clone)]
 pub struct PathSpec {
     pub method: HttpMethod,
     pub path: String,
-    pub params: Vec<PathParameter>,
+    pub params: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -105,7 +99,7 @@ pub struct Endpoint {
 pub struct Route {
     pub annotation: RouteAnnotation,
     pub prefix: String,
-    pub params: Vec<PathParameter>,
+    pub params: Vec<String>,
     pub endpoints: Vec<Endpoint>,
     pub docs: String,
 }

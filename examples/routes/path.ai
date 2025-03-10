@@ -1,7 +1,9 @@
 get /users/:id/posts/:postId {
     path {
+        """User Id"""
         @string(min_len=3)
         id: str,
+        """Post Id"""
         postId: int,
     }
 

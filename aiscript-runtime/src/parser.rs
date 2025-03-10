@@ -328,12 +328,12 @@ impl<'a> Parser<'a> {
             let mut matched_path_params = std::collections::HashSet::new();
 
             // Check each path spec parameter
-            for spec_param in &path_spec.params {
+            for param_name in &path_spec.params {
                 // Try to find exact match first
-                let exact_match = endpoint.path.iter().find(|f| f.name == spec_param.name);
+                let exact_match = endpoint.path.iter().find(|f| &f.name == param_name);
 
                 if exact_match.is_some() {
-                    matched_path_params.insert(spec_param.name.clone());
+                    matched_path_params.insert(param_name.clone());
                     continue;
                 }
 
@@ -341,13 +341,13 @@ impl<'a> Parser<'a> {
                 let case_insensitive_match = endpoint
                     .path
                     .iter()
-                    .find(|f| f.name.to_lowercase() == spec_param.name.to_lowercase());
+                    .find(|f| f.name.to_lowercase() == param_name.to_lowercase());
 
                 if let Some(field) = case_insensitive_match {
-                    case_mismatches.push((spec_param.name.clone(), field.name.clone()));
+                    case_mismatches.push((param_name.clone(), field.name.clone()));
                     matched_path_params.insert(field.name.clone());
                 } else {
-                    missing_params.push(spec_param.name.clone());
+                    missing_params.push(param_name.clone());
                 }
             }
 
@@ -358,7 +358,7 @@ impl<'a> Parser<'a> {
                     let is_case_mismatch = path_spec
                         .params
                         .iter()
-                        .any(|p| p.name.to_lowercase() == field.name.to_lowercase());
+                        .any(|p| p.to_lowercase() == field.name.to_lowercase());
 
                     if !is_case_mismatch {
                         extra_params.push(field.name.clone());
@@ -400,40 +400,12 @@ impl<'a> Parser<'a> {
                         .join(", ")
                 ));
             }
-
-            // Validate parameter types if specified in path
-            for path_param in &path_spec.params {
-                if path_param.param_type != "str" {
-                    // Find the corresponding field in the path block (case-insensitive)
-                    if let Some(field) = endpoint
-                        .path
-                        .iter()
-                        .find(|f| f.name.to_lowercase() == path_param.name.to_lowercase())
-                    {
-                        // Check if the types match
-                        let expected_type = match path_param.param_type.as_str() {
-                            "int" => FieldType::Number,
-                            "float" => FieldType::Number,
-                            "bool" => FieldType::Bool,
-                            _ => FieldType::Str, // Default to string
-                        };
-                        if field._type != expected_type {
-                            return Err(format!(
-                                "Type mismatch for path parameter '{}': expected '{}', got '{}'",
-                                field.name,
-                                path_param.param_type,
-                                field._type.as_str()
-                            ));
-                        }
-                    }
-                }
-            }
         }
 
         Ok(())
     }
 
-    fn parse_path(&mut self) -> Result<(String, Vec<PathParameter>), String> {
+    fn parse_path(&mut self) -> Result<(String, Vec<String>), String> {
         let mut path = String::new();
         let mut params = Vec::new();
 
@@ -464,11 +436,8 @@ impl<'a> Parser<'a> {
                     path.push_str(&name);
                     path.push('}');
 
-                    // Add parameter to our list
-                    params.push(PathParameter {
-                        name,
-                        param_type: "str".to_string(), // Default type, will be overridden by path block
-                    });
+                    // Add parameter name to our list
+                    params.push(name);
                 }
                 TokenType::Identifier => {
                     path.push_str(self.current.lexeme);
@@ -481,7 +450,6 @@ impl<'a> Parser<'a> {
 
         Ok((path, params))
     }
-
     fn consume(&mut self, expected: TokenType, message: &str) -> Result<(), String> {
         if self.check(expected) {
             self.advance();
@@ -551,8 +519,7 @@ mod tests {
         assert_eq!(route.docs, "Test route line1\nTest route line2");
         assert_eq!(route.prefix, "/test/{id}");
         assert_eq!(route.params.len(), 1);
-        assert_eq!(route.params[0].name, "id");
-        assert_eq!(route.params[0].param_type, "str");
+        assert_eq!(route.params[0], "id");
 
         let endpoint = &route.endpoints[0];
         assert_eq!(endpoint.docs, "Test endpoint");
@@ -760,7 +727,7 @@ mod tests {
         assert_eq!(endpoint.path_specs[0].method, HttpMethod::Get);
         assert_eq!(endpoint.path_specs[0].path, "/users/{id}");
         assert_eq!(endpoint.path_specs[0].params.len(), 1);
-        assert_eq!(endpoint.path_specs[0].params[0].name, "id");
+        assert_eq!(endpoint.path_specs[0].params[0], "id");
 
         assert_eq!(endpoint.path_specs[1].method, HttpMethod::Post);
         assert_eq!(endpoint.path_specs[1].path, "/users");

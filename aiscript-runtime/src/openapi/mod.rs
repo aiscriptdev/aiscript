@@ -11,9 +11,7 @@ use oas3::{
 };
 use std::collections::BTreeMap;
 
-use crate::ast::{
-    BodyKind, Endpoint, Field, FieldType, HttpMethod, PathParameter, PathSpec, Route,
-};
+use crate::ast::{BodyKind, Endpoint, Field, FieldType, HttpMethod, PathSpec, Route};
 
 pub struct OpenAPIGenerator;
 
@@ -120,7 +118,7 @@ impl OpenAPIGenerator {
     fn create_path_item(route: &Route, endpoint: &Endpoint, path_spec: &PathSpec) -> PathItem {
         let mut path_item = PathItem {
             summary: Some(endpoint.docs.clone()),
-            parameters: Self::create_path_parameters(&path_spec.params),
+            parameters: Self::create_path_parameters(endpoint, &path_spec.params),
             ..Default::default()
         };
 
@@ -170,7 +168,10 @@ impl OpenAPIGenerator {
             }
         }
 
-        let mut parameters = Self::create_path_parameters(&path_spec.params);
+        // Create path parameters using our enhanced function that leverages endpoint.path fields
+        let mut parameters = Self::create_path_parameters(endpoint, &path_spec.params);
+
+        // Add query parameters as before
         for query_field in &endpoint.query {
             parameters.push(Self::create_query_parameter(query_field));
         }
@@ -201,29 +202,45 @@ impl OpenAPIGenerator {
             ..Default::default()
         }
     }
-
-    fn create_path_parameters(params: &[PathParameter]) -> Vec<ObjectOrReference<Parameter>> {
+    fn create_path_parameters(
+        endpoint: &Endpoint,
+        params: &[String],
+    ) -> Vec<ObjectOrReference<Parameter>> {
         params
             .iter()
-            .map(|param| {
+            .map(|param_name| {
+                // Look for this parameter in the endpoint's path fields
+                let path_field = endpoint.path.iter().find(|field| &field.name == param_name);
+
                 ObjectOrReference::Object(Parameter {
-                    name: param.name.clone(),
+                    name: param_name.clone(),
                     location: ParameterIn::Path,
-                    description: Some(String::new()),
-                    required: Some(true),
+                    description: Some(path_field.map_or(String::new(), |f| f.docs.clone())),
+                    required: Some(true), // Path parameters are always required
                     deprecated: None,
                     allow_empty_value: None,
                     style: Some(ParameterStyle::Simple),
                     explode: None,
                     allow_reserved: None,
-                    schema: Some(Self::create_schema_for_type(&param.param_type)),
-                    example: None,
+                    schema: Some(match path_field {
+                        Some(field) => Self::create_schema_for_field(field),
+                        None => Self::create_default_schema_for_path_param(),
+                    }),
+                    example: path_field.and_then(|f| f.default.clone()),
                     examples: BTreeMap::new(),
                     content: None,
                     extensions: BTreeMap::new(),
                 })
             })
             .collect()
+    }
+
+    fn create_default_schema_for_path_param() -> ObjectOrReference<ObjectSchema> {
+        ObjectOrReference::Object(ObjectSchema {
+            schema_type: Some(SchemaTypeSet::Single(Type::String)),
+            description: Some(String::new()),
+            ..Default::default()
+        })
     }
 
     fn create_query_parameter(field: &Field) -> ObjectOrReference<Parameter> {
@@ -310,20 +327,6 @@ impl OpenAPIGenerator {
         }
 
         ObjectOrReference::Object(schema)
-    }
-
-    fn create_schema_for_type(type_str: &str) -> ObjectOrReference<ObjectSchema> {
-        ObjectOrReference::Object(ObjectSchema {
-            schema_type: Some(SchemaTypeSet::Single(match type_str {
-                "str" => Type::String,
-                "int" => Type::Integer,
-                "float" => Type::Number,
-                "bool" => Type::Boolean,
-                _ => Type::String,
-            })),
-            description: Some(String::new()),
-            ..Default::default()
-        })
     }
 
     fn create_default_responses() -> BTreeMap<String, ObjectOrReference<Response>> {
