@@ -81,6 +81,7 @@ pub struct Endpoint {
     pub path_specs: Vec<PathSpec>,
     #[allow(unused)]
     pub return_type: Option<String>,
+    pub path: Vec<Field>,
     pub query: Vec<Field>,
     pub body: RequestBody,
     pub statements: String,

@@ -87,6 +87,7 @@ impl<'a> Parser<'a> {
         let docs = self.parse_docs();
 
         // Parse structured parts (query and body)
+        let mut path = Vec::new();
         let mut query = Vec::new();
         let mut body = RequestBody::default();
 
@@ -98,6 +99,9 @@ impl<'a> Parser<'a> {
             } else if self.scanner.check_identifier("body") {
                 self.advance();
                 body.fields = self.parse_fields()?;
+            } else if self.scanner.check_identifier("path") {
+                self.advance();
+                path = self.parse_fields()?;
             } else if self.scanner.check(TokenType::At) {
                 let directives = DirectiveParser::new(&mut self.scanner).parse_directives();
                 for directive in directives {
@@ -126,12 +130,16 @@ impl<'a> Parser<'a> {
         }
         // Parse the handler function body
         let script = self.read_raw_script()?;
-        let statements = format!("ai fn handler(query, body, request, header){{{}}}", script);
+        let statements = format!(
+            "ai fn handler(path, query, body, request, header){{{}}}",
+            script
+        );
         self.consume(TokenType::CloseBrace, "Expect '}' after endpoint")?;
         Ok(Endpoint {
             annotation,
             path_specs,
             return_type: None,
+            path,
             query,
             body,
             statements,
@@ -304,30 +312,26 @@ impl<'a> Parser<'a> {
                     path.push('/');
                     self.advance();
                 }
-                TokenType::Less => {
-                    self.advance(); // Consume <
+                TokenType::Colon => {
+                    self.advance(); // Consume :
 
                     // Parse parameter name
                     if !self.check(TokenType::Identifier) {
-                        return Err("Expected parameter name".to_string());
+                        return Err("Expected parameter name after ':'".to_string());
                     }
                     let name = self.current.lexeme.to_string();
                     self.advance();
 
-                    self.consume(TokenType::Colon, "Expected ':' after parameter name")?;
-
-                    // Parse parameter type
-                    if !self.check(TokenType::Identifier) {
-                        return Err("Expected parameter type".to_string());
-                    }
-                    let param_type = self.current.lexeme.to_string();
-                    self.advance();
-
-                    self.consume(TokenType::Greater, "Expected '>' after parameter type")?;
-
-                    path.push(':');
+                    // Add parameter to path in the format Axum expects: {id}
+                    path.push('{');
                     path.push_str(&name);
-                    params.push(PathParameter { name, param_type });
+                    path.push('}');
+
+                    // Add parameter to our list
+                    params.push(PathParameter {
+                        name,
+                        param_type: "str".to_string(), // Default type, will be overridden by path block
+                    });
                 }
                 TokenType::Identifier => {
                     path.push_str(self.current.lexeme);
