@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use date::DateValidator;
+use regex::RegexValidator;
 use serde_json::Value;
 
 use crate::{Directive, DirectiveParams, FromDirective};
@@ -8,6 +9,7 @@ use crate::{Directive, DirectiveParams, FromDirective};
 mod array;
 mod date;
 mod format;
+mod regex;
 
 pub trait Validator: Send + Sync + Any {
     fn name(&self) -> &'static str;
@@ -265,6 +267,7 @@ impl FromDirective for Box<dyn Validator> {
             "not" => Ok(Box::new(NotValidator::from_directive(directive)?)),
             "date" => Ok(Box::new(DateValidator::from_directive(directive)?)),
             "array" => Ok(Box::new(AnyValidator::from_directive(directive)?)), // Add this line
+            "regex" => Ok(Box::new(RegexValidator::from_directive(directive)?)), // Add support for regex directive
             v => Err(format!("Invalid validators: @{}", v)),
         }
     }
