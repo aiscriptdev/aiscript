@@ -378,14 +378,14 @@ mod tests {
                     """Test endpoint"""
                     query {
                         """field name"""
-                        name: str = "hello"
-                        age: int = 18
+                        name: str = "hello",
+                        age: int = 18,
                     }
                     body {
                         """field a"""
                         @length(max=10)
-                        a: str
-                        b: bool = false
+                        a: str,
+                        b: bool = false,
                     }
 
                     let greeting = "Hello" + name;
@@ -494,11 +494,11 @@ mod tests {
                     body {
                         @string(max_len=10)
                         @not(@string(min_len=5))
-                        field: str
+                        field: str,
                         @in(["a" ,"b", "c"])
-                        x: str = "a"
+                        x: str = "a",
                         @in([1, 2, 3])
-                        y: int = 1
+                        y: int = 1,
                         @any(@in(["a", "b"]), @string(min_len=1))
                         z: str
                     }
