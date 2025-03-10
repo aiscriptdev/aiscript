@@ -443,6 +443,10 @@ impl<'a> Parser<'a> {
                     path.push_str(self.current.lexeme);
                     self.advance();
                 }
+                TokenType::Minus => {
+                    path.push('-');
+                    self.advance();
+                }
                 TokenType::OpenBrace | TokenType::Comma => break,
                 _ => return Err(format!("Unexpected token in path: {:?}", self.current.kind)),
             }
