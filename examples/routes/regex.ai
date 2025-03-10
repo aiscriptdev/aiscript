@@ -14,9 +14,9 @@ post /api/register {
     return { "success": true };
 }
 
-get /api/validate_phone {
+get /api/validate-phone {
     query {
-        """Phone number validation ((XXX)-XXX-XXXX format)"""
+        """Phone number validation (XXX-XXX-XXXX format)"""
         @regex(pattern="^\d{3}-\d{3}-\d{4}$")
         phone: str
     }

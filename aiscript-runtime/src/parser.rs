@@ -954,13 +954,16 @@ mod tests {
 
         let route = result.unwrap();
         assert_eq!(route.prefix, "/api");
-        
+
         let endpoint1 = &route.endpoints[0];
         assert_eq!(endpoint1.path_specs[0].method, HttpMethod::Get);
         assert_eq!(endpoint1.path_specs[0].path, "/get-messages");
-        
+
         let endpoint2 = &route.endpoints[1];
         assert_eq!(endpoint2.path_specs[0].method, HttpMethod::Post);
-        assert_eq!(endpoint2.path_specs[0].path, "/user-profile/update-settings");
+        assert_eq!(
+            endpoint2.path_specs[0].path,
+            "/user-profile/update-settings"
+        );
     }
 }

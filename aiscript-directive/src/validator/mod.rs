@@ -266,8 +266,8 @@ impl FromDirective for Box<dyn Validator> {
             "any" => Ok(Box::new(AnyValidator::from_directive(directive)?)),
             "not" => Ok(Box::new(NotValidator::from_directive(directive)?)),
             "date" => Ok(Box::new(DateValidator::from_directive(directive)?)),
-            "array" => Ok(Box::new(AnyValidator::from_directive(directive)?)), // Add this line
-            "regex" => Ok(Box::new(RegexValidator::from_directive(directive)?)), // Add support for regex directive
+            "array" => Ok(Box::new(AnyValidator::from_directive(directive)?)),
+            "regex" => Ok(Box::new(RegexValidator::from_directive(directive)?)),
             v => Err(format!("Invalid validators: @{}", v)),
         }
     }
