@@ -73,6 +73,19 @@ print(empty);  // expect: [1]
 numbers.clear();
 print(numbers);  // expect: []
 
+// Test slice method
+let nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+print(nums.slice(3, 7));      // expect: [3, 4, 5, 6]
+print(nums.slice(5));         // expect: [5, 6, 7, 8, 9]
+print(nums.slice(-3));        // expect: [7, 8, 9]
+print(nums.slice(-6, -2));    // expect: [4, 5, 6, 7]
+print(nums.slice(8, 5));      // expect: []
+
+// Complex examples
+let letters = ["a", "b", "c", "d", "e"];
+let reversed = letters.slice(1, 4).reverse();
+print(reversed);  // expect: [d, c, b]
+
 let nums = [1, 5, 2, 4, 3].sort();
 print(nums.pop(0));  // expect: 1
 print(nums);  // expect: [2, 3, 4, 5]

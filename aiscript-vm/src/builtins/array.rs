@@ -19,6 +19,8 @@ pub(crate) fn define_array_methods(ctx: Context) -> HashMap<InternedString, Buil
         // Ordering operations
         ("sort", BuiltinMethod(sort)),
         ("reverse", BuiltinMethod(reverse)),
+        // Subarray operations
+        ("slice", BuiltinMethod(slice)),
     ]
     .into_iter()
     .map(|(name, f)| (ctx.intern_static(name), f))
@@ -231,6 +233,51 @@ fn index<'gc>(
         "index: value {} not found in list",
         value_to_find
     )))
+}
+
+// Returns a shallow copy of a portion of the array
+fn slice<'gc>(
+    mc: &'gc Mutation<'gc>,
+    receiver: Value<'gc>,
+    args: Vec<Value<'gc>>,
+) -> Result<Value<'gc>, VmError> {
+    let list = receiver.as_array()?;
+
+    if args.is_empty() {
+        return Err(VmError::RuntimeError(
+            "slice: expected at least 1 argument".into(),
+        ));
+    }
+
+    let start = float_arg!(&args, 0, "slice")? as isize;
+
+    let list_ref = list.borrow();
+    let list_len = list_ref.data.len() as isize;
+
+    // Calculate start index (handle negative indices)
+    let start_idx = if start < 0 {
+        (list_len + start).max(0) as usize
+    } else {
+        start.min(list_len) as usize
+    };
+
+    // Calculate end index (handle negative indices and optional end parameter)
+    let end_idx = if args.len() > 1 {
+        let end = float_arg!(&args, 1, "slice")? as isize;
+        if end < 0 {
+            (list_len + end).max(0) as usize
+        } else {
+            end.min(list_len) as usize
+        }
+    } else {
+        list_len as usize
+    };
+
+    // Create a new array with the sliced elements
+    let start_idx = start_idx.min(end_idx); // Ensure start <= end
+    let result = list_ref.data[start_idx..end_idx].to_vec();
+
+    Ok(Value::array(mc, result))
 }
 
 // Return the number of times x appears in the list
