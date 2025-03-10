@@ -1,0 +1,25 @@
+post /api/register {
+    @json
+    body {
+        """Username validation (alphanumeric and underscore only)"""
+        @regex(pattern="^[a-zA-Z0-9_]+$")
+        username: str,
+        
+        """SSN validation (XXX-XX-XXXX format)"""
+        @regex(pattern="^\d{3}-\d{2}-\d{4}$") 
+        ssn: str
+    }
+    
+    print("Received registration for: ", username);
+    return { "success": true };
+}
+
+get /api/validate_phone {
+    query {
+        """Phone number validation ((XXX)-XXX-XXXX format)"""
+        @regex(pattern="^\d{3}-\d{3}-\d{4}$")
+        phone: str
+    }
+    
+    return { "valid": true };
+}
