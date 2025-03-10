@@ -1,6 +1,8 @@
 use ast::HttpMethod;
 use axum::Json;
+use axum::response::IntoResponse;
 use axum::{response::Html, routing::*};
+use hyper::StatusCode;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -254,6 +256,18 @@ async fn run_server(
             router = router.nest(&route.prefix, r);
         }
     }
+
+    // Add a custom 404 handler for unmatched routes
+    async fn handle_404() -> impl IntoResponse {
+        let error_json = serde_json::json!({
+            "message": "Not Found"
+        });
+
+        (StatusCode::NOT_FOUND, Json(error_json))
+    }
+
+    // Add the fallback handler to the router
+    router = router.fallback(handle_404);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await.unwrap();
