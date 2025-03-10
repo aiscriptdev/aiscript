@@ -57,7 +57,7 @@ $ export OPENAI_API_KEY=<your-openai-api-key>
 
 $ cat web.ai
 get / {
-    """A api to ask LLM"""
+    """An api to ask LLM"""
 
     query {
         """the question to ask"""

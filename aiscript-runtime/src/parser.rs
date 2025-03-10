@@ -198,6 +198,18 @@ impl<'a> Parser<'a> {
                 validators: validators.into_boxed_slice(),
                 docs,
             });
+
+            // If this is not the last field (not followed by a closing brace),
+            // then a comma is required
+            if !self.check(TokenType::CloseBrace) {
+                self.consume(TokenType::Comma, "Expected ',' after field definition")?;
+            } else {
+                // We've reached the closing brace, we can optionally have a comma
+                if self.check(TokenType::Comma) {
+                    self.advance(); // consume the optional trailing comma
+                }
+                break;
+            }
         }
 
         self.consume(TokenType::CloseBrace, "Expected '}' after fields")?;
