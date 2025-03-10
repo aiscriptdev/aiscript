@@ -443,6 +443,10 @@ impl<'a> Parser<'a> {
                     path.push_str(self.current.lexeme);
                     self.advance();
                 }
+                TokenType::Minus => {
+                    path.push('-');
+                    self.advance();
+                }
                 TokenType::OpenBrace | TokenType::Comma => break,
                 _ => return Err(format!("Unexpected token in path: {:?}", self.current.kind)),
             }
@@ -929,5 +933,34 @@ mod tests {
         let mut parser = Parser::new(input);
         let result = parser.parse_route();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_path_with_dash() {
+        let input = r#"
+            route /api {
+                get /get-messages {
+                    return "Messages";
+                }
+
+                post /user-profile/update-settings {
+                    return "Settings updated";
+                }
+            }
+        "#;
+
+        let mut parser = Parser::new(input);
+        let result = parser.parse_route();
+
+        let route = result.unwrap();
+        assert_eq!(route.prefix, "/api");
+        
+        let endpoint1 = &route.endpoints[0];
+        assert_eq!(endpoint1.path_specs[0].method, HttpMethod::Get);
+        assert_eq!(endpoint1.path_specs[0].path, "/get-messages");
+        
+        let endpoint2 = &route.endpoints[1];
+        assert_eq!(endpoint2.path_specs[0].method, HttpMethod::Post);
+        assert_eq!(endpoint2.path_specs[0].path, "/user-profile/update-settings");
     }
 }
