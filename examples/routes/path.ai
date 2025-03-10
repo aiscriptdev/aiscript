@@ -1,0 +1,16 @@
+get /users/:id/posts/:postId {
+    path {
+        @string(min_len=3)
+        id: str,
+        postId: int,
+    }
+
+    query {
+        refresh: bool = true
+    }
+
+    print(path);
+    let userId = path.id;
+    let postId = path.postId;
+    return f"Accessing post {postId} for user {userId}";
+}

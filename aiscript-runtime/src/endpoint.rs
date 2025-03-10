@@ -3,7 +3,7 @@ use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
     Form, Json, RequestExt,
     body::Body,
-    extract::{self, FromRequest, Request},
+    extract::{self, FromRequest, RawPathParams, Request},
     http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
 };
@@ -57,6 +57,7 @@ pub struct Field {
 #[derive(Clone)]
 pub struct Endpoint {
     pub annotation: RouteAnnotation,
+    pub path_params: Vec<Field>,
     pub query_params: Vec<Field>,
     pub body_type: BodyKind,
     pub body_fields: Vec<Field>,
@@ -70,6 +71,7 @@ pub struct Endpoint {
 
 enum ProcessingState {
     ValidatingAuth,
+    ValidatingPath,
     ValidatingQuery,
     ValidatingBody,
     Executing(JoinHandle<Result<ReturnValue, VmError>>),
@@ -79,6 +81,7 @@ pub struct RequestProcessor {
     endpoint: Endpoint,
     request: Request<Body>,
     jwt_claim: Option<Value>,
+    path_data: HashMap<String, Value>,
     query_data: HashMap<String, Value>,
     body_data: HashMap<String, Value>,
     state: ProcessingState,
@@ -89,12 +92,13 @@ impl RequestProcessor {
         let state = if endpoint.annotation.is_auth_required() {
             ProcessingState::ValidatingAuth
         } else {
-            ProcessingState::ValidatingQuery
+            ProcessingState::ValidatingPath
         };
         Self {
             endpoint,
             request,
             jwt_claim: None,
+            path_data: HashMap::new(),
             query_data: HashMap::new(),
             body_data: HashMap::new(),
             state,
@@ -307,6 +311,99 @@ impl Future for RequestProcessor {
                             }
                         }
                     }
+                    self.state = ProcessingState::ValidatingPath;
+                }
+                ProcessingState::ValidatingPath => {
+                    let raw_path_params = {
+                        // Extract path parameters using Axum's RawPathParams extractor
+                        let future = self.request.extract_parts::<RawPathParams>();
+
+                        tokio::pin!(future);
+                        match future.poll(cx) {
+                            Poll::Pending => return Poll::Pending,
+                            Poll::Ready(Ok(params)) => params,
+                            Poll::Ready(Err(e)) => {
+                                return Poll::Ready(Ok(format!(
+                                    "Failed to extract path parameters: {}",
+                                    e
+                                )
+                                .into_response()));
+                            }
+                        }
+                    };
+
+                    // Process and validate each path parameter
+                    for (param_name, param_value) in &raw_path_params {
+                        // Find the corresponding path parameter field
+                        if let Some(field) = self
+                            .endpoint
+                            .path_params
+                            .iter()
+                            .find(|f| f.name == param_name)
+                        {
+                            // Convert the value to the appropriate type based on the field definition
+                            let value = match field.field_type {
+                                FieldType::Str => Value::String(param_value.to_string()),
+                                FieldType::Number => {
+                                    if let Ok(num) = param_value.parse::<i64>() {
+                                        Value::Number(num.into())
+                                    } else if let Ok(float) = param_value.parse::<f64>() {
+                                        match serde_json::Number::from_f64(float) {
+                                            Some(n) => Value::Number(n),
+                                            None => {
+                                                return Poll::Ready(Ok(
+                                                    format!("Invalid path parameter type for {}: could not convert to number", param_name)
+                                                        .into_response()
+                                                ));
+                                            }
+                                        }
+                                    } else {
+                                        return Poll::Ready(Ok(format!(
+                                            "Invalid path parameter type for {}: expected a number",
+                                            param_name
+                                        )
+                                        .into_response()));
+                                    }
+                                }
+                                FieldType::Bool => match param_value.to_lowercase().as_str() {
+                                    "true" => Value::Bool(true),
+                                    "false" => Value::Bool(false),
+                                    _ => {
+                                        return Poll::Ready(Ok(
+                                                format!("Invalid path parameter type for {}: expected a boolean", param_name)
+                                                    .into_response()
+                                            ));
+                                    }
+                                },
+                                _ => {
+                                    return Poll::Ready(Ok(format!(
+                                        "Unsupported path parameter type for {}",
+                                        param_name
+                                    )
+                                    .into_response()));
+                                }
+                            };
+
+                            // Validate the value using our existing validation infrastructure
+                            if let Err(e) = Self::validate_field(field, &value) {
+                                return Poll::Ready(Ok(e.into_response()));
+                            }
+
+                            // Store the validated parameter
+                            self.path_data.insert(param_name.to_string(), value);
+                        }
+                    }
+
+                    // Check for missing required parameters
+                    for field in &self.endpoint.path_params {
+                        if !self.path_data.contains_key(&field.name) && field.required {
+                            return Poll::Ready(Ok(
+                                ServerError::MissingField(field.name.clone()).into_response()
+                            ));
+                        }
+                    }
+
+                    // Move to the next state
                     self.state = ProcessingState::ValidatingQuery;
                 }
                 ProcessingState::ValidatingQuery => {
@@ -400,6 +497,7 @@ impl Future for RequestProcessor {
                     } else {
                         None
                     };
+                    let path_data = mem::take(&mut self.path_data);
                     let query_data = mem::take(&mut self.query_data);
                     let body_data = mem::take(&mut self.body_data);
                     let pg_connection = self.endpoint.pg_connection.clone();
@@ -417,6 +515,7 @@ impl Future for RequestProcessor {
                             vm.eval_function(
                                 0,
                                 &[
+                                    Value::Object(path_data.into_iter().collect()),
                                     Value::Object(query_data.into_iter().collect()),
                                     Value::Object(body_data.into_iter().collect()),
                                     Value::Object(
