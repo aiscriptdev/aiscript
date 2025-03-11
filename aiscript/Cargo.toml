@@ -16,8 +16,8 @@ name = "aiscript"
 path = "src/main.rs"
 
 [dependencies]
-aiscript-vm = { path = "../aiscript-vm", version = "0.1.0" }
-aiscript-runtime = { path = "../aiscript-runtime", version = "0.1.0" }
+aiscript-vm = { path = "../aiscript-vm", version = "0.2.0" }
+aiscript-runtime = { path = "../aiscript-runtime", version = "0.2.0" }
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1.44", features = ["rt-multi-thread", "macros"] }
 dotenv = "0.15.0"

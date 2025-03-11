@@ -12,7 +12,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-aiscript-lexer = { path = "../aiscript-lexer", version = "0.1.0" }
+aiscript-lexer = { path = "../aiscript-lexer", version = "0.2.0" }
 serde_json = "1.0"
 chrono = "0.4"
 regex = "1.11"
