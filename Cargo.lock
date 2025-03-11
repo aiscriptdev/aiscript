@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "aiscript"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aiscript-runtime",
  "aiscript-vm",
@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "aiscript-api"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "aiscript-arena"
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "aiscript-directive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aiscript-lexer",
  "chrono",
@@ -94,11 +94,11 @@ dependencies = [
 
 [[package]]
 name = "aiscript-lexer"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "aiscript-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aiscript-directive",
  "aiscript-lexer",
@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "aiscript-vm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash",
  "aiscript-arena",
