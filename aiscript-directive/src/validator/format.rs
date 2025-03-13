@@ -44,6 +44,62 @@ static WEEK_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d{4}-W\d{2}
 static COLOR_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$").unwrap());
 
+mod uscc {
+    use std::{collections::HashMap, sync::LazyLock};
+
+    use regex::Regex;
+
+    static USCC_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$").unwrap()
+    });
+
+    static USCC_BASE_CHARS: LazyLock<HashMap<char, u8>> = LazyLock::new(|| {
+        let mut base_chars = HashMap::with_capacity(17);
+
+        [
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+            'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'W', 'X', 'Y',
+        ]
+        .into_iter()
+        .enumerate()
+        .for_each(|(index, c)| {
+            base_chars.insert(c, index as u8);
+        });
+
+        base_chars
+    });
+
+    static USCC_WEIGHT: LazyLock<[u8; 17]> = LazyLock::new(|| {
+        [
+            1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28,
+        ]
+    });
+
+    /// Determine whether it is a valid [Unified Social Credit Code](http://c.gb688.cn/bzgk/gb/showGb?type=online&hcno=24691C25985C1073D3A7C85629378AC0).
+    pub fn is_valid_unified_social_credit_code(uscc: &str) -> bool {
+        if USCC_REGEX.is_match(uscc) {
+            let total_weight = uscc
+                .chars()
+                .take(17)
+                .enumerate()
+                .map(|(index, ref c)| {
+                    // The previously executed regular expression match ensures that the value retrieval operation here is safe.
+                    *USCC_BASE_CHARS.get(c).unwrap() as usize * USCC_WEIGHT[index] as usize
+                })
+                .sum::<usize>();
+
+            let check_flag = ((31 - (total_weight % 31)) % 31) as u8;
+
+            match USCC_BASE_CHARS.iter().find(|(_, v)| **v == check_flag) {
+                Some((&flag, _)) => uscc.chars().last().unwrap() == flag,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+}
+
 pub struct FormatValidator {
     pub format_type: String,
 }
@@ -172,6 +228,7 @@ impl Validator for FormatValidator {
                             && chrono::DateTime::parse_from_rfc3339(value_str).is_ok()
                     }
                     "color" => COLOR_REGEX.is_match(value_str),
+                    "uscc" => uscc::is_valid_unified_social_credit_code(value_str),
                     _ => return Err(format!("Unsupported format type: {}", self.format_type)),
                 };
 
@@ -197,7 +254,7 @@ impl FromDirective for FormatValidator {
                 match params.get("type").and_then(|v| v.as_str()) {
                     Some(format_type) => match format_type {
                         "email" | "url" | "uuid" | "ipv4" | "ipv6" | "date" | "datetime"
-                        | "time" | "month" | "week" | "color" => Ok(Self {
+                        | "time" | "month" | "week" | "color" | "uscc" => Ok(Self {
                             format_type: format_type.to_string(),
                         }),
                         _ => Err(format!("Unsupported format type: {}", format_type)),
@@ -452,4 +509,22 @@ mod tests {
         assert!(validator.validate(&json!(null)).is_err());
         assert!(validator.validate(&json!(["email@example.com"])).is_err());
     }
+
+    #[test]
+    fn test_uscc_format() {
+        let mut params = HashMap::new();
+        params.insert("type".into(), json!("uscc"));
+        let directive = create_directive(params);
+        let validator = FormatValidator::from_directive(directive).unwrap();
+
+        assert!(validator.validate(&json!("91440300MA5FXT4K8N")).is_ok());
+        assert!(validator.validate(&json!("91110108660511594M")).is_ok());
+        assert!(validator.validate(&json!("91330110MA2AXY0E7F")).is_ok());
+        assert!(validator.validate(&json!("91330100716105852F")).is_ok());
+        assert!(validator.validate(&json!("911101085923662400")).is_ok());
+        assert!(validator.validate(&json!("911101085923662401")).is_err()); // The value of the check digit (the last character) is incorrect.
+        assert!(validator.validate(&json!("91110108592366240")).is_err()); // invalid length
+        assert!(validator.validate(&json!("9111010859236624001")).is_err()); // invalid length
+    }
+
 }
