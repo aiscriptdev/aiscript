@@ -526,5 +526,4 @@ mod tests {
         assert!(validator.validate(&json!("91110108592366240")).is_err()); // invalid length
         assert!(validator.validate(&json!("9111010859236624001")).is_err()); // invalid length
     }
-
 }
