@@ -1,6 +1,7 @@
 [apidoc]
 enabled = true
-path = "/redoc"
+type = "swagger"
+path = "/docs"
 
 [database.postgresql]
 url = "$DATABASE_URL"
