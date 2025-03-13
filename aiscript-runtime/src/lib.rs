@@ -190,10 +190,10 @@ async fn run_server(
     if config.apidoc.enabled {
         match config.apidoc.doc_type {
             config::ApiDocType::Swagger => {
-                // router = router.route(
-                //     &config.apidoc.path,
-                //     get(move || async { Html(include_str!("openapi/swagger.html")) }),
-                // );
+                router = router.route(
+                    &config.apidoc.path,
+                    get(move || async { Html(include_str!("openapi/swagger.html")) }),
+                );
             }
             config::ApiDocType::Redoc => {
                 router = router.route(
