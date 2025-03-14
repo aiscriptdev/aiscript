@@ -301,6 +301,7 @@ async fn run_server(
     }
 }
 
+// Generate OpenAPI JSON from routes
 fn generate_openapi_json(routes: &[ast::Route]) -> serde_json::Value {
     let mut openapi = serde_json::json!({
         "openapi": "3.0.0",
