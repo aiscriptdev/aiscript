@@ -1,9 +1,11 @@
 use openai_api_rs::v1::common::GPT3_5_TURBO;
 use tokio::runtime::Handle;
 
+use super::{AiConfig, ModelConfig, default_model};
+
 pub struct PromptConfig {
     pub input: String,
-    pub model: Option<String>,
+    pub ai_config: Option<AiConfig>,
     pub max_tokens: Option<i64>,
     pub temperature: Option<f64>,
     pub system_prompt: Option<String>,
@@ -13,10 +15,28 @@ impl Default for PromptConfig {
     fn default() -> Self {
         Self {
             input: String::new(),
-            model: Some(GPT3_5_TURBO.to_string()),
+            ai_config: Some(AiConfig::OpenAI(ModelConfig {
+                api_key: Default::default(),
+                model: Some(GPT3_5_TURBO.to_string()),
+            })),
             max_tokens: Default::default(),
             temperature: Default::default(),
             system_prompt: Default::default(),
+        }
+    }
+}
+
+impl PromptConfig {
+    fn take_model(&mut self) -> String {
+        self.ai_config
+            .as_mut()
+            .and_then(|config| config.take_model())
+            .unwrap_or_else(|| default_model(self.ai_config.as_ref()))
+    }
+
+    pub(crate) fn set_model(&mut self, model: String) {
+        if let Some(config) = self.ai_config.as_mut() {
+            config.set_model(model);
         }
     }
 }
@@ -28,12 +48,9 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
 
 #[cfg(not(feature = "ai_test"))]
 async fn _prompt_with_config(mut config: PromptConfig) -> String {
-    use openai_api_rs::v1::{
-        chat_completion::{self, ChatCompletionRequest},
-        common::GPT3_5_TURBO,
-    };
-
-    let mut client = super::openai_client();
+    use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
+    let mut client = super::openai_client(config.ai_config.as_ref());
+    let model = config.take_model();
 
     // Create system message if provided
     let mut messages = Vec::new();
@@ -57,13 +74,7 @@ async fn _prompt_with_config(mut config: PromptConfig) -> String {
     });
 
     // Build the request
-    let mut req = ChatCompletionRequest::new(
-        config
-            .model
-            .take()
-            .unwrap_or_else(|| GPT3_5_TURBO.to_string()),
-        messages,
-    );
+    let mut req = ChatCompletionRequest::new(model, messages);
 
     if let Some(max_tokens) = config.max_tokens {
         req.max_tokens = Some(max_tokens);
