@@ -49,9 +49,9 @@ pub(crate) fn openai_client() -> OpenAIClient {
 
 pub(crate) fn default_model() -> &'static str {
     if env::var("OPENAI_API_KEY").is_ok() {
-        return GPT3_5_TURBO;
+        GPT3_5_TURBO
     } else if env::var("DEEPSEEK_API_KEY").is_ok() {
-        return DEEPSEEK_CHAT;
+        DEEPSEEK_CHAT
     } else {
         panic!("No API key found.");
     }
