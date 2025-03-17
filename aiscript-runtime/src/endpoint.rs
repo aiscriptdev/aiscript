@@ -499,8 +499,13 @@ impl Future for RequestProcessor {
                     let redis_connection = self.endpoint.redis_connection.clone();
                     let handle: JoinHandle<Result<ReturnValue, VmError>> =
                         task::spawn_blocking(move || {
-                            let mut vm =
-                                Vm::new(pg_connection, sqlite_connection, redis_connection);
+                            let ai_config = Config::load().ai.clone();
+                            let mut vm = Vm::new(
+                                pg_connection,
+                                sqlite_connection,
+                                redis_connection,
+                                ai_config,
+                            );
                             if let Some(fields) = sso_fields {
                                 vm.inject_sso_instance(fields);
                             }
