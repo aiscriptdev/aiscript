@@ -6,6 +6,7 @@ pub use state::State;
 
 use crate::{
     ReturnValue, Value,
+    ai::AiConfig,
     ast::ChunkId,
     builtins, stdlib,
     string::{InternedString, InternedStringSet},
@@ -35,7 +36,7 @@ impl Display for VmError {
 
 impl Default for Vm {
     fn default() -> Self {
-        Self::new(None, None, None)
+        Self::new(None, None, None, None)
     }
 }
 
@@ -48,6 +49,7 @@ impl Vm {
         pg_connection: Option<PgPool>,
         sqlite_connection: Option<SqlitePool>,
         redis_connection: Option<redis::aio::MultiplexedConnection>,
+        ai_config: Option<AiConfig>,
     ) -> Self {
         let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| {
@@ -55,6 +57,7 @@ impl Vm {
                 state.pg_connection = pg_connection;
                 state.sqlite_connection = sqlite_connection;
                 state.redis_connection = redis_connection;
+                state.ai_config = ai_config;
                 state
             }),
         };

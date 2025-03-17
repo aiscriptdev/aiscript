@@ -15,7 +15,7 @@ use sqlx::{PgPool, SqlitePool};
 
 use crate::{
     NativeFn, OpCode, ReturnValue, Value,
-    ai::{self, PromptConfig},
+    ai::{self, AiConfig, PromptConfig},
     ast::{ChunkId, Visibility},
     builtins::BuiltinMethods,
     module::{ModuleKind, ModuleManager, ModuleSource},
@@ -110,6 +110,7 @@ pub struct State<'gc> {
     pub pg_connection: Option<PgPool>,
     pub sqlite_connection: Option<SqlitePool>,
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
+    pub ai_config: Option<AiConfig>,
 }
 
 unsafe impl Collect for State<'_> {
@@ -152,6 +153,7 @@ impl<'gc> State<'gc> {
             pg_connection: None,
             sqlite_connection: None,
             redis_connection: None,
+            ai_config: None,
         }
     }
 

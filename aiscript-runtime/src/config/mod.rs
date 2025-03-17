@@ -3,6 +3,7 @@ use std::{env, fmt::Display, fs, ops::Deref, path::Path, sync::OnceLock};
 use auth::AuthConfig;
 use serde::Deserialize;
 
+use aiscript_vm::AiConfig;
 use db::DatabaseConfig;
 pub use sso::{SsoConfig, get_sso_fields};
 
@@ -65,6 +66,8 @@ impl AsRef<str> for EnvString {
 #[derive(Debug, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
+    pub ai: Option<AiConfig>,
+    #[serde(default)]
     pub database: DatabaseConfig,
     #[serde(default)]
     pub apidoc: ApiDocConfig,
@@ -116,9 +119,9 @@ impl Config {
         }
     }
 
-    pub fn load(path: &str) -> &Config {
+    pub fn load() -> &'static Config {
         CONFIG.get_or_init(|| {
-            Config::new(path).unwrap_or_else(|e| {
+            Config::new("project.toml").unwrap_or_else(|e| {
                 eprintln!("Error loading config file: {}", e);
                 Config::default()
             })
