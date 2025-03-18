@@ -1,5 +1,6 @@
-use openai_api_rs::v1::common::GPT3_5_TURBO;
 use tokio::runtime::Handle;
+
+use super::default_model;
 
 pub struct PromptConfig {
     pub input: String,
@@ -13,7 +14,7 @@ impl Default for PromptConfig {
     fn default() -> Self {
         Self {
             input: String::new(),
-            model: Some(GPT3_5_TURBO.to_string()),
+            model: Some(default_model().to_string()),
             max_tokens: Default::default(),
             temperature: Default::default(),
             system_prompt: Default::default(),
@@ -28,10 +29,7 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
 
 #[cfg(not(feature = "ai_test"))]
 async fn _prompt_with_config(mut config: PromptConfig) -> String {
-    use openai_api_rs::v1::{
-        chat_completion::{self, ChatCompletionRequest},
-        common::GPT3_5_TURBO,
-    };
+    use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
 
     let mut client = super::openai_client();
 
@@ -61,7 +59,7 @@ async fn _prompt_with_config(mut config: PromptConfig) -> String {
         config
             .model
             .take()
-            .unwrap_or_else(|| GPT3_5_TURBO.to_string()),
+            .unwrap_or_else(|| default_model().to_string()),
         messages,
     );
 

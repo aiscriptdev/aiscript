@@ -8,7 +8,6 @@ use openai_api_rs::v1::{
         ChatCompletionMessage, ChatCompletionMessageForResponse, ChatCompletionRequest, Content,
         MessageRole, Tool, ToolCall, ToolChoiceType, ToolType,
     },
-    common::GPT3_5_TURBO,
     types::{self, FunctionParameters, JSONSchemaDefine},
 };
 use tokio::runtime::Handle;
@@ -278,6 +277,8 @@ pub async fn _run_agent<'gc>(
     mut agent: Gc<'gc, Agent<'gc>>,
     args: Vec<Value<'gc>>,
 ) -> Value<'gc> {
+    use super::default_model;
+
     let message = args[0];
     let debug = args[1].as_boolean();
     let mut history = Vec::new();
@@ -292,7 +293,7 @@ pub async fn _run_agent<'gc>(
     loop {
         let mut messages = vec![agent.get_instruction_message()];
         messages.extend(history.clone());
-        let mut req = ChatCompletionRequest::new(GPT3_5_TURBO.to_string(), messages);
+        let mut req = ChatCompletionRequest::new(default_model().to_string(), messages);
         let tools = agent.get_tools();
         if !tools.is_empty() {
             req = req

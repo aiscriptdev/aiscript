@@ -53,7 +53,14 @@ AIScript isn't just a language—it's a complete web development solution:
 ## How AIScript works
 
 ```javascript
+// use OpenAI
 $ export OPENAI_API_KEY=<your-openai-api-key>
+
+// or use Deepseek
+$ export DEEPSEEK_API_KEY=<your-deepseek-api-key>*/
+
+// optional, default is https://api.deepseek.com
+$ export DEEPSEEK_API_ENDPOINT=<your-deepseek-apit-endpoint>
 
 $ cat web.ai
 get / {
