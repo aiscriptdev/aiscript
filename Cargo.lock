@@ -111,6 +111,7 @@ dependencies = [
  "hyper-util",
  "indexmap",
  "jsonwebtoken",
+ "lazy_static",
  "minijinja",
  "notify",
  "oas3",

@@ -36,3 +36,4 @@ toml = "0.8"
 oas3 = "0.15"
 reqwest.workspace = true
 minijinja = { version = "1.0", features = ["loader"] }
+lazy_static = "1.4"
