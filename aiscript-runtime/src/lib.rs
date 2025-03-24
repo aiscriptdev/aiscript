@@ -24,6 +24,7 @@ mod error;
 mod openapi;
 mod parser;
 mod utils;
+mod template;
 
 use aiscript_lexer as lexer;
 
