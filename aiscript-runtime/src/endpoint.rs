@@ -602,3 +602,8 @@ pub(crate) fn convert_field(field: ast::Field) -> Field {
         validators: Arc::from(field.validators),
     }
 }
+
+pub fn render(template: &str, context: serde_json::Value) -> Result<String, String> {
+    let engine = template::get_template_engine();
+    engine.render(template, &context)
+}
