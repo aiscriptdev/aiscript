@@ -1013,15 +1013,21 @@ impl<'gc> State<'gc> {
                 let result = match value {
                     // Simple string case
                     Value::String(s) => {
-                        let input = s.to_str().unwrap().to_string();
-                        ai::prompt_with_config(PromptConfig {
-                            input,
+                        let mut config = PromptConfig {
+                            input: s.to_str().unwrap().to_string(),
                             ..Default::default()
-                        })
+                        };
+                        if let Some(ai_cfg) = &self.ai_config {
+                            config.ai_config = Some(ai_cfg.clone());
+                        }
+                        ai::prompt_with_config(config)
                     }
                     // Object config case
                     Value::Object(obj) => {
                         let mut config = PromptConfig::default();
+                        if let Some(ai_cfg) = &self.ai_config {
+                            config.ai_config = Some(ai_cfg.clone());
+                        }
                         let obj_ref = obj.borrow();
 
                         // Extract input (required)
@@ -1039,7 +1045,7 @@ impl<'gc> State<'gc> {
                         if let Some(Value::String(model)) =
                             obj_ref.fields.get(&self.intern(b"model"))
                         {
-                            config.model = Some(model.to_str().unwrap().to_string());
+                            config.set_model(model.to_str().unwrap().to_string());
                         }
 
                         // Extract max_tokens (optional)

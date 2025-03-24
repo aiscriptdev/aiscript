@@ -113,6 +113,28 @@ AIScript excels in these scenarios:
 
 Check out the [examples](./examples) directory for more sample code.
 
+## Supported AI Models
+
+AIScript supports the following AI models:
+
+- [x] OpenAI ((uses `OPENAI_API_KEY` environment variable by default))
+- [x] DeepSeek
+- [ ] Anthropic
+
+Configuration by `project.toml`:
+
+```toml
+# use OpenAI
+[ai.openai]
+api_key = "YOUR_API_KEY"
+model = "gpt-3.5-turbo"
+
+# or use DeepSeek
+[ai.deepseek]
+api_key = "YOUR_API_KEY"
+model = "deepseek-chat"
+```
+
 ## Roadmap
 
 See our [roadmap](https://aiscript.dev/guide/contribution/roadmap) for upcoming features and improvements.
