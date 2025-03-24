@@ -1,0 +1,5 @@
+{% if query.is_admin %}
+<div>Hello, {{ query.name }} (Admin)</div>
+{% else %}
+<div>Hello, {{ query.name }}</div>
+{% endif %}
