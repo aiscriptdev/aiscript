@@ -1,3 +1,4 @@
+use crate::template;
 use aiscript_directive::{Validator, route::RouteAnnotation};
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
