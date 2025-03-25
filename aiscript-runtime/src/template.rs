@@ -1,6 +1,4 @@
 use minijinja::Environment;
-use std::path::Path;
-use std::sync::Arc;
 use std::sync::RwLock;
 
 /// Template engine for AIScript
