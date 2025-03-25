@@ -23,8 +23,8 @@ mod endpoint;
 mod error;
 mod openapi;
 mod parser;
-mod utils;
 mod template;
+mod utils;
 
 use aiscript_lexer as lexer;
 
