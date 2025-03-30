@@ -9,8 +9,13 @@ pub use prompt::{PromptConfig, prompt_with_config};
 
 use serde::Deserialize;
 
+// Deepseek
 const DEEPSEEK_API_ENDPOINT: &str = "https://api.deepseek.com/v1";
 const DEEPSEEK_V3: &str = "deepseek-chat";
+
+// Anthropic
+const ANTHROPIC_API_ENDPOINT: &str = "https://api.anthropic.com/v1";
+const CLAUDE_3_5_SONNET: &str = "claude-3-5-sonnet-latest";
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum AiConfig {
@@ -69,7 +74,11 @@ pub(crate) fn openai_client(config: Option<&AiConfig>) -> OpenAIClient {
             .with_api_key(api_key)
             .build()
             .unwrap(),
-        Some(AiConfig::Anthropic(_)) => unimplemented!("Anthropic API not yet supported"),
+        Some(AiConfig::Anthropic(ModelConfig { api_key, .. })) => OpenAIClient::builder()
+            .with_endpoint(ANTHROPIC_API_ENDPOINT)
+            .with_api_key(api_key)
+            .build()
+            .unwrap(),
     }
 }
 
@@ -82,6 +91,8 @@ pub(crate) fn default_model(config: Option<&AiConfig>) -> String {
         Some(AiConfig::DeepSeek(ModelConfig { model, .. })) => {
             model.clone().unwrap_or(DEEPSEEK_V3.to_string())
         }
-        Some(AiConfig::Anthropic(_)) => unimplemented!("Anthropic API not yet supported"),
+        Some(AiConfig::Anthropic(ModelConfig { model, .. })) => {
+            model.clone().unwrap_or(CLAUDE_3_5_SONNET.to_string())
+        }
     }
 }
