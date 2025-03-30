@@ -48,7 +48,7 @@ enum Commands {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    Config::load("project.toml");
+    let config = Config::load();
 
     let cli = AIScriptCli::parse();
     match cli.command {
@@ -69,7 +69,12 @@ async fn main() {
                 let sqlite_connection = aiscript_runtime::get_sqlite_connection().await;
                 let redis_connection = aiscript_runtime::get_redis_connection().await;
                 task::spawn_blocking(move || {
-                    let mut vm = Vm::new(pg_connection, sqlite_connection, redis_connection);
+                    let mut vm = Vm::new(
+                        pg_connection,
+                        sqlite_connection,
+                        redis_connection,
+                        config.ai.clone(),
+                    );
                     vm.run_file(path);
                 })
                 .await // must use await to wait for the thread to finish

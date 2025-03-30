@@ -15,7 +15,7 @@ use sqlx::{PgPool, SqlitePool};
 
 use crate::{
     NativeFn, OpCode, ReturnValue, Value,
-    ai::{self, PromptConfig},
+    ai::{self, AiConfig, PromptConfig},
     ast::{ChunkId, Visibility},
     builtins::BuiltinMethods,
     module::{ModuleKind, ModuleManager, ModuleSource},
@@ -110,6 +110,7 @@ pub struct State<'gc> {
     pub pg_connection: Option<PgPool>,
     pub sqlite_connection: Option<SqlitePool>,
     pub redis_connection: Option<redis::aio::MultiplexedConnection>,
+    pub ai_config: Option<AiConfig>,
 }
 
 unsafe impl Collect for State<'_> {
@@ -152,6 +153,7 @@ impl<'gc> State<'gc> {
             pg_connection: None,
             sqlite_connection: None,
             redis_connection: None,
+            ai_config: None,
         }
     }
 
@@ -1011,15 +1013,21 @@ impl<'gc> State<'gc> {
                 let result = match value {
                     // Simple string case
                     Value::String(s) => {
-                        let input = s.to_str().unwrap().to_string();
-                        ai::prompt_with_config(PromptConfig {
-                            input,
+                        let mut config = PromptConfig {
+                            input: s.to_str().unwrap().to_string(),
                             ..Default::default()
-                        })
+                        };
+                        if let Some(ai_cfg) = &self.ai_config {
+                            config.ai_config = Some(ai_cfg.clone());
+                        }
+                        ai::prompt_with_config(config)
                     }
                     // Object config case
                     Value::Object(obj) => {
                         let mut config = PromptConfig::default();
+                        if let Some(ai_cfg) = &self.ai_config {
+                            config.ai_config = Some(ai_cfg.clone());
+                        }
                         let obj_ref = obj.borrow();
 
                         // Extract input (required)
@@ -1037,7 +1045,7 @@ impl<'gc> State<'gc> {
                         if let Some(Value::String(model)) =
                             obj_ref.fields.get(&self.intern(b"model"))
                         {
-                            config.model = Some(model.to_str().unwrap().to_string());
+                            config.set_model(model.to_str().unwrap().to_string());
                         }
 
                         // Extract max_tokens (optional)

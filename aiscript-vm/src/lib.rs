@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 
+pub use ai::AiConfig;
 use aiscript_arena::Collect;
 use aiscript_arena::Mutation;
 pub(crate) use aiscript_lexer as lexer;
