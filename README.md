@@ -119,7 +119,7 @@ AIScript supports the following AI models:
 
 - [x] OpenAI ((uses `OPENAI_API_KEY` environment variable by default))
 - [x] DeepSeek
-- [ ] Anthropic
+- [x] Anthropic
 
 Configuration by `project.toml`:
 
@@ -133,6 +133,11 @@ model = "gpt-3.5-turbo"
 [ai.deepseek]
 api_key = "YOUR_API_KEY"
 model = "deepseek-chat"
+
+# or use Anthropic
+[ai.anthropic]
+api_key = "YOUR_API_KEY"
+model = "claude-3-5-sonnet-latest"
 ```
 
 ## Roadmap
