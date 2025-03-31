@@ -60,6 +60,9 @@ pub struct ModelConfig {
 impl Default for ModelConfig {
     fn default() -> Self {
         ModelConfig {
+            #[cfg(feature = "ai_test")]
+            api_key: "".into(),
+            #[cfg(not(feature = "ai_test"))]
             api_key: env::var("OPENAI_API_KEY")
                 .expect("Expect `OPENAI_API_KEY` environment variable."),
             api_endpoint: Some(OPENAI_API_ENDPOINT.to_string()),
