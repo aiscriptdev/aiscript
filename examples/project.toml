@@ -19,3 +19,7 @@ client_id = "123"
 client_secret = "abc"
 redirect_url = "http://localhost:8080/callback"
 scopes = ["email"]
+
+[ai.anthropic]
+api_key = "$CLAUDE_API_KEY"
+model = "claude-3-5-sonnet-latest"

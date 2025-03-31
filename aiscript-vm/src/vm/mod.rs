@@ -36,7 +36,7 @@ impl Display for VmError {
 
 impl Default for Vm {
     fn default() -> Self {
-        Self::new(None, None, None, None)
+        Self::new(None, None, None, AiConfig::default())
     }
 }
 
@@ -49,7 +49,7 @@ impl Vm {
         pg_connection: Option<PgPool>,
         sqlite_connection: Option<SqlitePool>,
         redis_connection: Option<redis::aio::MultiplexedConnection>,
-        ai_config: Option<AiConfig>,
+        ai_config: AiConfig,
     ) -> Self {
         let mut vm = Vm {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| {

@@ -1,0 +1,6 @@
+// ignore
+let a = prompt {
+    input: "hi",
+    model: "invalid-model",
+};
+// expect runtime error: Unsupported model 'invalid-model'.

@@ -1,44 +1,14 @@
-use openai_api_rs::v1::common::GPT3_5_TURBO;
 use tokio::runtime::Handle;
 
-use super::{AiConfig, ModelConfig, default_model};
+use super::ModelConfig;
 
+#[derive(Default)]
 pub struct PromptConfig {
     pub input: String,
-    pub ai_config: Option<AiConfig>,
+    pub model_config: ModelConfig,
     pub max_tokens: Option<i64>,
     pub temperature: Option<f64>,
     pub system_prompt: Option<String>,
-}
-
-impl Default for PromptConfig {
-    fn default() -> Self {
-        Self {
-            input: String::new(),
-            ai_config: Some(AiConfig::OpenAI(ModelConfig {
-                api_key: Default::default(),
-                model: Some(GPT3_5_TURBO.to_string()),
-            })),
-            max_tokens: Default::default(),
-            temperature: Default::default(),
-            system_prompt: Default::default(),
-        }
-    }
-}
-
-impl PromptConfig {
-    fn take_model(&mut self) -> String {
-        self.ai_config
-            .as_mut()
-            .and_then(|config| config.take_model())
-            .unwrap_or_else(|| default_model(self.ai_config.as_ref()))
-    }
-
-    pub(crate) fn set_model(&mut self, model: String) {
-        if let Some(config) = self.ai_config.as_mut() {
-            config.set_model(model);
-        }
-    }
 }
 
 #[cfg(feature = "ai_test")]
@@ -49,8 +19,8 @@ async fn _prompt_with_config(config: PromptConfig) -> String {
 #[cfg(not(feature = "ai_test"))]
 async fn _prompt_with_config(mut config: PromptConfig) -> String {
     use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
-    let mut client = super::openai_client(config.ai_config.as_ref());
-    let model = config.take_model();
+    let model = config.model_config.model.take().unwrap();
+    let mut client = super::openai_client(&config.model_config);
 
     // Create system message if provided
     let mut messages = Vec::new();

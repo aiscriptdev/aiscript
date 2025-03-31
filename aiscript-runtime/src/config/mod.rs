@@ -66,7 +66,7 @@ impl AsRef<str> for EnvString {
 #[derive(Debug, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
-    pub ai: Option<AiConfig>,
+    pub ai: AiConfig,
     #[serde(default)]
     pub database: DatabaseConfig,
     #[serde(default)]
