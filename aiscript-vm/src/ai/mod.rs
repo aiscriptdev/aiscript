@@ -112,7 +112,7 @@ impl AiConfig {
                         })
                     }
                 }
-                m => Err(format!("Unsupported model `{m}`.")),
+                m => Err(format!("Unsupported model '{m}'.")),
             }
         } else {
             // Default is OpenAI model
