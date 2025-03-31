@@ -1,5 +1,5 @@
 let a = prompt {
     input: "What is rust?",
-    model: "claude-3-5-sonnet-latest"
+    model: "claude-3-7-sonnet-latest"
 };
 print(a);

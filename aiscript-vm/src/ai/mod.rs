@@ -77,14 +77,18 @@ impl AiConfig {
             match model {
                 m if m.starts_with("gpt") => {
                     if let Some(openai) = self.openai.as_ref() {
-                        Ok(openai.clone())
+                        let mut config = openai.clone();
+                        config.model = Some(m);
+                        Ok(config)
                     } else {
                         Ok(ModelConfig::default())
                     }
                 }
                 m if m.starts_with("claude") => {
-                    if let Some(anthropic) = self.openai.as_ref() {
-                        Ok(anthropic.clone())
+                    if let Some(anthropic) = self.anthropic.as_ref() {
+                        let mut config = anthropic.clone();
+                        config.model = Some(m);
+                        Ok(config)
                     } else {
                         Ok(ModelConfig {
                             api_key: env::var("CLAUDE_API_KEY")
@@ -96,7 +100,9 @@ impl AiConfig {
                 }
                 m if m.starts_with("deepseek") => {
                     if let Some(deepseek) = self.deepseek.as_ref() {
-                        Ok(deepseek.clone())
+                        let mut config = deepseek.clone();
+                        config.model = Some(m);
+                        Ok(config)
                     } else {
                         Ok(ModelConfig {
                             api_key: env::var("DEEPSEEK_API_KEY")
