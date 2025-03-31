@@ -277,8 +277,6 @@ pub async fn _run_agent<'gc>(
     mut agent: Gc<'gc, Agent<'gc>>,
     args: Vec<Value<'gc>>,
 ) -> Value<'gc> {
-    use super::default_model;
-
     let message = args[0];
     let debug = args[1].as_boolean();
     let mut history = Vec::new();
@@ -289,11 +287,13 @@ pub async fn _run_agent<'gc>(
         tool_calls: None,
         tool_call_id: None,
     });
-    let mut client = super::openai_client(state.ai_config.as_ref());
+    let model_config = state.ai_config.get_model_config(None).unwrap();
+    let mut client = super::openai_client(&model_config);
+    let model = model_config.model.unwrap();
     loop {
         let mut messages = vec![agent.get_instruction_message()];
         messages.extend(history.clone());
-        let mut req = ChatCompletionRequest::new(default_model(state.ai_config.as_ref()), messages);
+        let mut req = ChatCompletionRequest::new(model.clone(), messages);
         let tools = agent.get_tools();
         if !tools.is_empty() {
             req = req
