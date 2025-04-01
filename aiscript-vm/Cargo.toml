@@ -13,6 +13,7 @@ readme.workspace = true
 
 [dependencies]
 aiscript-lexer = { path = "../aiscript-lexer", version = "0.2.0" }
+aiscript-common = { path = "../aiscript-common", version = "0.2.0" }
 aiscript-directive = { path = "../aiscript-directive", version = "0.2.0" }
 aiscript-arena = { path = "../aiscript-arena", version = "0.1.0", features = [
     "allocator-api2",

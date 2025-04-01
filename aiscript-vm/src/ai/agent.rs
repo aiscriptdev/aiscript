@@ -293,7 +293,7 @@ pub async fn _run_agent<'gc>(
     loop {
         let mut messages = vec![agent.get_instruction_message()];
         messages.extend(history.clone());
-        let mut req = ChatCompletionRequest::new(model.clone(), messages);
+        let mut req = ChatCompletionRequest::new(model.0.clone(), messages);
         let tools = agent.get_tools();
         if !tools.is_empty() {
             req = req

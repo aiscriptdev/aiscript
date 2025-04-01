@@ -1,6 +1,7 @@
 mod agent;
 mod prompt;
 
+use aiscript_common::EnvString;
 use std::env;
 
 pub use agent::{Agent, run_agent};
@@ -32,19 +33,19 @@ impl Default for AiConfig {
     fn default() -> Self {
         Self {
             openai: env::var("OPENAI_API_KEY").ok().map(|key| ModelConfig {
-                api_key: key,
-                api_endpoint: Some(OPENAI_API_ENDPOINT.to_string()),
-                model: Some(OPENAI_DEFAULT_MODEL.to_string()),
+                api_key: key.into(),
+                api_endpoint: Some(OPENAI_API_ENDPOINT.into()),
+                model: Some(OPENAI_DEFAULT_MODEL.into()),
             }),
             anthropic: env::var("CLAUDE_API_KEY").ok().map(|key| ModelConfig {
-                api_key: key,
-                api_endpoint: Some(ANTHROPIC_API_ENDPOINT.to_string()),
-                model: Some(ANTHROPIC_DEFAULT_MODEL.to_string()),
+                api_key: key.into(),
+                api_endpoint: Some(ANTHROPIC_API_ENDPOINT.into()),
+                model: Some(ANTHROPIC_DEFAULT_MODEL.into()),
             }),
             deepseek: env::var("DEEPKSEEK_API_KEY").ok().map(|key| ModelConfig {
-                api_key: key,
-                api_endpoint: Some(DEEPSEEK_API_ENDPOINT.to_string()),
-                model: Some(DEEPSEEK_DEFAULT_MODEL.to_string()),
+                api_key: key.into(),
+                api_endpoint: Some(DEEPSEEK_API_ENDPOINT.into()),
+                model: Some(DEEPSEEK_DEFAULT_MODEL.into()),
             }),
         }
     }
@@ -52,9 +53,9 @@ impl Default for AiConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ModelConfig {
-    pub api_key: String,
-    pub api_endpoint: Option<String>,
-    pub model: Option<String>,
+    pub api_key: EnvString,
+    pub api_endpoint: Option<EnvString>,
+    pub model: Option<EnvString>,
 }
 
 impl Default for ModelConfig {
@@ -64,9 +65,10 @@ impl Default for ModelConfig {
             api_key: "".into(),
             #[cfg(not(feature = "ai_test"))]
             api_key: env::var("OPENAI_API_KEY")
-                .expect("Expect `OPENAI_API_KEY` environment variable."),
-            api_endpoint: Some(OPENAI_API_ENDPOINT.to_string()),
-            model: Some(OPENAI_DEFAULT_MODEL.to_string()),
+                .expect("Expect `OPENAI_API_KEY` environment variable.")
+                .into(),
+            api_endpoint: Some(OPENAI_API_ENDPOINT.into()),
+            model: Some(OPENAI_DEFAULT_MODEL.into()),
         }
     }
 }
@@ -81,7 +83,7 @@ impl AiConfig {
                 m if m.starts_with("gpt") => {
                     if let Some(openai) = self.openai.as_ref() {
                         let mut config = openai.clone();
-                        config.model = Some(m);
+                        config.model = Some(EnvString(m));
                         Ok(config)
                     } else {
                         Ok(ModelConfig::default())
@@ -90,28 +92,30 @@ impl AiConfig {
                 m if m.starts_with("claude") => {
                     if let Some(anthropic) = self.anthropic.as_ref() {
                         let mut config = anthropic.clone();
-                        config.model = Some(m);
+                        config.model = Some(EnvString(m));
                         Ok(config)
                     } else {
                         Ok(ModelConfig {
                             api_key: env::var("CLAUDE_API_KEY")
-                                .expect("Expect `CLAUDE_API_KEY` environment variable."),
-                            api_endpoint: Some(ANTHROPIC_API_ENDPOINT.to_string()),
-                            model: Some(ANTHROPIC_DEFAULT_MODEL.to_string()),
+                                .expect("Expect `CLAUDE_API_KEY` environment variable.")
+                                .into(),
+                            api_endpoint: Some(ANTHROPIC_API_ENDPOINT.into()),
+                            model: Some(ANTHROPIC_DEFAULT_MODEL.into()),
                         })
                     }
                 }
                 m if m.starts_with("deepseek") => {
                     if let Some(deepseek) = self.deepseek.as_ref() {
                         let mut config = deepseek.clone();
-                        config.model = Some(m);
+                        config.model = Some(EnvString(m));
                         Ok(config)
                     } else {
                         Ok(ModelConfig {
                             api_key: env::var("DEEPSEEK_API_KEY")
-                                .expect("Expect `DEEPSEEK_API_KEY` environment variable."),
-                            api_endpoint: Some(DEEPSEEK_API_ENDPOINT.to_string()),
-                            model: Some(DEEPSEEK_DEFAULT_MODEL.to_string()),
+                                .expect("Expect `DEEPSEEK_API_KEY` environment variable.")
+                                .into(),
+                            api_endpoint: Some(DEEPSEEK_API_ENDPOINT.into()),
+                            model: Some(DEEPSEEK_DEFAULT_MODEL.into()),
                         })
                     }
                 }
@@ -127,8 +131,8 @@ impl AiConfig {
 #[allow(unused)]
 pub(crate) fn openai_client(config: &ModelConfig) -> OpenAIClient {
     OpenAIClient::builder()
-        .with_api_key(&config.api_key)
-        .with_endpoint(config.api_endpoint.as_ref().unwrap())
+        .with_api_key(&*config.api_key)
+        .with_endpoint(config.api_endpoint.as_deref().unwrap())
         .build()
         .unwrap()
 }

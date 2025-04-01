@@ -69,6 +69,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aiscript-common"
+version = "0.2.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "aiscript-derived"
 version = "0.1.0"
 dependencies = [
@@ -96,6 +103,7 @@ version = "0.2.0"
 name = "aiscript-runtime"
 version = "0.2.0"
 dependencies = [
+ "aiscript-common",
  "aiscript-directive",
  "aiscript-lexer",
  "aiscript-vm",
@@ -127,6 +135,7 @@ version = "0.2.0"
 dependencies = [
  "ahash",
  "aiscript-arena",
+ "aiscript-common",
  "aiscript-directive",
  "aiscript-lexer",
  "chrono",

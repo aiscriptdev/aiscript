@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
+use aiscript_common::EnvString;
 use aiscript_directive::route::SsoProvider;
 use serde::Deserialize;
 
-use super::{Config, EnvString};
+use super::Config;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct SsoConfig {

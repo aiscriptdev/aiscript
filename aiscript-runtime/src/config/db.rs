@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::EnvString;
+use aiscript_common::EnvString;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct DatabaseConfig {

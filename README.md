@@ -127,7 +127,7 @@ Configuration by `project.toml`:
 # use OpenAI
 [ai.openai]
 api_key = "YOUR_API_KEY"
-model = "gpt-3.5-turbo"
+model = "gpt-4"
 
 # or use DeepSeek
 [ai.deepseek]

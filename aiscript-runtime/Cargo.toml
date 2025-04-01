@@ -13,6 +13,7 @@ readme.workspace = true
 
 [dependencies]
 aiscript-lexer = { path = "../aiscript-lexer", version = "0.2.0" }
+aiscript-common = { path = "../aiscript-common", version = "0.2.0" }
 aiscript-directive = { path = "../aiscript-directive", version = "0.2.0" }
 aiscript-vm = { path = "../aiscript-vm", version = "0.2.0" }
 hyper = "1.6"

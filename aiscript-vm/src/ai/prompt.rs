@@ -44,7 +44,7 @@ async fn _prompt_with_config(mut config: PromptConfig) -> String {
     });
 
     // Build the request
-    let mut req = ChatCompletionRequest::new(model, messages);
+    let mut req = ChatCompletionRequest::new(model.0, messages);
 
     if let Some(max_tokens) = config.max_tokens {
         req.max_tokens = Some(max_tokens);

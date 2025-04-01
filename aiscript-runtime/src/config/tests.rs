@@ -1,34 +1,5 @@
-use crate::{Config, config::EnvString};
+use crate::Config;
 use std::env;
-
-#[test]
-fn test_envstring_regular_value() {
-    let regular = EnvString::from("regular_value".to_string());
-    assert_eq!(regular.as_ref(), "regular_value");
-}
-
-#[test]
-fn test_envstring_env_var_exists() {
-    unsafe {
-        env::set_var("TEST_ENV_VAR", "value_from_env");
-        let env_string = EnvString::from("$TEST_ENV_VAR".to_string());
-        assert_eq!(env_string.as_ref(), "value_from_env");
-        env::remove_var("TEST_ENV_VAR");
-    };
-}
-
-#[test]
-fn test_envstring_env_var_not_exists() {
-    unsafe { env::remove_var("NONEXISTENT_VAR") };
-    let env_string = EnvString::from("$NONEXISTENT_VAR".to_string());
-    assert_eq!(env_string.as_ref(), "$NONEXISTENT_VAR");
-}
-
-#[test]
-fn test_envstring_dollar_in_middle() {
-    let regular = EnvString::from("some$value".to_string());
-    assert_eq!(regular.as_ref(), "some$value");
-}
 
 #[test]
 fn test_config_with_env_vars() {
