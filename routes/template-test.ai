@@ -1,0 +1,7 @@
+route /template {
+    get /hello {
+        name: str,
+        is_admin: bool = false,
+    }
+    return render("hello-page.jinja", query)
+}
