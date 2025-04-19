@@ -269,7 +269,11 @@ async fn run_server(
     // Add the fallback handler to the router
     router = router.fallback(handle_404);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = format!("{}:{}", config.network.host, port)
+        .parse::<SocketAddr>()
+        .unwrap();
+    println!("Server listening on http://{}", addr);
+
     let listener = TcpListener::bind(addr).await.unwrap();
 
     match reload_rx {

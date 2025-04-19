@@ -20,8 +20,11 @@ post /repo {
     return "create repo: " + name;
 }
 
-put /repo/<id:int> {
+put /repo/:id {
     """Update a repository API"""
+    path {
+        id: str
+    }
     body {
         """The repository name"""
         @string(min_len=3, max_len=30)

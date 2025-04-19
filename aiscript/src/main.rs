@@ -31,8 +31,8 @@ enum Commands {
         #[arg(value_name = "FILE")]
         file: Option<PathBuf>,
         /// The web server listening port.
-        #[arg(short, long, default_value_t = 8080)]
-        port: u16,
+        #[arg(short, long)]
+        port: Option<u16>,
         /// Reload the file on change
         #[arg(short, long, default_value_t = false)]
         reload: bool,
@@ -53,7 +53,7 @@ async fn main() {
     let cli = AIScriptCli::parse();
     match cli.command {
         Some(Commands::Serve { file, port, reload }) => {
-            println!("Server listening on port http://localhost:{}", port);
+            let port = port.unwrap_or(config.network.port);
             aiscript_runtime::run(file, port, reload).await;
         }
         Some(Commands::New { name }) => {
