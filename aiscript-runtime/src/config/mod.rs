@@ -27,6 +27,24 @@ pub struct Config {
     pub auth: AuthConfig,
     #[serde(default)]
     pub sso: SsoConfig,
+    #[serde(default)]
+    pub network: NetworkConfig,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NetworkConfig {
+    #[serde(default = "default_host")]
+    pub host: String,
+    #[serde(default = "default_port")]
+    pub port: u16,
+}
+
+fn default_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_port() -> u16 {
+    8080
 }
 
 #[derive(Debug, Deserialize, Default)]

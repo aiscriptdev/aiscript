@@ -5,9 +5,9 @@ route /poc {
         query {
             """hello content"""
             @string(min_len=3, max_len=30)
-            content: str
+            content: str,
             """hello age"""
-            age: int = 18
+            age: int = 18,
         }
 
         print(query);
@@ -25,24 +25,24 @@ route /poc {
         """Post and put hello API"""
         query {
             @string(min_len=3, max_len=30)
-            content: str
+            content: str,
             """age"""
-            age: int = 18
+            age: int = 18,
             @in(["ios", "android"])
-            platform: str = "ios" 
+            platform: str = "ios",
         }
 
         @json
         body {
             """test flag"""
-            test: bool = true
+            test: bool = true,
         }
 
         ai fn ask(question) {
-            return prompt content;
+            return prompt question;
         }
 
-        let answer = ask(content);
+        let answer = ask(query.content);
         return "AI answer: " + answer;
     }
 }

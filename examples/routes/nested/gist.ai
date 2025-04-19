@@ -3,12 +3,18 @@ get /gists {
     return "gist";
 }
 
-get /gists/<id:int> {
+get /gists/:id {
     """Get gist by id"""
-    return "gist: " + id;
+    path {
+        id: str,
+    }
+    return "gist: " + path.id;
 }
 
-delete /gists/<id:int> {
+delete /gists/:id {
     """Delete gist by id"""
-    return "delete gist: " + id;
+    path {
+        id: str,
+    }
+    return "delete gist: " + path.id;
 }
