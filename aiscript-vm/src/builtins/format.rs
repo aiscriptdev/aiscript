@@ -158,11 +158,11 @@ impl FormatSpec {
 
                 match self.align.unwrap_or('>') {
                     '<' => {
-                        formatted.extend(std::iter::repeat(fill_char).take(padding));
+                        formatted.extend(std::iter::repeat_n(fill_char, padding));
                     }
                     '>' => {
                         let mut new_string = String::new();
-                        new_string.extend(std::iter::repeat(fill_char).take(padding));
+                        new_string.extend(std::iter::repeat_n(fill_char, padding));
                         new_string.push_str(&formatted);
                         formatted = new_string;
                     }
@@ -170,9 +170,9 @@ impl FormatSpec {
                         let left_pad = padding / 2;
                         let right_pad = padding - left_pad;
                         let mut new_string = String::new();
-                        new_string.extend(std::iter::repeat(fill_char).take(left_pad));
+                        new_string.extend(std::iter::repeat_n(fill_char, left_pad));
                         new_string.push_str(&formatted);
-                        new_string.extend(std::iter::repeat(fill_char).take(right_pad));
+                        new_string.extend(std::iter::repeat_n(fill_char, right_pad));
                         formatted = new_string;
                     }
                     _ => unreachable!(),

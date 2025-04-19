@@ -166,7 +166,7 @@ impl<'gc> State<'gc> {
 
     pub fn import_module(&mut self, path: InternedString<'gc>) -> Result<(), VmError> {
         // Get the simple name (last component) from the path
-        let simple_name = path.to_str().unwrap().split('.').last().unwrap();
+        let simple_name = path.to_str().unwrap().split('.').next_back().unwrap();
         let simple_name = self.intern(simple_name.as_bytes());
 
         // Check if simple name is already used
