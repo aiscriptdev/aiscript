@@ -22,11 +22,16 @@ const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-chat";
 const ANTHROPIC_API_ENDPOINT: &str = "https://api.anthropic.com/v1";
 const ANTHROPIC_DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 
+// Ollama
+const OLLAMA_DEFAULT_API_ENDPOINT: &str = "http://localhost:11434/v1";
+const OLLAMA_DEFAULT_MODEL: &str = "llama3";
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiConfig {
     pub openai: Option<ModelConfig>,
     pub anthropic: Option<ModelConfig>,
     pub deepseek: Option<ModelConfig>,
+    pub ollama: Option<ModelConfig>,
 }
 
 impl Default for AiConfig {
@@ -47,6 +52,17 @@ impl Default for AiConfig {
                 api_endpoint: Some(DEEPSEEK_API_ENDPOINT.into()),
                 model: Some(DEEPSEEK_DEFAULT_MODEL.into()),
             }),
+            ollama: env::var("OLLAMA_API_ENDPOINT")
+                .ok()
+                .map(|endpoint| ModelConfig {
+                    api_key: EnvString(String::default()), // Ollama does not require an API key
+                    api_endpoint: endpoint
+                        .parse()
+                        .ok()
+                        .map(|url: String| url.into())
+                        .or(Some(OLLAMA_DEFAULT_API_ENDPOINT.into())),
+                    model: Some(OLLAMA_DEFAULT_MODEL.into()),
+                }),
         }
     }
 }
@@ -64,9 +80,7 @@ impl Default for ModelConfig {
             #[cfg(feature = "ai_test")]
             api_key: "".into(),
             #[cfg(not(feature = "ai_test"))]
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("Expect `OPENAI_API_KEY` environment variable.")
-                .into(),
+            api_key: EnvString(env::var("OPENAI_API_KEY").unwrap_or_default()),
             api_endpoint: Some(OPENAI_API_ENDPOINT.into()),
             model: Some(OPENAI_DEFAULT_MODEL.into()),
         }
@@ -78,6 +92,12 @@ impl AiConfig {
         &self,
         model_name: Option<String>,
     ) -> Result<ModelConfig, String> {
+        if let Some(ollama) = self.ollama.as_ref() {
+            let model = model_name.as_deref().unwrap_or(OLLAMA_DEFAULT_MODEL);
+            let mut config = ollama.clone();
+            config.model = Some(EnvString(model.to_string()));
+            return Ok(config);
+        }
         if let Some(model) = model_name {
             match model {
                 m if m.starts_with("gpt") => {
@@ -120,6 +140,14 @@ impl AiConfig {
                     }
                 }
                 m => Err(format!("Unsupported model '{m}'.")),
+            }
+        } else if let Some(ollama) = self.ollama.as_ref() {
+            if let Some(model) = model_name {
+                let mut config = ollama.clone();
+                config.model = Some(EnvString(model));
+                return Ok(config);
+            } else {
+                return Ok(ollama.clone());
             }
         } else {
             // Default is OpenAI model

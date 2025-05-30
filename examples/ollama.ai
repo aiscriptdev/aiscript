@@ -1,0 +1,5 @@
+let a = prompt {
+    input: "What is rust?",
+    model: "llama3.2"
+};
+print(a);
