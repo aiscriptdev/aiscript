@@ -117,9 +117,10 @@ Check out the [examples](./examples) directory for more sample code.
 
 AIScript supports the following AI models:
 
-- [x] OpenAI ((uses `OPENAI_API_KEY` environment variable by default))
+- [x] OpenAI (uses `OPENAI_API_KEY` environment variable by default or local models with Ollama)
 - [x] DeepSeek
 - [x] Anthropic
+- [x] Ollama (100+ local models from various providers)
 
 Configuration by `project.toml`:
 
@@ -138,7 +139,26 @@ model = "deepseek-chat"
 [ai.anthropic]
 api_key = "YOUR_API_KEY"
 model = "claude-3-5-sonnet-latest"
+
+# or use Ollama (local models)
+[ai.ollama]
+api_endpoint = "http://localhost:11434/v1"  # Default Ollama endpoint
+model = "llama3.2"  # or any other model installed in your Ollama instance
 ```
+
+### Using Ollama
+
+[Ollama](https://ollama.ai/) allows you to run local AI models on your own hardware. To use Ollama with AIScript:
+
+1. Install Ollama from [ollama.ai](https://ollama.ai/)
+2. Pull your desired models (e.g., `ollama pull llama3.2`)
+3. Make sure Ollama is running locally
+4. Configure AIScript to use Ollama as shown above or by setting the `OLLAMA_API_ENDPOINT` environment variable.
+
+Ollama provides access to 100+ models ranging from small 135M parameter models to massive 671B parameter models, including:
+- Llama family (llama4, llama3.2, codellama)
+- DeepSeek models (deepseek-r1, deepseek-v3)
+- And [many more specialized models](https://ollama.com/search)
 
 ## Roadmap
 

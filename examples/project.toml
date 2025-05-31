@@ -27,3 +27,7 @@ scopes = ["email"]
 [ai.anthropic]
 api_key = "$CLAUDE_API_KEY"
 model = "claude-3-5-sonnet-latest"
+
+[ai.ollama]
+api_endpoint = "http://localhost:11434/v1"
+model = "llama3.2"
