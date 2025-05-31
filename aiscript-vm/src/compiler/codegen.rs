@@ -70,7 +70,7 @@ pub struct CodeGen<'gc> {
 
 impl<'gc> CodeGen<'gc> {
     pub fn new(ctx: Context<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
-        let generator = Box::new(CodeGen {
+        Box::new(CodeGen {
             ctx,
             chunks: HashMap::new(),
             named_id_map: HashMap::new(),
@@ -107,9 +107,7 @@ impl<'gc> CodeGen<'gc> {
             enclosing: None,
             current_line: 0,
             error_reporter: ErrorReporter::new(),
-        });
-
-        generator
+        })
     }
 
     pub fn register_enum(&mut self, name: &'gc str, enum_: GcRefLock<'gc, Enum<'gc>>) {

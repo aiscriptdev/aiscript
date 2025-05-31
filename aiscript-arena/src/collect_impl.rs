@@ -21,6 +21,19 @@ macro_rules! static_collect {
         where
             $type: 'static,
         {
+            // Don't implement needs_trace for unsized types
+        }
+    };
+}
+
+/// For sized static types, we can implement needs_trace
+#[macro_export]
+macro_rules! static_collect_sized {
+    ($type:ty) => {
+        unsafe impl Collect for $type
+        where
+            $type: 'static,
+        {
             #[inline]
             fn needs_trace() -> bool {
                 false
@@ -29,33 +42,33 @@ macro_rules! static_collect {
     };
 }
 
-static_collect!(bool);
-static_collect!(char);
-static_collect!(u8);
-static_collect!(u16);
-static_collect!(u32);
-static_collect!(u64);
-static_collect!(usize);
-static_collect!(i8);
-static_collect!(i16);
-static_collect!(i32);
-static_collect!(i64);
-static_collect!(isize);
-static_collect!(f32);
-static_collect!(f64);
-static_collect!(String);
+static_collect_sized!(bool);
+static_collect_sized!(char);
+static_collect_sized!(u8);
+static_collect_sized!(u16);
+static_collect_sized!(u32);
+static_collect_sized!(u64);
+static_collect_sized!(usize);
+static_collect_sized!(i8);
+static_collect_sized!(i16);
+static_collect_sized!(i32);
+static_collect_sized!(i64);
+static_collect_sized!(isize);
+static_collect_sized!(f32);
+static_collect_sized!(f64);
+static_collect_sized!(String);
 static_collect!(str);
-static_collect!(alloc::ffi::CString);
+static_collect_sized!(alloc::ffi::CString);
 static_collect!(core::ffi::CStr);
-static_collect!(core::any::TypeId);
+static_collect_sized!(core::any::TypeId);
 #[cfg(feature = "std")]
 static_collect!(std::path::Path);
 #[cfg(feature = "std")]
-static_collect!(std::path::PathBuf);
+static_collect_sized!(std::path::PathBuf);
 #[cfg(feature = "std")]
 static_collect!(std::ffi::OsStr);
 #[cfg(feature = "std")]
-static_collect!(std::ffi::OsString);
+static_collect_sized!(std::ffi::OsString);
 
 /// SAFETY: We know that a `&'static` reference cannot possibly point to `'gc` data, so it is safe
 /// to keep in a rooted objet and we do not have to trace through it.
@@ -84,10 +97,7 @@ static_collect!(std::ffi::OsString);
 ///
 /// DO NOT REMOVE THIS EXTRA `T: 'static` BOUND
 unsafe impl<T: ?Sized + 'static> Collect for &'static T {
-    #[inline]
-    fn needs_trace() -> bool {
-        false
-    }
+    // Don't implement needs_trace since T might be unsized
 }
 
 unsafe impl<T: ?Sized + Collect> Collect for Box<T> {
@@ -98,10 +108,7 @@ unsafe impl<T: ?Sized + Collect> Collect for Box<T> {
 }
 
 unsafe impl<T: Collect> Collect for [T] {
-    #[inline]
-    fn needs_trace() -> bool {
-        T::needs_trace()
-    }
+    // Don't implement needs_trace since [T] is unsized
 
     #[inline]
     fn trace(&self, cc: &Collection) {
