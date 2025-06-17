@@ -23,6 +23,7 @@ mod endpoint;
 mod error;
 mod openapi;
 mod parser;
+mod template;
 mod utils;
 
 use aiscript_lexer as lexer;
@@ -303,4 +304,57 @@ async fn run_server(
             axum::serve(listener, router).await.unwrap();
         }
     }
+}
+
+// Generate OpenAPI JSON from routes
+fn generate_openapi_json(routes: &[ast::Route]) -> serde_json::Value {
+    let mut openapi = serde_json::json!({
+        "openapi": "3.0.0",
+        "info": {
+            "title": "AIScript API",
+            "version": "1.0.0",
+            "description": "API documentation for AIScript"
+        },
+        "paths": {},
+    });
+
+    //Add paths from routes
+    let paths = openapi["paths"].as_object_mut().unwrap();
+
+    for route in routes {
+        for endpoint in &route.endpoints {
+            for path_spec in &endpoint.path_specs {
+                let path = if route.prefix == "/" {
+                    path_spec.path.clone()
+                } else {
+                    format!("{}{}", route.prefix, path_spec.path)
+                };
+
+                let method = match path_spec.method {
+                    ast::HttpMethod::Get => "get",
+                    ast::HttpMethod::Post => "post",
+                    ast::HttpMethod::Put => "put",
+                    ast::HttpMethod::Delete => "delete",
+                };
+
+                //For each method, add the path and method to the paths object
+                if !paths.contains_key(&path) {
+                    paths.insert(path.clone(), serde_json::json!({}));
+                }
+
+                //Add the method to the path
+                let path_obj = paths.get_mut(&path).unwrap();
+                path_obj[method] = serde_json::json!({
+                    "summary": format!("{} {}", method.to_uppercase(), path),
+                    "responses": {
+                        "200": {
+                            "description": "Successful response"
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    openapi
 }

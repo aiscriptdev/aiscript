@@ -1,3 +1,4 @@
+use crate::template;
 use aiscript_directive::{Validator, route::RouteAnnotation};
 use aiscript_vm::{ReturnValue, Vm, VmError};
 use axum::{
@@ -606,4 +607,9 @@ pub(crate) fn convert_field(field: ast::Field) -> Field {
         default: field.default,
         validators: Arc::from(field.validators),
     }
+}
+
+pub fn render(template: &str, context: serde_json::Value) -> Result<String, String> {
+    let engine = template::get_template_engine();
+    engine.render(template, &context)
 }
